@@ -94,6 +94,10 @@ const config = {
       to: 'modules/pdf',
     },
     {
+      from: '../hwp/out',
+      to: 'modules/hwp',
+    },
+    {
       from: '../../node_modules/@genspark/cli',
       to: 'gsk/node_modules/@genspark/cli',
     },

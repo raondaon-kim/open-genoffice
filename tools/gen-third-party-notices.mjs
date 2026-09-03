@@ -29,6 +29,7 @@ const BUILTIN = new Set(builtinModules)
  */
 const SRC_GLOBS = [
   'apps/docs/src',
+  'apps/hwp/src',
   'apps/pdf/src',
   'apps/sheets/src',
   'apps/shell/src',

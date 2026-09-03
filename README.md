@@ -57,6 +57,7 @@ Mainfunc, Inc.; other names belong to their respective owners.
 | `apps/sheets` | **Open GenOffice Sheets** | `.xlsx` spreadsheet. UI built on the open-source [Univer](https://github.com/dream-num/univer) core (Apache-2.0) with a large layer of in-house extensions; xlsx import/export runs through an in-house Rust sidecar (calamine + IronCalc), charts are rendered in-house (Konva), plus pivot tables, slicers, conditional formatting, and formula tracing. |
 | `apps/slides` | **Open GenOffice Slides** | `.pptx` presentations. In-house pptx parse/render/edit engine with masters, charts, cropping, ink, and text shaping (HarfBuzz metrics).                                                                                                                                                                                                                    |
 | `apps/pdf`    | **Open GenOffice PDF**    | PDF viewer/editor on pdf.js + pdf-lib: annotations, forms, outlines, stamps, signatures, page operations, print.                                                                                                                                                                                                                                           |
+| `apps/hwp`    | **Open GenOffice HWP**    | Hangul word processor (`.hwp`/`.hwpx`) viewer/editor built on the MIT-licensed [rhwp](https://github.com/edwardkim/rhwp) engine (Rust + WASM, embedded as an iframe studio): text editing, formatting, tables, and save-back in the source format.                                                                                                         |
 | `apps/shell`  | **Open GenOffice**        | The suite shell: home screen and tabbed hosting of the four editors. Auto-update is optional and disabled unless a derivative update feed is configured at packaging time.                                                                                                                                                                                 |
 
 Every app embeds the same AI panel: block-granular AI editing with version
@@ -64,10 +65,11 @@ snapshots and diffs in docs, a tool-calling agent over workbook/slide/PDF
 state in the others.
 
 **AI providers.** Genspark remains available through its account sign-in. The
-derivative also supports device-local OpenRouter, Anthropic, and OpenAI keys,
-with a suite default and sticky per-document provider/model routes. Bring-your-
-own keys are encrypted in the Electron main process and are not exposed to
-renderers or stored in office documents.
+derivative also supports device-local OpenRouter, Anthropic, OpenAI, DeepSeek,
+GLM (Z.ai), Kimi (Moonshot), and MiniMax keys, with a suite default and sticky
+per-document provider/model routes. Bring-your-own keys are encrypted in the
+Electron main process and are not exposed to renderers or stored in office
+documents.
 
 ## Engine packages
 

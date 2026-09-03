@@ -9,6 +9,7 @@ import {
   requestDocsClose,
   setActiveDocsResolver,
 } from '../../../docs/src/main/docs-main'
+import { createHwpView, hwpIsDirty, requestHwpClose } from '../../../hwp/src/main/hwp-main'
 import { createPdfView, pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import {
   createSheetsView,
@@ -177,6 +178,17 @@ export class TabManager {
     return id
   }
 
+  openHwpTab(openPath: string): string {
+    const view = createHwpView(openPath)
+    const id = `t${this.nextId++}`
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.trackHtmlFullScreen(id, view)
+    this.tabs.push({ id, kind: 'hwp', view, title: basename(openPath), filePath: openPath })
+    this.activateTab(id)
+    return id
+  }
+
   activateTab(id: string): void {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
@@ -244,6 +256,13 @@ export class TabManager {
       .map((t) => ({ id: t.id, webContents: t.view!.webContents }))
   }
 
+  /** hwp tabs whose renderer reports unsaved editor changes (shell-close guard) */
+  dirtyHwpTabs(): Array<{ id: string; webContents: WebContents }> {
+    return this.tabs
+      .filter((t) => t.kind === 'hwp' && t.view && hwpIsDirty(t.view.webContents.id))
+      .map((t) => ({ id: t.id, webContents: t.view!.webContents }))
+  }
+
   /** slides tabs whose main-process session has unsaved edits (shell-close guard) */
   dirtySlidesTabs(): Array<{ id: string; webContents: WebContents }> {
     return this.tabs
@@ -273,9 +292,11 @@ export class TabManager {
         ? requestSheetsClose
         : tab.kind === 'pdf' && pdfIsDirty(tab.view.webContents.id)
           ? requestPdfClose
-          : tab.kind === 'slides' && slidesIsDirty(tab.view.webContents.id)
-            ? requestSlidesClose
-            : null)
+          : tab.kind === 'hwp' && hwpIsDirty(tab.view.webContents.id)
+            ? requestHwpClose
+            : tab.kind === 'slides' && slidesIsDirty(tab.view.webContents.id)
+              ? requestSlidesClose
+              : null)
     // docs dirty state lives in the renderer and needs an async query; skip the guard when clean (avoids a flash activation)
     if (!closeGuard && tab.kind === 'docs' && tab.view) {
       this.closingIds.add(id)
@@ -341,10 +362,22 @@ export class TabManager {
     return this.tabs.find((t) => t.kind === 'pdf' && t.filePath === path)?.id
   }
 
+  findHwpTabByPath(path: string): string | undefined {
+    return this.tabs.find((t) => t.kind === 'hwp' && t.filePath === path)?.id
+  }
+
   /** the active tab's pdf view, if the active tab is a pdf (pdf menu target) */
   activePdfTab(): { webContents: WebContents; filePath?: string } | undefined {
     const tab = this.tabs.find((t) => t.id === this.activeId)
     return tab?.kind === 'pdf' && tab.view
+      ? { webContents: tab.view.webContents, filePath: tab.filePath }
+      : undefined
+  }
+
+  /** the active tab's hwp view, if the active tab is a hwp doc (hwp menu target) */
+  activeHwpTab(): { webContents: WebContents; filePath?: string } | undefined {
+    const tab = this.tabs.find((t) => t.id === this.activeId)
+    return tab?.kind === 'hwp' && tab.view
       ? { webContents: tab.view.webContents, filePath: tab.filePath }
       : undefined
   }

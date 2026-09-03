@@ -7,6 +7,10 @@ with upstream commit `4da673d4dfa994bd0b4a9bc43430e4a058a17c61`.
 The fork's material changes include:
 
 - first-class OpenRouter, Anthropic, and OpenAI routes alongside Genspark;
+- direct bring-your-own-key routes for DeepSeek, GLM (Z.ai), Kimi (Moonshot),
+  and MiniMax through their OpenAI-compatible endpoints;
+- a Hangul document (`.hwp`/`.hwpx`) editor module built on the MIT-licensed
+  rhwp engine, embedded as a fifth shell tab;
 - encrypted device-local storage for user-supplied provider keys;
 - a global default model and sticky per-document provider/model selection;
 - model catalog discovery, compatibility filtering, and key verification;

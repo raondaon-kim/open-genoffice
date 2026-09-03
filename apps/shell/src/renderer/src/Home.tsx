@@ -4,6 +4,7 @@ import iconDocx from './assets/file-docx.svg'
 import iconXlsx from './assets/file-xlsx.svg'
 import iconPptx from './assets/file-pptx.svg'
 import iconPdf from './assets/file-pdf.svg'
+import iconHwp from './assets/file-hwp.svg'
 import type {
   AccountStatus,
   HomeApi,
@@ -42,6 +43,8 @@ const FILE_ICONS: Record<string, string> = {
   xlsx: iconXlsx,
   pptx: iconPptx,
   pdf: iconPdf,
+  hwp: iconHwp,
+  hwpx: iconHwp,
 }
 
 function FileBadge({ ext, size }: { ext: string; size: number }) {
@@ -112,6 +115,7 @@ const FILTERS: { key: string; label: StringKey }[] = [
   { key: 'xlsx', label: 'filterSheets' },
   { key: 'pptx', label: 'filterSlides' },
   { key: 'pdf', label: 'filterPdf' },
+  { key: 'hwp', label: 'filterHwp' },
 ]
 
 // ── Project sidebar component ────────────────────────────
@@ -1157,7 +1161,9 @@ export function Home() {
             <span className="quick-title-row">
               <span className="quick-title">{t('openLocal')}</span>
             </span>
-            <span className="quick-sub">.docx / .xlsx / .xls / .csv / .pptx / .pdf</span>
+            <span className="quick-sub">
+              .docx / .xlsx / .xls / .csv / .pptx / .pdf / .hwp / .hwpx
+            </span>
           </span>
         </button>
       </div>

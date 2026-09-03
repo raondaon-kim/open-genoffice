@@ -78,12 +78,38 @@ function SlideIcon() {
   )
 }
 
+function HwpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 240 240" fill="none" aria-hidden="true">
+      <rect width="240" height="240" rx="48" fill="#0F6B3E" />
+      <path
+        d="M74 66C74 61.5817 77.5817 58 82 58H158C162.418 58 166 61.5817 166 66V174C166 178.418 162.418 182 158 182H82C77.5817 182 74 178.418 74 174V66Z"
+        fill="#fff"
+        fillOpacity="0.92"
+      />
+      <path
+        d="M94 92C94 88.6863 96.6863 86 100 86H124C127.314 86 130 88.6863 130 92C130 95.3137 127.314 98 124 98H100C96.6863 98 94 95.3137 94 92Z"
+        fill="#0F6B3E"
+      />
+      <path
+        d="M94 124C94 120.686 96.6863 118 100 118H140C143.314 118 146 120.686 146 124C146 127.314 143.314 130 140 130H100C96.6863 130 94 127.314 94 124Z"
+        fill="#0F6B3E"
+      />
+      <path
+        d="M94 156C94 152.686 96.6863 150 100 150H140C143.314 150 146 152.686 146 156C146 159.314 143.314 162 140 162H100C96.6863 162 94 159.314 94 156Z"
+        fill="#0F6B3E"
+      />
+    </svg>
+  )
+}
+
 const KIND_ICON: Record<TabSummary['kind'], ReactElement> = {
   home: <HomeIcon />,
   docs: <DocIcon />,
   sheets: <SheetIcon />,
   slides: <SlideIcon />,
   pdf: <PdfIcon />,
+  hwp: <HwpIcon />,
 }
 
 export function TabBar() {
