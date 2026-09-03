@@ -8,6 +8,7 @@ export const HWP_CHANNELS = {
   consumePending: 'hwp:consume-pending',
   readFile: 'hwp:read-file',
   save: 'hwp:save',
+  saveAs: 'hwp:save-as',
   saveRequest: 'hwp:save-request',
   saveResult: 'hwp:save-result',
   dirtyChanged: 'hwp:dirty-changed',
@@ -43,6 +44,9 @@ export interface SaveHwpResult {
   ok: boolean
   error?: string
 }
+
+/** What this tab should do once its renderer mounts. */
+export type HwpOpenIntent = { mode: 'open'; path: string } | { mode: 'blank' }
 
 export interface AiConversationIdentity {
   projectId: string
@@ -83,10 +87,12 @@ export interface ProjectChatMessage {
 }
 
 export interface HwpApi {
-  /** path queued at tab creation; consumed once after mount */
-  consumePending(): Promise<string | null>
+  /** tab-start intent queued at view creation; consumed once after mount */
+  consumePending(): Promise<HwpOpenIntent | null>
   readFile(path: string): Promise<ArrayBuffer>
   save(request: SaveHwpRequest): Promise<SaveHwpResult>
+  /** ask main for a destination path for an untitled document (Save As); grants the returned path for this view */
+  saveAs(): Promise<SaveHwpResult & { path?: string; canceled?: boolean }>
   /** mirror the editor's dirty flag into the main process (drives close guards) */
   setDirty(dirty: boolean): void
   /** main → renderer: write pending edits to disk (menu Save / close guard) */

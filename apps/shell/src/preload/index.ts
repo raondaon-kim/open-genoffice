@@ -82,6 +82,9 @@ const homeApi: HomeApi = {
   async newSlide(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newSlide, opts)
   },
+  async newHwp(opts) {
+    await ipcRenderer.invoke(HOME_CHANNELS.newHwp, opts)
+  },
   async removeRecent(paths) {
     await ipcRenderer.invoke(HOME_CHANNELS.removeRecent, paths)
   },

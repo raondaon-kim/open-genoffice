@@ -9,7 +9,12 @@ import {
   requestDocsClose,
   setActiveDocsResolver,
 } from '../../../docs/src/main/docs-main'
-import { createHwpView, hwpIsDirty, requestHwpClose } from '../../../hwp/src/main/hwp-main'
+import {
+  createHwpView,
+  hwpIsDirty,
+  markHwpNewBlank,
+  requestHwpClose,
+} from '../../../hwp/src/main/hwp-main'
 import { createPdfView, pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import {
   createSheetsView,
@@ -178,15 +183,31 @@ export class TabManager {
     return id
   }
 
-  openHwpTab(openPath: string): string {
+  openHwpTab(openPath?: string, options?: { newBlank?: boolean }): string {
     const view = createHwpView(openPath)
     const id = `t${this.nextId++}`
+    if (options?.newBlank || !openPath) markHwpNewBlank(view.webContents.id)
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(id, view)
-    this.tabs.push({ id, kind: 'hwp', view, title: basename(openPath), filePath: openPath })
+    this.tabs.push({
+      id,
+      kind: 'hwp',
+      view,
+      title: openPath ? basename(openPath) : this.untitled('hwp', 'Open GenOffice HWP'),
+      filePath: openPath,
+    })
     this.activateTab(id)
     return id
+  }
+
+  /** after an untitled hwp tab is saved: retitle the tab and bind its file path */
+  setHwpTabSaved(webContentsId: number, path: string): void {
+    const tab = this.tabs.find((t) => t.kind === 'hwp' && t.view?.webContents.id === webContentsId)
+    if (!tab) return
+    tab.filePath = path
+    tab.title = basename(path)
+    this.onChanged()
   }
 
   activateTab(id: string): void {

@@ -82,6 +82,8 @@ export interface HomeApi {
   newSheet(opts?: { projectId?: string }): Promise<void>
   /** open a slides tab at its start screen (open-a-pptx) */
   newSlide(opts?: { projectId?: string }): Promise<void>
+  /** open a new blank Hangul (.hwp) document tab */
+  newHwp(opts?: { projectId?: string }): Promise<void>
   /** drop entries from the recent list (does not touch the files) */
   removeRecent(paths: string[]): Promise<void>
   /** reveal the file in Finder / Explorer */
@@ -183,6 +185,7 @@ export const HOME_CHANNELS = {
   newDoc: 'home:new-doc',
   newSheet: 'home:new-sheet',
   newSlide: 'home:new-slide',
+  newHwp: 'home:new-hwp',
   removeRecent: 'home:remove-recent',
   revealPath: 'home:reveal-path',
   renameFile: 'home:rename-file',

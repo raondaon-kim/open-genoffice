@@ -1125,10 +1125,15 @@ export function Home() {
     void window.aiOffice.newSlide(selectedProjectId ? { projectId: selectedProjectId } : undefined)
   }
 
+  const handleNewHwp = () => {
+    void window.aiOffice.newHwp(selectedProjectId ? { projectId: selectedProjectId } : undefined)
+  }
+
   const NEW_ITEMS = [
     { ext: 'docx', title: t('newDoc'), sub: '.docx', action: handleNewDoc },
     { ext: 'xlsx', title: t('newSheet'), sub: '.xlsx', action: handleNewSheet },
     { ext: 'pptx', title: t('newSlide'), sub: '.pptx', action: handleNewSlide },
+    { ext: 'hwp', title: t('newHwp'), sub: '.hwp', action: handleNewHwp },
   ]
 
   function renderQuickCards() {

@@ -159,6 +159,10 @@ configureHwpRuntime({
   preloadPath: join(HWP_OUT, 'preload', 'index.js'),
   rendererUrl: process.env.HWP_RENDERER_URL,
   rendererFile: join(HWP_OUT, 'renderer', 'index.html'),
+  onSaved: (webContentsId, path) => {
+    tabManager?.setHwpTabSaved(webContentsId, path)
+    recordRecentFile(path)
+  },
 })
 
 // ---- UI language ----
@@ -1272,6 +1276,13 @@ function registerHomeIpc(): void {
       pendingNewFileProject.set('slide', opts.projectId)
     }
     tabManager?.openSlidesTab()
+  })
+
+  ipcMain.handle(HOME_CHANNELS.newHwp, (_event, opts?: { projectId?: string }) => {
+    if (opts?.projectId && opts.projectId !== 'default') {
+      pendingNewFileProject.set('hwp', opts.projectId)
+    }
+    tabManager?.openHwpTab(undefined, { newBlank: true })
   })
 
   ipcMain.handle(HOME_CHANNELS.removeRecent, (_event, paths: unknown) => {

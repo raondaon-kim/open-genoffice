@@ -17,6 +17,7 @@ const api: HwpApi = {
   consumePending: () => ipcRenderer.invoke(HWP_CHANNELS.consumePending),
   readFile: (path) => ipcRenderer.invoke(HWP_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(HWP_CHANNELS.save, request),
+  saveAs: () => ipcRenderer.invoke(HWP_CHANNELS.saveAs),
   setDirty: (dirty) => ipcRenderer.send(HWP_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = () => handler()

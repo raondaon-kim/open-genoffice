@@ -14,6 +14,8 @@ const tDlg = createI18n({
   zh: {
     closeUnsavedMsg: '此文档有未保存的更改。',
     closeUnsavedDetail: '关闭前是否保存？',
+    saveAsTitle: '另存为',
+    filterHwp: 'HWP 文档',
     btnSave: '保存',
     btnDontSave: '不保存',
     btnCancel: '取消',
@@ -21,6 +23,8 @@ const tDlg = createI18n({
   en: {
     closeUnsavedMsg: 'This document has unsaved changes.',
     closeUnsavedDetail: 'Do you want to save them before closing?',
+    saveAsTitle: 'Save As',
+    filterHwp: 'Hangul Documents',
     btnSave: 'Save',
     btnDontSave: "Don't Save",
     btnCancel: 'Cancel',
@@ -28,6 +32,8 @@ const tDlg = createI18n({
   ja: {
     closeUnsavedMsg: 'このドキュメントに未保存の変更があります。',
     closeUnsavedDetail: '閉じる前に保存しますか？',
+    saveAsTitle: '名前を付けて保存',
+    filterHwp: '한글 ドキュメント',
     btnSave: '保存',
     btnDontSave: '保存しない',
     btnCancel: 'キャンセル',
@@ -35,6 +41,8 @@ const tDlg = createI18n({
   ko: {
     closeUnsavedMsg: '이 문서에 저장하지 않은 변경 사항이 있습니다.',
     closeUnsavedDetail: '닫기 전에 저장하시겠습니까?',
+    saveAsTitle: '다른 이름으로 저장',
+    filterHwp: '한글 문서',
     btnSave: '저장',
     btnDontSave: '저장 안 함',
     btnCancel: '취소',
@@ -42,6 +50,8 @@ const tDlg = createI18n({
   fr: {
     closeUnsavedMsg: 'Ce document contient des modifications non enregistrées.',
     closeUnsavedDetail: 'Voulez-vous les enregistrer avant de fermer ?',
+    saveAsTitle: 'Enregistrer sous',
+    filterHwp: 'Documents Hangul',
     btnSave: 'Enregistrer',
     btnDontSave: 'Ne pas enregistrer',
     btnCancel: 'Annuler',
@@ -49,6 +59,8 @@ const tDlg = createI18n({
   de: {
     closeUnsavedMsg: 'Dieses Dokument enthält ungespeicherte Änderungen.',
     closeUnsavedDetail: 'Vor dem Schließen speichern?',
+    saveAsTitle: 'Speichern unter',
+    filterHwp: 'Hangul-Dokumente',
     btnSave: 'Speichern',
     btnDontSave: 'Nicht speichern',
     btnCancel: 'Abbrechen',
@@ -56,6 +68,8 @@ const tDlg = createI18n({
   es: {
     closeUnsavedMsg: 'Este documento tiene cambios sin guardar.',
     closeUnsavedDetail: '¿Quieres guardarlos antes de cerrar?',
+    saveAsTitle: 'Guardar como',
+    filterHwp: 'Documentos Hangul',
     btnSave: 'Guardar',
     btnDontSave: 'No guardar',
     btnCancel: 'Cancelar',
@@ -63,6 +77,8 @@ const tDlg = createI18n({
   th: {
     closeUnsavedMsg: 'เอกสารนี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก',
     closeUnsavedDetail: 'ต้องการบันทึกก่อนปิดหรือไม่?',
+    saveAsTitle: 'บันทึกเป็น',
+    filterHwp: 'เอกสาร Hangul',
     btnSave: 'บันทึก',
     btnDontSave: 'ไม่บันทึก',
     btnCancel: 'ยกเลิก',
@@ -70,6 +86,8 @@ const tDlg = createI18n({
   id: {
     closeUnsavedMsg: 'Dokumen ini memiliki perubahan yang belum disimpan.',
     closeUnsavedDetail: 'Simpan sebelum menutup?',
+    saveAsTitle: 'Simpan sebagai',
+    filterHwp: 'Dokumen Hangul',
     btnSave: 'Simpan',
     btnDontSave: 'Jangan Simpan',
     btnCancel: 'Batal',
@@ -77,6 +95,8 @@ const tDlg = createI18n({
   ru: {
     closeUnsavedMsg: 'В этом документе есть несохранённые изменения.',
     closeUnsavedDetail: 'Сохранить их перед закрытием?',
+    saveAsTitle: 'Сохранить как',
+    filterHwp: 'Документы Hangul',
     btnSave: 'Сохранить',
     btnDontSave: 'Не сохранять',
     btnCancel: 'Отмена',
@@ -84,6 +104,8 @@ const tDlg = createI18n({
   ar: {
     closeUnsavedMsg: 'يحتوي هذا المستند على تغييرات غير محفوظة.',
     closeUnsavedDetail: 'هل تريد حفظها قبل الإغلاق؟',
+    saveAsTitle: 'حفظ باسم',
+    filterHwp: 'مستندات Hangul',
     btnSave: 'حفظ',
     btnDontSave: 'عدم الحفظ',
     btnCancel: 'إلغاء',
@@ -91,6 +113,8 @@ const tDlg = createI18n({
   pt: {
     closeUnsavedMsg: 'Este documento tem alterações não salvas.',
     closeUnsavedDetail: 'Deseja salvá-las antes de fechar?',
+    saveAsTitle: 'Salvar como',
+    filterHwp: 'Documentos Hangul',
     btnSave: 'Salvar',
     btnDontSave: 'Não Salvar',
     btnCancel: 'Cancelar',
@@ -98,6 +122,8 @@ const tDlg = createI18n({
   it: {
     closeUnsavedMsg: 'Questo documento contiene modifiche non salvate.',
     closeUnsavedDetail: 'Vuoi salvarle prima di chiudere?',
+    saveAsTitle: 'Salva con nome',
+    filterHwp: 'Documenti Hangul',
     btnSave: 'Salva',
     btnDontSave: 'Non salvare',
     btnCancel: 'Annulla',
@@ -105,6 +131,8 @@ const tDlg = createI18n({
   pl: {
     closeUnsavedMsg: 'Ten dokument ma niezapisane zmiany.',
     closeUnsavedDetail: 'Czy zapisać je przed zamknięciem?',
+    saveAsTitle: 'Zapisz jako',
+    filterHwp: 'Dokumenty Hangul',
     btnSave: 'Zapisz',
     btnDontSave: 'Nie zapisuj',
     btnCancel: 'Anuluj',
@@ -112,6 +140,8 @@ const tDlg = createI18n({
   nl: {
     closeUnsavedMsg: 'Dit document bevat niet-opgeslagen wijzigingen.',
     closeUnsavedDetail: 'Wilt u ze opslaan voordat u sluit?',
+    saveAsTitle: 'Opslaan als',
+    filterHwp: 'Hangul-documenten',
     btnSave: 'Opslaan',
     btnDontSave: 'Niet opslaan',
     btnCancel: 'Annuleren',
@@ -119,6 +149,8 @@ const tDlg = createI18n({
   ms: {
     closeUnsavedMsg: 'Dokumen ini mempunyai perubahan yang belum disimpan.',
     closeUnsavedDetail: 'Simpan sebelum menutup?',
+    saveAsTitle: 'Simpan sebagai',
+    filterHwp: 'Dokumen Hangul',
     btnSave: 'Simpan',
     btnDontSave: 'Jangan Simpan',
     btnCancel: 'Batal',
@@ -126,6 +158,8 @@ const tDlg = createI18n({
   he: {
     closeUnsavedMsg: 'במסמך זה יש שינויים שלא נשמרו.',
     closeUnsavedDetail: 'האם לשמור אותם לפני הסגירה?',
+    saveAsTitle: 'שמירה בשם',
+    filterHwp: 'מסמכי Hangul',
     btnSave: 'שמירה',
     btnDontSave: 'אל תשמור',
     btnCancel: 'ביטול',
@@ -133,6 +167,8 @@ const tDlg = createI18n({
   hi: {
     closeUnsavedMsg: 'इस दस्तावेज़ में सहेजे नहीं गए परिवर्तन हैं।',
     closeUnsavedDetail: 'क्या बंद करने से पहले उन्हें सहेजना चाहते हैं?',
+    saveAsTitle: 'इस रूप में सहेजें',
+    filterHwp: 'Hangul दस्तावेज़',
     btnSave: 'सहेजें',
     btnDontSave: 'न सहेजें',
     btnCancel: 'रद्द करें',
@@ -140,6 +176,8 @@ const tDlg = createI18n({
   'zh-TW': {
     closeUnsavedMsg: '此文件有未儲存的變更。',
     closeUnsavedDetail: '關閉前是否儲存？',
+    saveAsTitle: '另存新檔',
+    filterHwp: 'HWP 文件',
     btnSave: '儲存',
     btnDontSave: '不儲存',
     btnCancel: '取消',
@@ -152,12 +190,16 @@ type DlgKey =
   | 'btnSave'
   | 'btnDontSave'
   | 'btnCancel'
+  | 'saveAsTitle'
+  | 'filterHwp'
 const tm = (key: DlgKey) => tDlg(getUiLang(), key)
 
 interface RuntimePaths {
   preloadPath: string
   rendererUrl?: string
   rendererFile?: string
+  /** called after a successful save so the shell can retitle the tab and record the file */
+  onSaved?: (webContentsId: number, path: string) => void
 }
 
 let runtime: RuntimePaths = { preloadPath: '' }
@@ -168,11 +210,18 @@ export function configureHwpRuntime(paths: RuntimePaths): void {
 
 /** Open paths queued at tab creation; the renderer consumes them after mount (avoids did-finish-load races) */
 const pendingByWc = new Map<number, string>()
+/** Views created for a new (untitled) document — no path is granted until Save As */
+const blankByWc = new Set<number>()
 /** File paths granted to each view — readFile/save only allow these */
 const allowedByWc = new Map<number, Set<string>>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
 const dirtyByWc = new Set<number>()
 const saveWaiters = new Map<number, (ok: boolean) => void>()
+
+/** Mark the view as a fresh blank document instead of a file-backed one. */
+export function markHwpNewBlank(webContentsId: number): void {
+  blankByWc.add(webContentsId)
+}
 
 export function hwpIsDirty(webContentsId: number): boolean {
   return dirtyByWc.has(webContentsId)
@@ -235,9 +284,11 @@ function registerHwpIpc(): void {
   ipcRegistered = true
 
   ipcMain.handle(HWP_CHANNELS.consumePending, (e) => {
+    const blank = blankByWc.delete(e.sender.id)
+    if (blank) return { mode: 'blank' }
     const path = pendingByWc.get(e.sender.id) ?? null
     pendingByWc.delete(e.sender.id)
-    return path
+    return path ? { mode: 'open', path } : null
   })
 
   ipcMain.handle(HWP_CHANNELS.readFile, async (e, path: unknown) => {
@@ -260,11 +311,39 @@ function registerHwpIpc(): void {
       const tmp = `${path}.gensave-${process.pid}.tmp`
       await writeFile(tmp, bytes)
       await rename(tmp, path)
+      // first save of an untitled doc / title + recent-file updates
+      runtime.onSaved?.(e.sender.id, path)
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
+
+  // Save As for untitled tabs: pick a destination (and grant it) without writing yet —
+  // the renderer exports and calls HWP_CHANNELS.save with the granted path.
+  ipcMain.handle(
+    HWP_CHANNELS.saveAs,
+    async (e): Promise<SaveHwpResult & { path?: string; canceled?: boolean }> => {
+      const parent = BrowserWindow.fromWebContents(e.sender)
+      const options = {
+        title: tm('saveAsTitle'),
+        defaultPath: 'untitled.hwp',
+        filters: [{ name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] }],
+      }
+      const result =
+        parent && !parent.isDestroyed()
+          ? await dialog.showSaveDialog(parent, options)
+          : await dialog.showSaveDialog(options)
+      if (result.canceled || !result.filePath) return { ok: false, canceled: true }
+      const path = result.filePath
+      if (!/\.(hwp|hwpx)$/i.test(path))
+        return { ok: false, error: 'hwp: destination must end in .hwp or .hwpx' }
+      const allowed = allowedByWc.get(e.sender.id) ?? new Set<string>()
+      allowed.add(path)
+      allowedByWc.set(e.sender.id, allowed)
+      return { ok: true, path }
+    },
+  )
 
   ipcMain.on(HWP_CHANNELS.dirtyChanged, (e, dirty: unknown) => {
     if (dirty === true) dirtyByWc.add(e.sender.id)
@@ -296,6 +375,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   })
   wc.once('destroyed', () => {
     pendingByWc.delete(wcId)
+    blankByWc.delete(wcId)
     allowedByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)
@@ -345,7 +425,8 @@ function ensureLoopbackRendererOrigin(): Promise<string> {
         res.writeHead(403).end()
         return
       }
-      const target = existsSync(filePath) && !filePath.endsWith(sep) ? filePath : join(root, 'index.html')
+      const target =
+        existsSync(filePath) && !filePath.endsWith(sep) ? filePath : join(root, 'index.html')
       void readFile(target)
         .then((bytes) => {
           const ext = target.slice(target.lastIndexOf('.')).toLowerCase()
@@ -419,9 +500,7 @@ export function startHwpStandalone(): void {
         sandbox: true,
       },
     })
-    const argPath = process.argv
-      .slice(1)
-      .find((a) => /\.(hwp|hwpx)$/i.test(a) && existsSync(a))
+    const argPath = process.argv.slice(1).find((a) => /\.(hwp|hwpx)$/i.test(a) && existsSync(a))
     grantAndTrack(win.webContents, argPath)
     void rendererLoadUrl()
       .then((url) => {
