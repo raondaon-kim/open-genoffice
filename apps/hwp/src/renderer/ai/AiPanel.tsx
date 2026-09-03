@@ -6,18 +6,32 @@ import { openRouterRetrySuggestion } from '@genoffice/ai-provider'
 import type { AiModelSummary, AiRoute } from '@genoffice/ai-provider'
 import { AiComposer, Markdown, ModelPicker } from '@genoffice/ui'
 import type { ModelPickerModel } from '@genoffice/ui'
-import type {
-  AiConversationIdentity,
-  ProjectChatMessage,
-  PublicAiProvider,
-} from '../../shared/ipc'
+import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } from '../../shared/ipc'
 import { createHwpSkill } from './hwp-skill'
 import { createElectronTransport } from './transport'
 import type { HwpAiDeps } from './tools'
+import { HWP_TEMPLATES } from '../templates'
+import type { HwpTemplate } from '../templates'
 
 const PANEL_WIDTH_KEY = 'hwp-ai-panel-width'
 const PANEL_WIDTH_DEFAULT = 420
 const PANEL_WIDTH_MIN = 280
+
+/** clickable starter prompts for the empty state (fill the input, do not send) */
+const STARTER_PROMPTS: Record<'en' | 'ko', string[]> = {
+  en: [
+    'Create a course syllabus template',
+    'Write a weekly project report',
+    'Summarize this document',
+    'List the form fields (누름틀)',
+  ],
+  ko: [
+    '강의 실라버스 양식 만들어줘',
+    '프로젝트 주간 보고서 작성해줘',
+    '이 문서를 요약해줘',
+    '누름틀 필드 목록을 확인해줘',
+  ],
+}
 
 function clampPanelWidth(w: number): number {
   return Math.min(Math.max(w, PANEL_WIDTH_MIN), Math.min(720, Math.round(window.innerWidth * 0.6)))
@@ -37,7 +51,10 @@ function isHwpCompatibleModel(model: AiModelSummary): boolean {
   )
 }
 
-function toPickerModel(model: AiModelSummary, providers: readonly PublicAiProvider[]): ModelPickerModel {
+function toPickerModel(
+  model: AiModelSummary,
+  providers: readonly PublicAiProvider[],
+): ModelPickerModel {
   const providerLabel = providers.find((provider) => provider.id === model.providerId)?.label
   return {
     providerId: model.providerId,
@@ -58,7 +75,10 @@ function toPickerModel(model: AiModelSummary, providers: readonly PublicAiProvid
 
 function routeEquals(left: AiRoute | null | undefined, right: AiRoute | null | undefined): boolean {
   return (
-    left != null && right != null && left.providerId === right.providerId && left.modelId === right.modelId
+    left != null &&
+    right != null &&
+    left.providerId === right.providerId &&
+    left.modelId === right.modelId
   )
 }
 
@@ -101,8 +121,11 @@ export function HwpAiPanel({
   const [routeReady, setRouteReady] = useState(false)
   const [routeValidated, setRouteValidated] = useState(false)
   const [modelNotice, setModelNotice] = useState<string | null>(null)
+  const [lang, setLang] = useState<'en' | 'ko'>('en')
+  const [templateBusy, setTemplateBusy] = useState<string | null>(null)
   const chatRef = useRef<HTMLDivElement>(null)
   const asideRef = useRef<HTMLElement>(null)
+  const composerRef = useRef<HTMLTextAreaElement | null>(null)
   const stickToBottomRef = useRef(true)
   const conversationRef = useRef<AiConversationIdentity | null>(null)
   const routeRef = useRef<AiRoute | null>(null)
@@ -156,7 +179,9 @@ export function HwpAiPanel({
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit }) => {
-          const final = turnLimit ? [text, 'Turn limit reached.'].filter(Boolean).join('\n\n') : text || (cancelled ? 'Stopped.' : '')
+          const final = turnLimit
+            ? [text, 'Turn limit reached.'].filter(Boolean).join('\n\n')
+            : text || (cancelled ? 'Stopped.' : '')
           patchLast((last) => ({
             streaming: false,
             text: final || (last.tools?.length ? last.text : 'No reply.'),
@@ -178,7 +203,9 @@ export function HwpAiPanel({
             streaming: false,
             text: error,
             isError: true,
-            retrySuggestion: failedRoute ? openRouterRetrySuggestion(failedRoute, failedModel) : undefined,
+            retrySuggestion: failedRoute
+              ? openRouterRetrySuggestion(failedRoute, failedModel)
+              : undefined,
           })
           setBusy(false)
         },
@@ -186,7 +213,9 @@ export function HwpAiPanel({
     })
   }
 
-  const patchLast = (patch: Partial<ChatEntry> | ((last: ChatEntry) => Partial<ChatEntry>)): void => {
+  const patchLast = (
+    patch: Partial<ChatEntry> | ((last: ChatEntry) => Partial<ChatEntry>),
+  ): void => {
     setChat((prev) => {
       const next = [...prev]
       const last = next.at(-1)
@@ -230,35 +259,58 @@ export function HwpAiPanel({
     loopRef.current?.reset()
     void (async () => {
       try {
-        if (!filePath) {
-          setRouteReady(true)
-          setRouteValidated(false)
-          return
-        }
-        const identity = await window.hwpApi.resolveProjectChat({ filePath })
+        const identity = await window.hwpApi.resolveProjectChat(
+          filePath
+            ? { filePath }
+            : {
+                filePath: null,
+                tempChatId: `unsaved-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              },
+        )
         if (cancelled) return
-        const [settings, catalog, route] = await Promise.all([
+        const [settings, catalog, storedRoute] = await Promise.all([
           window.hwpApi.getAiPublicSettings(),
           window.hwpApi.listAiModels(),
           window.hwpApi.getAiConversationRoute(identity),
         ])
         if (cancelled) return
         conversationRef.current = identity
-        routeRef.current = route
-        setSelectedRoute(route)
-        setRouteValidated(true)
         setProviders(settings.providers)
         const compatible = catalog.models.filter(isHwpCompatibleModel)
         setModels(compatible)
+        // auto-select: keep the stored/default route when it is usable, otherwise
+        // fall back to the first compatible model so the panel never blocks on
+        // an unavailable selection
+        let route = storedRoute
         if (
           !compatible.some((model) =>
             routeEquals(route, { providerId: model.providerId, modelId: model.id }),
           )
         ) {
-          setModelNotice(
-            `The selected model (${route.modelId}) is unavailable. Choose a compatible replacement before sending.`,
-          )
+          const fallback = compatible[0]
+          if (fallback) {
+            route = { providerId: fallback.providerId, modelId: fallback.id }
+            try {
+              route = await window.hwpApi.setAiConversationRoute(identity, route)
+            } catch {
+              // keep the local fallback for this session even if persistence fails
+            }
+            if (cancelled) return
+          }
         }
+        routeRef.current = route
+        setSelectedRoute(route)
+        const routeUsable = compatible.some((model) =>
+          routeEquals(route, { providerId: model.providerId, modelId: model.id }),
+        )
+        setRouteValidated(routeUsable)
+        setModelNotice(
+          compatible.length === 0
+            ? 'No AI model is available — add a provider key in Settings to use the assistant here.'
+            : routeUsable
+              ? null
+              : `The selected model (${route.modelId}) is unavailable. Choose a compatible one from the picker.`,
+        )
         const messages: ProjectChatMessage[] = await window.hwpApi.loadProjectChat({
           projectId: identity.projectId,
           chatId: identity.chatId,
@@ -267,7 +319,9 @@ export function HwpAiPanel({
         console.info(
           `[hwp-ai] route ready: ${route.providerId}/${route.modelId}, ${compatible.length} compatible model(s), ${messages.length > 0 ? 'transcript restored' : 'new conversation'}`,
         )
-        loopRef.current?.restore(messages.map((message) => ({ role: message.role, text: message.text })))
+        loopRef.current?.restore(
+          messages.map((message) => ({ role: message.role, text: message.text })),
+        )
         setChat(
           messages.map((message) => ({
             role: message.role,
@@ -287,6 +341,20 @@ export function HwpAiPanel({
       cancelled = true
     }
   }, [filePath])
+
+  // UI language: Korean gets Korean starter prompts (document/work language)
+  useEffect(() => {
+    let cancelled = false
+    void window.hwpApi
+      .getLanguage()
+      .then((l) => {
+        if (!cancelled) setLang(l === 'ko' ? 'ko' : 'en')
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     if (stickToBottomRef.current) chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight })
@@ -364,6 +432,33 @@ export function HwpAiPanel({
     }
   }
 
+  const createTemplate = async (template: HwpTemplate): Promise<void> => {
+    if (templateBusy) return
+    const api = window.hwpApi
+    if (!api?.createDocument) {
+      setModelNotice('양식 생성 기능을 사용할 수 없습니다.')
+      return
+    }
+    setTemplateBusy(template.id)
+    setModelNotice(null)
+    try {
+      const result = await api.createDocument(template.source, template.fileName)
+      if (result.ok && result.path) {
+        setModelNotice(
+          lang === 'ko'
+            ? `「${template.name}」 문서를 새 탭에 만들었습니다. {학교명} 같은 자리표시자를 채우고 ⌘S로 저장하세요.`
+            : `Created "${template.name}" in a new tab. Replace placeholders like {school name} and press ⌘S to save.`,
+        )
+      } else {
+        setModelNotice(`양식 생성 실패: ${result.error ?? 'unknown error'}`)
+      }
+    } catch (err) {
+      setModelNotice(`양식 생성 실패: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setTemplateBusy(null)
+    }
+  }
+
   const selectModel = (picked: ModelPickerModel): void => {
     const identity = conversationRef.current
     const incoming = models.find(
@@ -395,21 +490,25 @@ export function HwpAiPanel({
           )
           .catch(() => undefined)
       })
-      .catch((err: unknown) =>
-        setModelNotice(err instanceof Error ? err.message : String(err)),
-      )
+      .catch((err: unknown) => setModelNotice(err instanceof Error ? err.message : String(err)))
   }
 
   const pickerModels = models.map((model) => toPickerModel(model, providers))
   const pickerSelection = selectedRoute
-    ? pickerModels.find(
-        (model) => model.providerId === selectedRoute.providerId && model.modelId === selectedRoute.modelId,
-      ) ?? null
+    ? (pickerModels.find(
+        (model) =>
+          model.providerId === selectedRoute.providerId && model.modelId === selectedRoute.modelId,
+      ) ?? null)
     : null
 
   return (
     <aside ref={asideRef} className="hwp-ai" style={{ width: panelWidth }}>
-      <div className="hwp-ai__resize" onPointerDown={onResizeStart} role="separator" aria-orientation="vertical" />
+      <div
+        className="hwp-ai__resize"
+        onPointerDown={onResizeStart}
+        role="separator"
+        aria-orientation="vertical"
+      />
       <header className="hwp-ai__head">
         <ModelPicker
           models={pickerModels}
@@ -423,33 +522,95 @@ export function HwpAiPanel({
           searchPlaceholder="Search models"
           emptyLabel="No compatible models"
         />
-        <button type="button" className="hwp-ai__collapse" aria-label="Collapse AI panel" onClick={onCollapse}>
+        <button
+          type="button"
+          className="hwp-ai__collapse"
+          aria-label="Collapse AI panel"
+          onClick={onCollapse}
+        >
           <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+            <path
+              d="M6 3l5 5-5 5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
+            />
           </svg>
         </button>
       </header>
 
       {modelNotice && (
-        <p className="hwp-ai__notice" role="status">{modelNotice}</p>
+        <p className="hwp-ai__notice" role="status">
+          {modelNotice}
+        </p>
       )}
 
       <div ref={chatRef} className="hwp-ai__chat" onScroll={onChatScroll}>
         {!routeReady && <div className="hwp-ai__empty">Loading AI…</div>}
         {routeReady && chat.length === 0 && (
           <div className="hwp-ai__empty">
-            Ask about this document — summarize it, fill its form fields, or update table cells.
+            <p>
+              {lang === 'ko'
+                ? '문서에 대해 물어보세요 — 요약, 누름틀 작성, 표 정리, 서식 변경을 도와드립니다.'
+                : 'Ask about this document — summarize it, fill its form fields, or format it.'}
+            </p>
+            {models.length > 0 && (
+              <div className="hwp-ai__starter-list">
+                {STARTER_PROMPTS[lang].map((starter) => (
+                  <button
+                    key={starter}
+                    type="button"
+                    className="hwp-ai__starter"
+                    onClick={() => {
+                      setPrompt(starter)
+                      composerRef.current?.focus()
+                    }}
+                  >
+                    {starter}
+                  </button>
+                ))}
+              </div>
+            )}
+            {models.length > 0 && HWP_TEMPLATES.length > 0 && (
+              <div className="hwp-ai__templates">
+                <div className="hwp-ai__templates-title">
+                  {lang === 'ko' ? '문서 양식으로 바로 만들기' : 'Start from a school form'}
+                </div>
+                {HWP_TEMPLATES.map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    className="hwp-ai__template"
+                    disabled={templateBusy !== null}
+                    onClick={() => void createTemplate(template)}
+                  >
+                    {template.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {chat.map((entry, index) => (
           <div key={index} className={`hwp-ai__msg hwp-ai__msg--${entry.role}`}>
-            {entry.role === 'assistant' && entry.streaming && !entry.text && entry.tools?.length === 0 && (
-              <div className="hwp-ai__phase">
-                {phase === 'working' ? 'Working…' : phase === 'replying' ? 'Writing…' : 'Thinking…'}
-              </div>
-            )}
+            {entry.role === 'assistant' &&
+              entry.streaming &&
+              !entry.text &&
+              entry.tools?.length === 0 && (
+                <div className="hwp-ai__phase">
+                  {phase === 'working'
+                    ? 'Working…'
+                    : phase === 'replying'
+                      ? 'Writing…'
+                      : 'Thinking…'}
+                </div>
+              )}
             {entry.tools?.map((tool, toolIndex) => (
-              <details key={toolIndex} className={`hwp-ai__tool${tool.isError ? ' hwp-ai__tool--error' : ''}`}>
+              <details
+                key={toolIndex}
+                className={`hwp-ai__tool${tool.isError ? ' hwp-ai__tool--error' : ''}`}
+              >
                 <summary>
                   <span className="hwp-ai__tool-name">{tool.name}</span>
                   <span className="hwp-ai__tool-summary">{tool.summary}</span>
@@ -457,15 +618,14 @@ export function HwpAiPanel({
                 {tool.output && <pre>{tool.output}</pre>}
               </details>
             ))}
-            {entry.text && (
-              entry.role === 'assistant' ? (
+            {entry.text &&
+              (entry.role === 'assistant' ? (
                 <div className="hwp-ai__markdown">
                   <Markdown text={entry.text} />
                 </div>
               ) : (
                 <p>{entry.text}</p>
-              )
-            )}
+              ))}
             {entry.isError && entry.retrySuggestion && (
               <p className="hwp-ai__retry">{entry.retrySuggestion}</p>
             )}
@@ -478,6 +638,7 @@ export function HwpAiPanel({
         busy={busy}
         placeholder="Ask about this document…"
         ariaLabel="Message the assistant"
+        textareaRef={composerRef}
         hintIdle="Enter to send"
         hintBusy="Generating…"
         sendLabel="Send"

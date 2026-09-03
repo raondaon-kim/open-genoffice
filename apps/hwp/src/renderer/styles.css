@@ -449,3 +449,78 @@
     color: #c9c9d2;
   }
 }
+
+/* ---- AI starter prompt chips (empty state) ---- */
+.hwp-ai__starter-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hwp-ai__starter {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--hwp-border, #d5d8de);
+  background: transparent;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.hwp-ai__starter:hover {
+  border-color: #a8adb8;
+  background: rgb(15 107 62 / 6%);
+}
+
+.hwp-ai__starter:active {
+  transform: scale(0.985);
+}
+
+/* ---- built-in school form templates ---- */
+.hwp-ai__templates {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hwp-border, #e2e4e9);
+}
+
+.hwp-ai__templates-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #5d6470);
+}
+
+.hwp-ai__template {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--hwp-border, #d5d8de);
+  background: rgb(15 107 62 / 4%);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.hwp-ai__template:hover:not(:disabled) {
+  border-color: #0f6b3e;
+  background: rgb(15 107 62 / 10%);
+}
+
+.hwp-ai__template:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

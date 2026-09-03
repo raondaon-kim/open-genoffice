@@ -163,6 +163,9 @@ configureHwpRuntime({
     tabManager?.setHwpTabSaved(webContentsId, path)
     recordRecentFile(path)
   },
+  onCreateDocument: (path) => {
+    openDocumentPath(path)
+  },
 })
 
 // ---- UI language ----
@@ -203,6 +206,7 @@ const tMain = createI18n({
     untitledSheet: '未命名表格',
     untitledDoc: '未命名文档',
     untitledDeck: '未命名演示文稿',
+    untitledHwp: '未命名 HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: '打开…',
     menuSave: '保存',
@@ -237,6 +241,7 @@ const tMain = createI18n({
     untitledSheet: 'Untitled Spreadsheet',
     untitledDoc: 'Untitled Document',
     untitledDeck: 'Untitled Presentation',
+    untitledHwp: 'Untitled HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Open…',
     menuSave: 'Save',
@@ -271,6 +276,7 @@ const tMain = createI18n({
     untitledSheet: '無題のスプレッドシート',
     untitledDoc: '無題のドキュメント',
     untitledDeck: '無題のプレゼンテーション',
+    untitledHwp: '無題の HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: '開く…',
     menuSave: '保存',
@@ -305,6 +311,7 @@ const tMain = createI18n({
     untitledSheet: '제목 없는 스프레드시트',
     untitledDoc: '제목 없는 문서',
     untitledDeck: '제목 없는 프레젠테이션',
+    untitledHwp: '제목 없는 HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: '열기…',
     menuSave: '저장',
@@ -339,6 +346,7 @@ const tMain = createI18n({
     untitledSheet: 'Feuille de calcul sans titre',
     untitledDoc: 'Document sans titre',
     untitledDeck: 'Présentation sans titre',
+    untitledHwp: 'HWP sans titre',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Ouvrir…',
     menuSave: 'Enregistrer',
@@ -373,6 +381,7 @@ const tMain = createI18n({
     untitledSheet: 'Unbenannte Tabelle',
     untitledDoc: 'Unbenanntes Dokument',
     untitledDeck: 'Unbenannte Präsentation',
+    untitledHwp: 'Unbenanntes HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Öffnen…',
     menuSave: 'Speichern',
@@ -407,6 +416,7 @@ const tMain = createI18n({
     untitledSheet: 'Hoja de cálculo sin título',
     untitledDoc: 'Documento sin título',
     untitledDeck: 'Presentación sin título',
+    untitledHwp: 'HWP sin título',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Abrir…',
     menuSave: 'Guardar',
@@ -441,6 +451,7 @@ const tMain = createI18n({
     untitledSheet: 'สเปรดชีตไม่มีชื่อ',
     untitledDoc: 'เอกสารไม่มีชื่อ',
     untitledDeck: 'งานนำเสนอไม่มีชื่อ',
+    untitledHwp: 'HWP ที่ยังไม่มีชื่อ',
     menuNewSlide: 'AI Slides',
     menuOpen: 'เปิด…',
     menuSave: 'บันทึก',
@@ -475,6 +486,7 @@ const tMain = createI18n({
     untitledSheet: 'Spreadsheet tanpa judul',
     untitledDoc: 'Dokumen tanpa judul',
     untitledDeck: 'Presentasi tanpa judul',
+    untitledHwp: 'HWP Tanpa Judul',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
@@ -509,6 +521,7 @@ const tMain = createI18n({
     untitledSheet: 'Таблица без названия',
     untitledDoc: 'Документ без названия',
     untitledDeck: 'Презентация без названия',
+    untitledHwp: 'Безымянный HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Открыть…',
     menuSave: 'Сохранить',
@@ -543,6 +556,7 @@ const tMain = createI18n({
     untitledSheet: 'جدول بيانات بلا عنوان',
     untitledDoc: 'مستند بدون عنوان',
     untitledDeck: 'عرض تقديمي بدون عنوان',
+    untitledHwp: 'HWP بدون عنوان',
     menuNewSlide: 'AI Slides',
     menuOpen: 'فتح…',
     menuSave: 'حفظ',
@@ -577,6 +591,7 @@ const tMain = createI18n({
     untitledSheet: 'Planilha sem título',
     untitledDoc: 'Documento sem título',
     untitledDeck: 'Apresentação sem título',
+    untitledHwp: 'HWP sem título',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Abrir…',
     menuSave: 'Salvar',
@@ -611,6 +626,7 @@ const tMain = createI18n({
     untitledSheet: 'Foglio di calcolo senza titolo',
     untitledDoc: 'Documento senza titolo',
     untitledDeck: 'Presentazione senza titolo',
+    untitledHwp: 'HWP senza titolo',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Apri…',
     menuSave: 'Salva',
@@ -645,6 +661,7 @@ const tMain = createI18n({
     untitledSheet: 'Arkusz bez tytułu',
     untitledDoc: 'Dokument bez tytułu',
     untitledDeck: 'Prezentacja bez tytułu',
+    untitledHwp: 'HWP bez nazwy',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Otwórz…',
     menuSave: 'Zapisz',
@@ -679,6 +696,7 @@ const tMain = createI18n({
     untitledSheet: 'Naamloze spreadsheet',
     untitledDoc: 'Naamloos document',
     untitledDeck: 'Naamloze presentatie',
+    untitledHwp: 'Naamloos HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Openen…',
     menuSave: 'Opslaan',
@@ -713,6 +731,7 @@ const tMain = createI18n({
     untitledSheet: 'Hamparan tanpa tajuk',
     untitledDoc: 'Dokumen tanpa tajuk',
     untitledDeck: 'Persembahan tanpa tajuk',
+    untitledHwp: 'HWP Tanpa Tajuk',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
@@ -747,6 +766,7 @@ const tMain = createI18n({
     untitledSheet: 'גיליון אלקטרוני ללא שם',
     untitledDoc: 'מסמך ללא שם',
     untitledDeck: 'מצגת ללא שם',
+    untitledHwp: 'HWP ללא שם',
     menuNewSlide: 'AI Slides',
     menuOpen: 'פתיחה…',
     menuSave: 'שמירה',
@@ -781,6 +801,7 @@ const tMain = createI18n({
     untitledSheet: 'शीर्षकहीन स्प्रेडशीट',
     untitledDoc: 'बिना शीर्षक दस्तावेज़',
     untitledDeck: 'बिना शीर्षक प्रस्तुति',
+    untitledHwp: 'अनाम HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: 'खोलें…',
     menuSave: 'सहेजें',
@@ -815,6 +836,7 @@ const tMain = createI18n({
     untitledSheet: '未命名試算表',
     untitledDoc: '未命名文件',
     untitledDeck: '未命名簡報',
+    untitledHwp: '未命名 HWP',
     menuNewSlide: 'AI Slides',
     menuOpen: '開啟…',
     menuSave: '儲存',
@@ -937,7 +959,9 @@ function createShellWindow(): void {
         ? tm('untitledDoc')
         : kind === 'slides'
           ? tm('untitledDeck')
-          : tm('untitledSheet'),
+          : kind === 'hwp'
+            ? tm('untitledHwp')
+            : tm('untitledSheet'),
   )
   tabManager = manager
 

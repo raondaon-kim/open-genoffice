@@ -86,12 +86,19 @@ export function App() {
         console.info(`[hwp] loaded ${basename(intent.path)}: ${result.pageCount} page(s)`)
         setPages(result.pageCount)
       } else {
-        // blank new document — activating the hwpctrl plugin makes the studio
-        // hand over a clean one-page HWP document (verified against the studio)
+        // blank new document — activate the hwpctrl plugin, then ask the studio
+        // to create a clean blank document explicitly (file:new-doc) so the tab
+        // never starts on a "no document loaded" state
         filePathRef.current = null
         setDocName(UNTITLED_NAME)
         setAiPath(null)
         await editor.plugins.load('hwpctrl')
+        try {
+          await editor.commands.execute('file:new-doc')
+        } catch {
+          // older studios without file:new-doc already hand over a blank doc
+          // once the hwpctrl plugin is active
+        }
         const state = await editor.getDocumentState()
         if (disposed) return
         console.info('[hwp] new blank document ready')

@@ -37,6 +37,7 @@
     "dist:win": "npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell"
   },
   "dependencies": {
+    "@hwpforge/mcp": "^0.16.4",
     "ws": "^8.21.1"
   },
   "devDependencies": {

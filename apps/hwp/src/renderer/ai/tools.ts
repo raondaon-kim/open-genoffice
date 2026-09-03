@@ -1,5 +1,11 @@
 import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { RhwpEditor } from '@rhwp/editor'
+import type { HwpApi } from '../../shared/ipc'
+
+/** renderer API bridge (same object App declares on window) */
+function hwpApi(): HwpApi | undefined {
+  return (window as unknown as { hwpApi?: HwpApi }).hwpApi
+}
 
 /** Text cap per read_pages fed back to the model (the payload is resent each turn) */
 const READ_CHUNK_CHARS = 24_000
@@ -196,35 +202,10 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     },
   },
   {
-    name: 'get_table_cell',
+    name: 'add_table',
     description:
-      'Read the text of one table cell. tablePara is the paragraph index of the table in the body; row and col are 0-based.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tablePara: { type: 'integer', description: 'Body paragraph index of the table' },
-        row: { type: 'integer', description: 'Row index (0-based)' },
-        col: { type: 'integer', description: 'Column index (0-based)' },
-        colCount: { type: 'integer', description: 'Total column count of the table' },
-      },
-      required: ['tablePara', 'row', 'col', 'colCount'],
-    },
-  },
-  {
-    name: 'set_table_cell',
-    description:
-      'Replace the text of one table cell (existing cell text is replaced in full). Changes are unsaved until the user presses ⌘S.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        tablePara: { type: 'integer', description: 'Body paragraph index of the table' },
-        row: { type: 'integer', description: 'Row index (0-based)' },
-        col: { type: 'integer', description: 'Column index (0-based)' },
-        colCount: { type: 'integer', description: 'Total column count of the table' },
-        text: { type: 'string', description: 'New cell text' },
-      },
-      required: ['tablePara', 'row', 'col', 'colCount', 'text'],
-    },
+      'Insert a 5-row x 5-column table. Only works on an EMPTY new document (it refuses when the document already has text); the engine inserts the table at the start of the document. Table cells cannot be filled by the AI — after creating the table, tell the user to type cell contents directly or format the table in the editor. Changes are unsaved until the user presses ⌘S.',
+    inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'set_text_color',
@@ -269,6 +250,38 @@ export const AGENT_TOOLS: AgentToolDef[] = [
         paragraph: { type: 'integer', description: 'Body paragraph index (0-based)' },
       },
       required: ['paragraph'],
+    },
+  },
+  {
+    name: 'create_document',
+    description:
+      'Create a NEW Hangul (.hwpx) document from Markdown and open it in a new tab. Unlike write_content/add_table this supports the FULL structure: headings, paragraphs, and real GFM tables with filled cells — use it for templates and documents that mix text and tables (예: 강의 실라버스, 보고서, 계획서). Put the file name in file_name (e.g. "강의실라버스"). The current document is not modified; the new document opens as its own tab and is unsaved until ⌘S.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        markdown: {
+          type: 'string',
+          description:
+            'Markdown content: #/## headings, plain paragraphs, bullet lists, and GFM tables (| a | b | rows). Fill table cells with real content.',
+        },
+        file_name: { type: 'string', description: 'Suggested file name (default: document)' },
+      },
+      required: ['markdown'],
+    },
+  },
+  {
+    name: 'write_content',
+    description:
+      'Write plain text into an EMPTY new document (e.g. a report, letter, or note the user asked you to create). Use newlines to separate paragraphs. Only works while the document is empty — it refuses when the document already has content, so never use it on a document that already contains text. The inserted text uses default formatting; the user can then edit or format it. Changes are unsaved until the user presses ⌘S.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: {
+          type: 'string',
+          description: 'Full document content to write (paragraphs separated by newlines)',
+        },
+      },
+      required: ['text'],
     },
   },
 ]
@@ -325,32 +338,31 @@ export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Prom
           throw new Error(`fill_field failed: engine could not update field "${field}"`)
         return { output: `Field "${field}" filled.`, mutated: true, summary: `filled "${field}"` }
       }
-      case 'get_table_cell': {
-        const text = await hwpCall(
-          editor,
-          'GetCellText',
-          intArg(call, 'tablePara'),
-          intArg(call, 'row'),
-          intArg(call, 'col'),
-          intArg(call, 'colCount'),
-        )
-        return textResult(typeof text === 'string' ? text : JSON.stringify(text))
-      }
-      case 'set_table_cell': {
-        const ok = await hwpCall(
-          editor,
-          'SetCellText',
-          intArg(call, 'tablePara'),
-          intArg(call, 'row'),
-          intArg(call, 'col'),
-          strArg(call, 'text'),
-          intArg(call, 'colCount'),
-        )
-        if (ok === false) throw new Error('set_table_cell failed: engine could not update the cell')
+      case 'add_table': {
+        // only on empty documents: inserting into an existing paragraph is
+        // unreliable on the current engine (end-of-document cursor actions bug)
+        const existing = await hwpCall(editor, 'GetTextFile', 'UNICODE')
+        if (typeof existing === 'string' && existing.replace(/\s+/g, '').length > 0) {
+          return {
+            output:
+              'add_table only works on an empty document. Start a new empty document (New HWP), ask for the table there, then type cell contents in the editor.',
+            isError: true,
+            summary: 'document not empty',
+          }
+        }
+        const ctrl = await hwpCall(editor, 'InsertCtrl', 'tbl')
+        if (ctrl === null || ctrl === undefined) {
+          return {
+            output: 'add_table failed: the engine could not insert a table.',
+            isError: true,
+            summary: 'table insert failed',
+          }
+        }
         return {
-          output: `Cell (${intArg(call, 'row')},${intArg(call, 'col')}) updated.`,
+          output:
+            'A 5x5 table was added at the start of the document. Cell contents cannot be filled by the AI — please type into the cells directly; save with ⌘S when done.',
           mutated: true,
-          summary: 'table cell updated',
+          summary: '5x5 table added',
         }
       }
       case 'set_text_color': {
@@ -388,6 +400,64 @@ export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Prom
         return okRun(
           `Character formatting of paragraph ${paragraph} reset.`,
           `paragraph ${paragraph} reset`,
+        )
+      }
+      case 'create_document': {
+        const markdown = strArg(call, 'markdown')
+        const api = hwpApi()
+        if (!api?.createDocument) {
+          return {
+            output: 'create_document is unavailable in this build.',
+            isError: true,
+            summary: 'unavailable',
+          }
+        }
+        const fileName = (call.input as Record<string, unknown>).file_name
+        const result = await api.createDocument(
+          markdown,
+          typeof fileName === 'string' && fileName.trim() ? fileName.trim() : undefined,
+        )
+        if (!result.ok || !result.path) {
+          return {
+            output: `create_document failed: ${result.error ?? 'unknown error'}`,
+            isError: true,
+            summary: 'creation failed',
+          }
+        }
+        return {
+          output: `Created "${result.path.split(/[\\/]/).pop()}" and opened it in a new tab. Tables in the Markdown became real Hangul tables with their cell text. The new document is unsaved — press ⌘S to save it.`,
+          summary: 'document created and opened',
+        }
+      }
+      case 'write_content': {
+        const text = strArg(call, 'text')
+        if (!text.trim()) {
+          return {
+            output: 'write_content needs non-empty text.',
+            isError: true,
+            summary: 'empty text',
+          }
+        }
+        const existing = await hwpCall(editor, 'GetTextFile', 'UNICODE')
+        if (typeof existing === 'string' && existing.replace(/\s+/g, '').length > 0) {
+          return {
+            output:
+              'This document already contains text, so write_content refused to touch it. Start from a new empty document (New HWP) to compose content.',
+            isError: true,
+            summary: 'document not empty',
+          }
+        }
+        const ok = await hwpCall(editor, 'SetTextFile', text)
+        if (ok === false) {
+          return {
+            output: 'write_content failed: the engine could not insert the text.',
+            isError: true,
+            summary: 'insert failed',
+          }
+        }
+        return okRun(
+          'Written. The content is unsaved — press ⌘S to save the document.',
+          'content written',
         )
       }
       default:

@@ -9,6 +9,7 @@ import { installNavigationGuard, safeExternalUrl } from '@genoffice/electron-uti
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { HWP_CHANNELS } from '../shared/ipc'
 import type { SaveHwpRequest, SaveHwpResult } from '../shared/ipc'
+import { createHwpFromMarkdown } from './hwpforge-client'
 
 const tDlg = createI18n({
   zh: {
@@ -200,6 +201,8 @@ interface RuntimePaths {
   rendererFile?: string
   /** called after a successful save so the shell can retitle the tab and record the file */
   onSaved?: (webContentsId: number, path: string) => void
+  /** called when the HwpForge generator created a new document so the shell can open it in a tab */
+  onCreateDocument?: (path: string) => void
 }
 
 let runtime: RuntimePaths = { preloadPath: '' }
@@ -342,6 +345,26 @@ function registerHwpIpc(): void {
       allowed.add(path)
       allowedByWc.set(e.sender.id, allowed)
       return { ok: true, path }
+    },
+  )
+
+  // Rich document creation: compile Markdown (with tables) into a new .hwpx
+  // via the HwpForge generator, then ask the shell to open it in a new tab.
+  ipcMain.handle(
+    HWP_CHANNELS.createDocument,
+    async (_event, markdown: unknown, fileName?: unknown) => {
+      if (typeof markdown !== 'string' || !markdown.trim() || markdown.length > 400_000) {
+        return { ok: false, error: 'hwp: createDocument needs markdown text' }
+      }
+      const baseName =
+        typeof fileName === 'string' && fileName.trim() ? fileName.trim() : 'document'
+      const result = await createHwpFromMarkdown(
+        markdown,
+        join(app.getPath('userData'), 'ai-created'),
+        baseName,
+      )
+      if (result.ok && result.path) runtime.onCreateDocument?.(result.path)
+      return result
     },
   )
 

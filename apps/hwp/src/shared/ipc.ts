@@ -12,6 +12,7 @@ export const HWP_CHANNELS = {
   saveRequest: 'hwp:save-request',
   saveResult: 'hwp:save-result',
   dirtyChanged: 'hwp:dirty-changed',
+  createDocument: 'hwp:create-document',
   getLanguage: 'hwp:get-language',
   languageChanged: 'hwp:language-changed',
 } as const
@@ -42,6 +43,12 @@ export interface SaveHwpRequest {
 
 export interface SaveHwpResult {
   ok: boolean
+  error?: string
+}
+
+export interface CreateDocumentResult {
+  ok: boolean
+  path?: string
   error?: string
 }
 
@@ -93,6 +100,11 @@ export interface HwpApi {
   save(request: SaveHwpRequest): Promise<SaveHwpResult>
   /** ask main for a destination path for an untitled document (Save As); grants the returned path for this view */
   saveAs(): Promise<SaveHwpResult & { path?: string; canceled?: boolean }>
+  /**
+   * Compile Markdown (GFM tables included) into a NEW .hwpx document via the
+   * HwpForge generator and open it in a new tab. Returns the created path.
+   */
+  createDocument(markdown: string, fileName?: string): Promise<CreateDocumentResult>
   /** mirror the editor's dirty flag into the main process (drives close guards) */
   setDirty(dirty: boolean): void
   /** main → renderer: write pending edits to disk (menu Save / close guard) */
