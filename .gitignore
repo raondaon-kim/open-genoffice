@@ -26,6 +26,7 @@ ai-model-catalogs/
 
 # Local ad-hoc e2e driver scripts (not pushed); the folder and README are tracked, the scripts are not
 /scripts/drivers/driver.*.mjs
+/scripts/drivers/probe-*.mjs
 /probe*.mjs
 /apps/shell/build/THIRD-PARTY-NOTICES.txt
 /example/

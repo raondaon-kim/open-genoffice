@@ -17,10 +17,96 @@ async function ensureHwpctrl(editor: RhwpEditor): Promise<void> {
   }
 }
 
-/** Call a method on the embedded Hangul-compatible control (hwpctl plugin). */
+/** Call a method on the embedded Hangul-compatible control (hwpctrl plugin). */
 async function hwpCall(editor: RhwpEditor, method: string, ...args: unknown[]): Promise<unknown> {
   await ensureHwpctrl(editor)
   return editor.hwpctrl.call(method, args)
+}
+
+/**
+ * Formatting is applied through the hwpctrl action registry, which the studio
+ * implements deterministically for **whole body paragraphs** (index 0 = first
+ * body paragraph; SetPos(0, para, 0) moves the hwpctrl caret there first).
+ * Text colors are the standard Hangul palette (8 presets); arbitrary RGB is not
+ * supported by the engine, and current character formatting cannot be read
+ * back. Undo with ⌘Z restores the paragraph.
+ */
+const CHAR_COLOR_PALETTE: Record<string, { action: string; hex: string }> = {
+  black: { action: 'CharShapeTextColorBlack', hex: '#000000' },
+  blue: { action: 'CharShapeTextColorBlue', hex: '#0000FF' },
+  red: { action: 'CharShapeTextColorRed', hex: '#FF0000' },
+  green: { action: 'CharShapeTextColorGreen', hex: '#008000' },
+  bluish: { action: 'CharShapeTextColorBluish', hex: '#008080' },
+  violet: { action: 'CharShapeTextColorViolet', hex: '#993366' },
+  white: { action: 'CharShapeTextColorWhite', hex: '#FFFFFF' },
+  yellow: { action: 'CharShapeTextColorYellow', hex: '#FFFF00' },
+}
+
+const CHAR_ALIGN_ACTIONS: Record<string, string> = {
+  justify: 'ParagraphShapeAlignJustify',
+  left: 'ParagraphShapeAlignLeft',
+  right: 'ParagraphShapeAlignRight',
+  center: 'ParagraphShapeAlignCenter',
+  distribute: 'ParagraphShapeAlignDistribute',
+  division: 'ParagraphShapeAlignDivision',
+}
+
+/** resolve a color argument to a palette action id; nearest-match for #rrggbb */
+function resolveColorAction(color: unknown): string | null {
+  if (typeof color !== 'string') return null
+  const raw = color.trim().toLowerCase()
+  if (CHAR_COLOR_PALETTE[raw]) return CHAR_COLOR_PALETTE[raw].action
+  const hexMatch = /^#?([0-9a-f]{6})$/i.exec(raw)
+  if (!hexMatch) return null
+  const [r, g, b] = [0, 2, 4].map((i) => Number.parseInt(hexMatch[1].slice(i, i + 2), 16))
+  let best: string | null = null
+  let bestDist = Number.POSITIVE_INFINITY
+  for (const [name, entry] of Object.entries(CHAR_COLOR_PALETTE)) {
+    const h = entry.hex.slice(1)
+    const [pr, pg, pb] = [0, 2, 4].map((i) => Number.parseInt(h.slice(i, i + 2), 16))
+    const dist = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2
+    if (dist < bestDist) {
+      bestDist = dist
+      best = name
+    }
+  }
+  return best ? CHAR_COLOR_PALETTE[best].action : null
+}
+
+/** move the hwpctrl caret to body paragraph `paragraph`, select the whole paragraph, and verify the engine actually selected it */
+async function selectParagraph(
+  editor: RhwpEditor,
+  paragraph: number,
+): Promise<{ spara: number; epara: number; spos: number; epos: number }> {
+  await hwpCall(editor, 'Run', 'Cancel')
+  await hwpCall(editor, 'SetPos', 0, paragraph, 0)
+  await hwpCall(editor, 'Run', 'MoveSelParaBegin')
+  await hwpCall(editor, 'Run', 'MoveSelParaEnd')
+  const raw = await hwpCall(editor, 'GetSelectedPos')
+  const sel = (raw ?? {}) as { spara?: number; epara?: number; spos?: number; epos?: number }
+  if (sel.spara !== paragraph || sel.epara !== paragraph) {
+    throw new Error(
+      `Body paragraph ${paragraph} does not exist in this document (the engine selected paragraph ${sel.spara ?? '?'}). Re-read the page text and pick an existing paragraph number.`,
+    )
+  }
+  if ((sel.epos ?? 0) <= (sel.spos ?? 0)) {
+    throw new Error(
+      `Body paragraph ${paragraph} contains no selectable text. Pick the paragraph whose text you want to change.`,
+    )
+  }
+  return sel as { spara: number; epara: number; spos: number; epos: number }
+}
+
+/** select the whole paragraph, run a preset formatting action, then clear the selection */
+async function formatParagraph(
+  editor: RhwpEditor,
+  paragraph: number,
+  actionId: string,
+): Promise<void> {
+  await selectParagraph(editor, paragraph)
+  const ok = await hwpCall(editor, 'Run', actionId)
+  if (ok === false) throw new Error(`engine could not run ${actionId}`)
+  await hwpCall(editor, 'Run', 'Cancel')
 }
 
 /** Extract readable text from a rendered page SVG in document order. */
@@ -63,11 +149,15 @@ function strArg(call: AgentToolCall, key: string): string {
   throw new Error(`${key} must be a string`)
 }
 
+function okRun(output: string, summary: string): ToolExecution {
+  return { output, mutated: true, summary }
+}
+
 export const AGENT_TOOLS: AgentToolDef[] = [
   {
     name: 'read_pages',
     description:
-      'Read the text content of a page range of the open Hangul document (with [Page N] markers). Read the relevant pages before answering; at most 10 pages per call, over-long output is truncated.',
+      'Read the text content of a page range of the open Hangul document (with [Page N] markers). Read the relevant pages before answering or editing; at most 10 pages per call, over-long output is truncated.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -137,30 +227,66 @@ export const AGENT_TOOLS: AgentToolDef[] = [
     },
   },
   {
-    name: 'insert_text_at',
+    name: 'set_text_color',
     description:
-      'Insert text at the start of a body paragraph (caret is moved to the paragraph first). section and paragraph are 0-based indices. For replacing a paragraph, read it first and tell the user when a full replace is not possible.',
+      'Set the text color of one whole body paragraph (index 0 = first body paragraph of the main text; read_pages helps you find which paragraph). Supports only the standard Hangul palette: black, blue, red, green, bluish, violet, white, yellow (also accepts a #rrggbb hex that is matched to the nearest palette color). The change applies to the entire paragraph; character formatting cannot be read back, so mention what you changed. Undo with ⌘Z. Changes are unsaved until the user presses ⌘S.',
     inputSchema: {
       type: 'object',
       properties: {
-        section: { type: 'integer', description: 'Section index (0-based)' },
-        paragraph: { type: 'integer', description: 'Paragraph index within the section (0-based)' },
-        text: { type: 'string', description: 'Text to insert at the paragraph start' },
+        paragraph: { type: 'integer', description: 'Body paragraph index (0-based)' },
+        color: {
+          type: 'string',
+          description:
+            'Palette color name (black/blue/red/green/bluish/violet/white/yellow) or #rrggbb hex',
+        },
       },
-      required: ['section', 'paragraph', 'text'],
+      required: ['paragraph', 'color'],
+    },
+  },
+  {
+    name: 'set_paragraph_alignment',
+    description:
+      'Set the alignment of one whole body paragraph (index 0 = first body paragraph of the main text; read_pages helps you find which paragraph). Values: left, center, right, justify, distribute, division. Undo with ⌘Z. Changes are unsaved until the user presses ⌘S.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paragraph: { type: 'integer', description: 'Body paragraph index (0-based)' },
+        align: {
+          type: 'string',
+          enum: ['left', 'center', 'right', 'justify', 'distribute', 'division'],
+        },
+      },
+      required: ['paragraph', 'align'],
+    },
+  },
+  {
+    name: 'clear_character_format',
+    description:
+      'Reset character formatting (bold/italic/underline/strike/super/subscript and text color back to black) of one whole body paragraph (index 0 = first body paragraph of the main text). Font size is kept. Undo with ⌘Z. Changes are unsaved until the user presses ⌘S.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paragraph: { type: 'integer', description: 'Body paragraph index (0-based)' },
+      },
+      required: ['paragraph'],
     },
   },
 ]
 
 export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Promise<ToolExecution> {
   const editor = deps.editor()
-  if (!editor) return { output: 'The document is not open yet.', isError: true, summary: 'no document' }
+  if (!editor)
+    return { output: 'The document is not open yet.', isError: true, summary: 'no document' }
   try {
     switch (call.name) {
       case 'read_pages': {
         const state = await editor.getDocumentState()
         const start = Math.max(1, intArg(call, 'start'))
-        const end = Math.min(state.pageCount, start + 9, Math.max(start, intArg(call, 'end', start)))
+        const end = Math.min(
+          state.pageCount,
+          start + 9,
+          Math.max(start, intArg(call, 'end', start)),
+        )
         const parts: string[] = []
         for (let page = start; page <= end; page++) {
           const svg = await editor.getPageSvg(page - 1)
@@ -194,7 +320,9 @@ export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Prom
       case 'fill_field': {
         const field = strArg(call, 'field')
         const text = strArg(call, 'text')
-        await hwpCall(editor, 'PutFieldText', field, text)
+        const ok = await hwpCall(editor, 'PutFieldText', field, text)
+        if (ok === false)
+          throw new Error(`fill_field failed: engine could not update field "${field}"`)
         return { output: `Field "${field}" filled.`, mutated: true, summary: `filled "${field}"` }
       }
       case 'get_table_cell': {
@@ -209,7 +337,7 @@ export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Prom
         return textResult(typeof text === 'string' ? text : JSON.stringify(text))
       }
       case 'set_table_cell': {
-        await hwpCall(
+        const ok = await hwpCall(
           editor,
           'SetCellText',
           intArg(call, 'tablePara'),
@@ -218,23 +346,49 @@ export async function executeHwpTool(deps: HwpAiDeps, call: AgentToolCall): Prom
           strArg(call, 'text'),
           intArg(call, 'colCount'),
         )
+        if (ok === false) throw new Error('set_table_cell failed: engine could not update the cell')
         return {
           output: `Cell (${intArg(call, 'row')},${intArg(call, 'col')}) updated.`,
           mutated: true,
           summary: 'table cell updated',
         }
       }
-      case 'insert_text_at': {
-        const section = intArg(call, 'section')
+      case 'set_text_color': {
         const paragraph = intArg(call, 'paragraph')
-        const text = strArg(call, 'text')
-        await editor.focusTarget({ kind: 'body_paragraph', section, paragraph, charOffset: 0, length: 0 })
-        await hwpCall(editor, 'InsertText', text)
-        return {
-          output: `Text inserted at section ${section}, paragraph ${paragraph}.`,
-          mutated: true,
-          summary: 'text inserted',
+        const action = resolveColorAction((call.input as Record<string, unknown>).color)
+        if (!action) {
+          return {
+            output:
+              'Unsupported color. The Hangul engine supports only the palette: black, blue, red, green, bluish, violet, white, yellow (or a #rrggbb hex matched to the nearest palette color).',
+            isError: true,
+            summary: 'unsupported color',
+          }
         }
+        await formatParagraph(editor, paragraph, action)
+        return okRun(`Paragraph ${paragraph} text color set.`, `paragraph ${paragraph} recolored`)
+      }
+      case 'set_paragraph_alignment': {
+        const paragraph = intArg(call, 'paragraph')
+        const align = strArg(call, 'align').toLowerCase()
+        const action = CHAR_ALIGN_ACTIONS[align]
+        if (!action) {
+          return {
+            output:
+              'Unsupported alignment. Use left, center, right, justify, distribute, or division.',
+            isError: true,
+            summary: 'unsupported alignment',
+          }
+        }
+        await formatParagraph(editor, paragraph, action)
+        return okRun(`Paragraph ${paragraph} set to ${align}.`, `paragraph ${paragraph} ${align}`)
+      }
+      case 'clear_character_format': {
+        const paragraph = intArg(call, 'paragraph')
+        await formatParagraph(editor, paragraph, 'CharShapeNormal')
+        return okRun(
+          `Character formatting of paragraph ${paragraph} reset.`,
+          `paragraph ${paragraph} reset`,
+        )
       }
       default:
         return { output: `Unknown tool: ${call.name}`, isError: true, summary: 'unknown tool' }
