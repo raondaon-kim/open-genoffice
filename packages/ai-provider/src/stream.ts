@@ -1,6 +1,6 @@
 import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 import { httpBodyDetail } from './http-error'
-import { GENSPARK_LLM_BASE_URLS, OPENROUTER_API_BASE_URL } from './providers'
+import { GENSPARK_LLM_BASE_URLS, OPENAI_COMPATIBLE_BASE_URLS } from './providers'
 import type { AiProviderConfig, AiProviderId } from './types'
 
 // ---- streaming (SSE line splitting shared by all providers) ----
@@ -309,7 +309,7 @@ export async function streamGemini(
   }
 }
 
-// ---- OpenAI-compatible (openai / deepseek / custom) ----
+// ---- OpenAI-compatible (openai / deepseek / glm / kimi / minimax / openrouter / custom) ----
 
 function openAiMessages(system: string, messages: AgentMessage[]): unknown[] {
   const out: unknown[] = [{ role: 'system', content: system }]
@@ -437,12 +437,6 @@ export async function streamOpenAiCompatible(
   flushTools()
 }
 
-const OPENAI_COMPATIBLE_BASE_URLS: Partial<Record<AiProviderId, string>> = {
-  deepseek: 'https://api.deepseek.com/v1',
-  openai: 'https://api.openai.com/v1',
-  openrouter: OPENROUTER_API_BASE_URL,
-}
-
 /** route a streaming, tool-calling-capable turn by provider id */
 export async function streamForProvider(
   provider: AiProviderId,
@@ -493,6 +487,9 @@ export async function streamForProvider(
     case 'gemini':
       return streamGemini(config, system, messages, tools, maxTokens, cb)
     case 'deepseek':
+    case 'glm':
+    case 'kimi':
+    case 'minimax':
     case 'openai':
     case 'openrouter':
       return streamOpenAiCompatible(

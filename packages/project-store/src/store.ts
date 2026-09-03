@@ -53,6 +53,9 @@ const AI_PROVIDER_IDS = new Set<AiProviderId>([
   'anthropic',
   'gemini',
   'deepseek',
+  'glm',
+  'kimi',
+  'minimax',
   'openai',
   'custom',
 ])

@@ -86,6 +86,62 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     keyPlaceholder: 'sk-...',
   },
   {
+    id: 'glm',
+    label: 'GLM',
+    protocol: 'openai-compatible',
+    auth: 'bearer-key',
+    modelSource: 'static',
+    defaultBaseUrl: 'https://api.z.ai/api/paas/v4',
+    models: [
+      'glm-5.3',
+      'glm-5.1',
+      'glm-4.7',
+      'glm-4.6',
+      'glm-4.5',
+      'glm-4.5-air',
+      'glm-4.5-flash',
+    ],
+    defaultModel: 'glm-5.3',
+    keyPlaceholder: '<id>.<secret>',
+  },
+  {
+    id: 'kimi',
+    label: 'Kimi',
+    protocol: 'openai-compatible',
+    auth: 'bearer-key',
+    modelSource: 'static',
+    defaultBaseUrl: 'https://api.moonshot.ai/v1',
+    models: [
+      'kimi-k3',
+      'kimi-k2.7-code-highspeed',
+      'kimi-k2.6',
+      'kimi-k2.5',
+      'kimi-k2-0905-preview',
+    ],
+    defaultModel: 'kimi-k3',
+    keyPlaceholder: 'sk-...',
+  },
+  {
+    id: 'minimax',
+    label: 'MiniMax',
+    protocol: 'openai-compatible',
+    auth: 'bearer-key',
+    modelSource: 'static',
+    defaultBaseUrl: 'https://api.minimax.io/v1',
+    models: [
+      'MiniMax-M3',
+      'MiniMax-M2.7',
+      'MiniMax-M2.7-highspeed',
+      'MiniMax-M2.5',
+      'MiniMax-M2.5-highspeed',
+      'MiniMax-M2.1',
+      'MiniMax-M2.1-highspeed',
+      'MiniMax-M2',
+    ],
+    defaultModel: 'MiniMax-M2.1',
+    keyPlaceholder: 'eyJ…',
+  },
+  {
     id: 'openai',
     label: 'OpenAI',
     protocol: 'openai-compatible',
@@ -108,6 +164,18 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     needsBaseUrl: true,
   },
 ]
+
+/**
+ * Base URLs for providers that speak the OpenAI chat-completions protocol
+ * directly (derived from AI_PROVIDERS so the registry stays the single
+ * source of truth for chat, streaming, and verification).
+ */
+export const OPENAI_COMPATIBLE_BASE_URLS: Partial<Record<AiProviderId, string>> =
+  Object.fromEntries(
+    AI_PROVIDERS.filter(
+      (meta) => meta.protocol === 'openai-compatible' && !meta.needsBaseUrl && meta.defaultBaseUrl,
+    ).map((meta) => [meta.id, meta.defaultBaseUrl]),
+  )
 
 /**
  * Fresh settings with every provider's default model and an empty key,

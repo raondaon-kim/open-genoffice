@@ -22,6 +22,7 @@ import type {
   VerifyAndSaveAiProviderArgs,
   VerifyAndSaveAiProviderResult,
 } from '../shared/ipc'
+import { PUBLIC_AI_PROVIDER_IDS } from '../shared/ipc'
 import { AiCatalogCache } from './ai-catalog-cache'
 import { AiSecretStore, redactProviderError, type SecretCipher } from './ai-secret-store'
 
@@ -54,7 +55,17 @@ export interface AiSettingsServiceOptions {
   fetch?: FetchLike
 }
 
-const PUBLIC_PROVIDER_IDS = ['genspark', 'openrouter', 'anthropic', 'openai'] as const
+const PUBLIC_PROVIDER_IDS = PUBLIC_AI_PROVIDER_IDS
+/** Keyed providers whose credentials can be verified and stored (every public provider except Genspark). */
+const VERIFIABLE_PROVIDER_IDS = [
+  'openrouter',
+  'anthropic',
+  'openai',
+  'deepseek',
+  'glm',
+  'kimi',
+  'minimax',
+] as const satisfies readonly Exclude<PublicAiProviderId, 'genspark'>[]
 const DEFAULT_ROUTE: AiRoute = {
   providerId: 'genspark',
   modelId:
@@ -172,7 +183,7 @@ export class AiSettingsService {
 
   async verifyAndSave(args: VerifyAndSaveAiProviderArgs): Promise<VerifyAndSaveAiProviderResult> {
     const providerId = args?.providerId
-    if (!['openrouter', 'anthropic', 'openai'].includes(providerId)) {
+    if (!VERIFIABLE_PROVIDER_IDS.includes(providerId)) {
       throw new Error('Provider does not support API-key verification')
     }
     if (typeof args.apiKey !== 'string' || !args.apiKey.trim() || args.apiKey.length > 16_384) {
@@ -219,7 +230,10 @@ export class AiSettingsService {
   }
 
   removeProviderKey(providerId: unknown): PublicAiSettings {
-    if (!['openrouter', 'anthropic', 'openai'].includes(String(providerId))) {
+    if (
+      typeof providerId !== 'string' ||
+      !VERIFIABLE_PROVIDER_IDS.includes(providerId as Exclude<PublicAiProviderId, 'genspark'>)
+    ) {
       throw new Error('Provider key cannot be removed')
     }
     const id = providerId as Exclude<PublicAiProviderId, 'genspark'>

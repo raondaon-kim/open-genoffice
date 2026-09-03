@@ -1,10 +1,19 @@
 import { httpBodyDetail } from './http-error'
-import { OPENROUTER_API_BASE_URL } from './providers'
+import { OPENAI_COMPATIBLE_BASE_URLS, OPENROUTER_API_BASE_URL } from './providers'
 import type { AiProviderId } from './types'
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
-export type VerifiableAiProviderId = Extract<AiProviderId, 'openrouter' | 'anthropic' | 'openai'>
+export type VerifiableAiProviderId = Extract<
+  AiProviderId,
+  'openrouter' | 'anthropic' | 'openai' | 'deepseek' | 'glm' | 'kimi' | 'minimax'
+>
+
+/** Providers whose keys are verified through their OpenAI-compatible GET /models endpoint. */
+export type OpenAiCompatibleVerifiableProviderId = Extract<
+  VerifiableAiProviderId,
+  'openai' | 'deepseek' | 'glm' | 'kimi' | 'minimax'
+>
 
 export type AiProviderVerificationErrorCode =
   | 'missing-key'
@@ -228,14 +237,23 @@ export async function verifyAnthropicApiKey(
   }
 }
 
-export async function verifyOpenAiApiKey(
+/**
+ * Shared verification for OpenAI-compatible providers that expose
+ * `GET {baseUrl}/models` with Bearer auth (OpenAI, DeepSeek, GLM, Kimi,
+ * MiniMax). A 2xx with a model list proves the key; the list is surfaced
+ * as details without generating tokens.
+ */
+async function verifyOpenAiCompatibleModelsKey(
+  providerId: OpenAiCompatibleVerifiableProviderId,
   apiKey: string,
   options: VerifyApiKeyOptions = {},
+  baseUrl = OPENAI_COMPATIBLE_BASE_URLS[providerId],
 ): Promise<AiProviderVerificationResult> {
+  if (!baseUrl) throw new Error(`No base URL configured for ${providerId} verification`)
   const requested = await request(
-    'openai',
+    providerId,
     apiKey,
-    'https://api.openai.com/v1/models',
+    `${baseUrl.replace(/\/$/, '')}/models`,
     { method: 'GET', headers: { Authorization: `Bearer ${apiKey}` } },
     options,
   )
@@ -246,27 +264,67 @@ export async function verifyOpenAiApiKey(
     payload = await requested.response.json()
   } catch {
     return failure(
-      'openai',
+      providerId,
       requested.verifiedAt,
       'invalid-response',
-      'OpenAI verification returned invalid JSON',
+      `${providerId} verification returned invalid JSON`,
     )
   }
   const ids = modelIds(payload)
   if (ids === null) {
     return failure(
-      'openai',
+      providerId,
       requested.verifiedAt,
       'invalid-response',
-      'OpenAI verification returned an invalid response',
+      `${providerId} verification returned an invalid response`,
     )
   }
   return {
     ok: true,
-    providerId: 'openai',
+    providerId,
     verifiedAt: requested.verifiedAt,
     details: { modelIds: ids },
   }
+}
+
+export async function verifyOpenAiApiKey(
+  apiKey: string,
+  options: VerifyApiKeyOptions = {},
+): Promise<AiProviderVerificationResult> {
+  return verifyOpenAiCompatibleModelsKey(
+    'openai',
+    apiKey,
+    options,
+    'https://api.openai.com/v1',
+  )
+}
+
+export function verifyDeepSeekApiKey(
+  apiKey: string,
+  options: VerifyApiKeyOptions = {},
+): Promise<AiProviderVerificationResult> {
+  return verifyOpenAiCompatibleModelsKey('deepseek', apiKey, options)
+}
+
+export function verifyGlmApiKey(
+  apiKey: string,
+  options: VerifyApiKeyOptions = {},
+): Promise<AiProviderVerificationResult> {
+  return verifyOpenAiCompatibleModelsKey('glm', apiKey, options)
+}
+
+export function verifyKimiApiKey(
+  apiKey: string,
+  options: VerifyApiKeyOptions = {},
+): Promise<AiProviderVerificationResult> {
+  return verifyOpenAiCompatibleModelsKey('kimi', apiKey, options)
+}
+
+export function verifyMiniMaxApiKey(
+  apiKey: string,
+  options: VerifyApiKeyOptions = {},
+): Promise<AiProviderVerificationResult> {
+  return verifyOpenAiCompatibleModelsKey('minimax', apiKey, options)
 }
 
 export function verifyProviderApiKey(
@@ -281,5 +339,13 @@ export function verifyProviderApiKey(
       return verifyAnthropicApiKey(apiKey, options)
     case 'openai':
       return verifyOpenAiApiKey(apiKey, options)
+    case 'deepseek':
+      return verifyDeepSeekApiKey(apiKey, options)
+    case 'glm':
+      return verifyGlmApiKey(apiKey, options)
+    case 'kimi':
+      return verifyKimiApiKey(apiKey, options)
+    case 'minimax':
+      return verifyMiniMaxApiKey(apiKey, options)
   }
 }

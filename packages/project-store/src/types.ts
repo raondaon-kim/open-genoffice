@@ -33,7 +33,16 @@ export interface ChatAttachment {
 
 /** Kept structurally compatible with @genoffice/ai-provider without coupling storage to it. */
 export type AiProviderId =
-  'genspark' | 'openrouter' | 'anthropic' | 'gemini' | 'deepseek' | 'openai' | 'custom'
+  | 'genspark'
+  | 'openrouter'
+  | 'anthropic'
+  | 'gemini'
+  | 'deepseek'
+  | 'glm'
+  | 'kimi'
+  | 'minimax'
+  | 'openai'
+  | 'custom'
 
 /** A provider/model selection. Credentials and other secrets never belong here. */
 export interface AiRoute {

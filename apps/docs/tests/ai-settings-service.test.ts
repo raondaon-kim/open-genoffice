@@ -231,4 +231,69 @@ describe('AiSettingsService migration and public boundary', () => {
       ),
     ).rejects.toThrow('does not support image input')
   })
+
+  it('verifies and stores a GLM key and exposes its compatible models', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'genoffice-ai-glm-'))
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [{ id: 'glm-5.3' }, { id: 'glm-4.6' }] }), {
+          status: 200,
+        }),
+    )
+    const cipher = new TestCipher()
+    const secretStore = new AiSecretStore(join(dir, 'ai-secrets.json'), cipher)
+    const settingsPath = join(dir, 'ai-settings.json')
+    const service = new AiSettingsService({
+      settingsPath,
+      secretStore,
+      catalogs: new AiCatalogCache({
+        cacheDir: join(dir, 'catalogs'),
+        getApiKey: (providerId) => secretStore.get(providerId),
+        fetch: fetchMock,
+      }),
+      isGensparkConfigured: () => false,
+      fetch: fetchMock,
+    })
+
+    const result = await service.verifyAndSave({ providerId: 'glm', apiKey: 'glm-key' })
+
+    expect(result.verification).toMatchObject({ ok: true, providerId: 'glm' })
+    expect(result.saved).toBe(true)
+    expect(result.compatibleModelCount).toBe(2)
+    expect(result.settings.providers.find((provider) => provider.id === 'glm')).toMatchObject({
+      id: 'glm',
+      label: 'GLM',
+      status: 'connected',
+      hasApiKey: true,
+    })
+    expect(secretStore.get('glm')).toBe('glm-key')
+    expect(readFileSync(settingsPath, 'utf8')).not.toContain('glm-key')
+
+    const models = await service.listModels()
+    expect(models.models.map((model) => model.id)).toEqual(['glm-4.6', 'glm-5.3'])
+  })
+
+  it('removes a stored Kimi key that is not the global default', async () => {
+    const { settingsPath, secretStore, service } = fixture()
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        globalDefault: { providerId: 'genspark', modelId: 'claude-opus-4-7' },
+        providers: { kimi: { verifiedAt: '2026-08-03T00:00:00.000Z', usable: true } },
+      }),
+    )
+    secretStore.set('kimi', 'kimi-key')
+
+    const settings = service.removeProviderKey('kimi')
+
+    expect(settings.providers.find((provider) => provider.id === 'kimi')).toMatchObject({
+      status: 'not-configured',
+      hasApiKey: false,
+    })
+    expect(secretStore.get('kimi')).toBeNull()
+    expect(() => service.removeProviderKey('not-a-provider')).toThrow(
+      'Provider key cannot be removed',
+    )
+  })
 })

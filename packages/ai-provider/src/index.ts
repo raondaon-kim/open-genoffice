@@ -22,6 +22,7 @@ export type {
 export {
   AI_PROVIDERS,
   GENSPARK_LLM_BASE_URLS,
+  OPENAI_COMPATIBLE_BASE_URLS,
   OPENROUTER_API_BASE_URL,
   defaultAiSettings,
   resolveAiSettings,
@@ -39,6 +40,10 @@ export type {
 } from './catalog'
 export {
   verifyAnthropicApiKey,
+  verifyDeepSeekApiKey,
+  verifyGlmApiKey,
+  verifyKimiApiKey,
+  verifyMiniMaxApiKey,
   verifyOpenAiApiKey,
   verifyOpenRouterApiKey,
   verifyProviderApiKey,
@@ -56,6 +61,7 @@ export type {
   AiProviderVerificationError,
   AiProviderVerificationErrorCode,
   AiProviderVerificationResult,
+  OpenAiCompatibleVerifiableProviderId,
   VerifiableAiProviderId,
   VerifyApiKeyOptions,
 } from './verification'

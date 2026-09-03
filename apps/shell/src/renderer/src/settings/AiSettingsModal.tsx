@@ -22,6 +22,10 @@ const PROVIDER_ORDER: readonly PublicAiProviderId[] = [
   'openrouter',
   'anthropic',
   'openai',
+  'deepseek',
+  'glm',
+  'kimi',
+  'minimax',
 ]
 
 const PROVIDER_HELP: Record<PublicAiProviderId, string> = {
@@ -29,17 +33,29 @@ const PROVIDER_HELP: Record<PublicAiProviderId, string> = {
   openrouter: 'Access compatible models from many providers with one key.',
   anthropic: 'Get your Anthropic key',
   openai: 'Get your OpenAI key',
+  deepseek: 'Get your DeepSeek key',
+  glm: 'Get your Z.ai (GLM) key',
+  kimi: 'Get your Kimi (Moonshot) key',
+  minimax: 'Get your MiniMax key',
 }
 
 const PROVIDER_KEY_LINKS: Partial<Record<PublicAiProviderId, string>> = {
   anthropic: 'https://platform.claude.com/settings/workspaces/default/keys',
   openai: 'https://platform.openai.com/api-keys',
+  deepseek: 'https://platform.deepseek.com/api_keys',
+  glm: 'https://z.ai/manage-apikey/apikey-list',
+  kimi: 'https://platform.moonshot.ai/console/api-keys',
+  minimax: 'https://platform.minimax.io/user-center/basic-information/interface-key',
 }
 
 const KEY_PLACEHOLDERS: Record<KeyedAiProviderId, string> = {
   openrouter: 'sk-or-v1-…',
   anthropic: 'sk-ant-…',
   openai: 'sk-…',
+  deepseek: 'sk-…',
+  glm: 'id.secret',
+  kimi: 'sk-…',
+  minimax: 'eyJ…',
 }
 
 function providerLabel(providerId: string): string {
@@ -52,6 +68,14 @@ function providerLabel(providerId: string): string {
       return 'Anthropic'
     case 'openai':
       return 'OpenAI'
+    case 'deepseek':
+      return 'DeepSeek'
+    case 'glm':
+      return 'GLM'
+    case 'kimi':
+      return 'Kimi'
+    case 'minimax':
+      return 'MiniMax'
     default:
       return providerId
   }

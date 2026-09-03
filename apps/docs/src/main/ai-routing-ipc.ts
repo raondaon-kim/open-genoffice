@@ -13,7 +13,13 @@ import type {
   ResolveChatArgs,
 } from '@genoffice/project-store'
 import { isAbsolute, normalize } from 'node:path'
-import { AI_CHANNELS, type AiConversationIdentity, type AiStreamRequest } from '../shared/ipc'
+import {
+  AI_CHANNELS,
+  type AiConversationIdentity,
+  type AiStreamRequest,
+  isPublicAiProviderId,
+  type PublicAiProviderId,
+} from '../shared/ipc'
 import { redactProviderError } from './ai-secret-store'
 import type { AiSettingsService } from './ai-settings-service'
 
@@ -149,18 +155,15 @@ export function parseProjectResolveArgs(value: unknown): ResolveChatArgs {
   return result
 }
 
-function parseProjectRoute(
-  value: unknown,
-  label: string,
-): { providerId: 'genspark' | 'openrouter' | 'anthropic' | 'openai'; modelId: string } {
+function parseProjectRoute(value: unknown, label: string): AiRoute {
   if (!isRecord(value)) throw new Error(`${label} is invalid`)
   assertOnlyKeys(value, ['providerId', 'modelId'], label)
   const providerId = boundedString(value.providerId, `${label} providerId`, 64, false)
-  if (!['genspark', 'openrouter', 'anthropic', 'openai'].includes(providerId)) {
+  if (!isPublicAiProviderId(providerId)) {
     throw new Error('Unsupported AI provenance provider')
   }
   return {
-    providerId: providerId as 'genspark' | 'openrouter' | 'anthropic' | 'openai',
+    providerId,
     modelId: boundedString(value.modelId, `${label} modelId`, 512, false),
   }
 }
@@ -337,11 +340,11 @@ function parseRoute(value: unknown): AiRoute {
   if (!isRecord(value)) throw new Error('AI route is required')
   assertOnlyKeys(value, ['providerId', 'modelId'], 'AI route')
   const providerId = boundedString(value.providerId, 'providerId', 64, false)
-  if (!['genspark', 'openrouter', 'anthropic', 'openai'].includes(providerId)) {
+  if (!isPublicAiProviderId(providerId)) {
     throw new Error('AI route provider is not supported')
   }
   return {
-    providerId: providerId as AiRoute['providerId'],
+    providerId,
     modelId: boundedString(value.modelId, 'modelId', 512, false),
   }
 }
@@ -579,7 +582,7 @@ async function refreshAfterModelError(
 ) {
   if (!isModelAvailabilityError(message)) return
   await settings.refreshModels({
-    providerIds: [route.providerId as 'genspark' | 'openrouter' | 'anthropic' | 'openai'],
+    providerIds: [route.providerId as PublicAiProviderId],
   })
 }
 
@@ -605,8 +608,10 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       if (!isRecord(value)) throw new Error('Provider verification request is required')
       assertOnlyKeys(value, ['providerId', 'apiKey'], 'Provider verification request')
       return await settings.verifyAndSave({
-        providerId: boundedString(value.providerId, 'providerId', 64, false) as
-          'openrouter' | 'anthropic' | 'openai',
+        providerId: boundedString(value.providerId, 'providerId', 64, false) as Exclude<
+          PublicAiProviderId,
+          'genspark'
+        >,
         apiKey: boundedString(value.apiKey, 'apiKey', 16_384, false),
       })
     } catch (error) {
@@ -659,13 +664,10 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       const providerIds =
         isRecord(value) && Array.isArray(value.providerIds)
           ? value.providerIds.map((id) => {
-              if (
-                typeof id !== 'string' ||
-                !['genspark', 'openrouter', 'anthropic', 'openai'].includes(id)
-              ) {
+              if (!isPublicAiProviderId(id)) {
                 throw new Error('providerIds contains an unsupported provider')
               }
-              return id as 'genspark' | 'openrouter' | 'anthropic' | 'openai'
+              return id
             })
           : undefined
       const requireImageInput = isRecord(value)

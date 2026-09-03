@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { join } from 'node:path'
 import {
   AI_PROVIDERS,
+  OPENAI_COMPATIBLE_BASE_URLS,
   fetchOpenRouterModelCatalog,
   filterCompatibleModels,
   type AiModelCatalog,
@@ -127,14 +128,24 @@ function accessibleIds(payload: unknown): Array<{ id: string; createdAt?: string
   })
 }
 
+/** Providers whose model list is discovered remotely via a models endpoint and narrowed to the registry allowlist. */
+type ConservativeRemoteProviderId = Extract<
+  PublicAiProviderId,
+  'anthropic' | 'openai' | 'deepseek' | 'glm' | 'kimi' | 'minimax'
+>
+
 function conservativeRemoteModels(
-  providerId: Extract<PublicAiProviderId, 'anthropic' | 'openai'>,
+  providerId: ConservativeRemoteProviderId,
   payload: unknown,
 ): AiModelSummary[] {
   const allowed = new Set(providerDefinition(providerId)?.models ?? [])
-  return accessibleIds(payload)
-    .filter(({ id }) => allowed.has(id))
-    .map(({ id, createdAt }) => normalizeStaticModel(providerId, id, createdAt))
+  const accessible = accessibleIds(payload)
+  const listed = accessible.filter(({ id }) => allowed.has(id))
+  // Registry allowlists can lag a provider's live catalog (fast-moving model
+  // lineups); when none of the allowlisted ids are reachable, fall back to the
+  // ids the key can actually access instead of reporting no models.
+  const source = listed.length > 0 ? listed : accessible
+  return source.map(({ id, createdAt }) => normalizeStaticModel(providerId, id, createdAt))
 }
 
 export class AiCatalogCache {
@@ -310,10 +321,16 @@ export class AiCatalogCache {
     }
 
     const isAnthropic = providerId === 'anthropic'
+    const baseUrl = isAnthropic
+      ? 'https://api.anthropic.com'
+      : OPENAI_COMPATIBLE_BASE_URLS[providerId]
+    if (!baseUrl) {
+      throw new Error(`${providerDefinition(providerId)?.label ?? providerId} has no models URL`)
+    }
     const response = await this.fetchImpl(
       isAnthropic
-        ? 'https://api.anthropic.com/v1/models?limit=1000'
-        : 'https://api.openai.com/v1/models',
+        ? `${baseUrl}/v1/models?limit=1000`
+        : `${baseUrl.replace(/\/$/, '')}/models`,
       {
         method: 'GET',
         headers: isAnthropic

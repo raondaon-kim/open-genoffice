@@ -35,7 +35,7 @@ export type { AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 
 export type PublicAiProviderId = Extract<
   AiProviderId,
-  'genspark' | 'openrouter' | 'anthropic' | 'openai'
+  'genspark' | 'openrouter' | 'anthropic' | 'openai' | 'deepseek' | 'glm' | 'kimi' | 'minimax'
 >
 
 export interface AiConversationIdentity {

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   verifyAnthropicApiKey,
+  verifyDeepSeekApiKey,
+  verifyGlmApiKey,
+  verifyKimiApiKey,
+  verifyMiniMaxApiKey,
   verifyOpenAiApiKey,
   verifyOpenRouterApiKey,
   verifyProviderApiKey,
@@ -133,5 +137,68 @@ describe('provider key verification', () => {
       },
     })
     expect(JSON.stringify(result)).not.toContain('super-secret-key')
+  })
+
+  it.each([
+    {
+      providerId: 'deepseek',
+      verify: verifyDeepSeekApiKey,
+      baseUrl: 'https://api.deepseek.com/v1',
+      modelId: 'deepseek-chat',
+    },
+    {
+      providerId: 'glm',
+      verify: verifyGlmApiKey,
+      baseUrl: 'https://api.z.ai/api/paas/v4',
+      modelId: 'glm-5.3',
+    },
+    {
+      providerId: 'kimi',
+      verify: verifyKimiApiKey,
+      baseUrl: 'https://api.moonshot.ai/v1',
+      modelId: 'kimi-k3',
+    },
+    {
+      providerId: 'minimax',
+      verify: verifyMiniMaxApiKey,
+      baseUrl: 'https://api.minimax.io/v1',
+      modelId: 'MiniMax-M2.1',
+    },
+  ] as const)(
+    'verifies $providerId through its OpenAI-compatible model list',
+    async ({ providerId, verify, baseUrl, modelId }) => {
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: [{ id: modelId }] }))
+
+      const result = await verify('provider-secret', { fetch: fetchMock, now })
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        `${baseUrl}/models`,
+        expect.objectContaining({
+          method: 'GET',
+          headers: { Authorization: 'Bearer provider-secret' },
+        }),
+      )
+      expect(result).toEqual({
+        ok: true,
+        providerId,
+        verifiedAt: now.toISOString(),
+        details: { modelIds: [modelId] },
+      })
+    },
+  )
+
+  it('rejects an invalid key for a new provider with a typed failure', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('{"error":{"message":"token expired"}}', { status: 401 }))
+
+    const result = await verifyProviderApiKey('glm', 'glm-secret', { fetch: fetchMock, now })
+
+    expect(result).toMatchObject({
+      ok: false,
+      providerId: 'glm',
+      error: { code: 'invalid-key', status: 401 },
+    })
+    expect(JSON.stringify(result)).not.toContain('glm-secret')
   })
 })

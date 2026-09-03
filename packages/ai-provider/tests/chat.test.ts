@@ -76,6 +76,21 @@ describe('chatForProvider', () => {
     )
   })
 
+  it.each([
+    ['deepseek', 'https://api.deepseek.com/v1/chat/completions'],
+    ['glm', 'https://api.z.ai/api/paas/v4/chat/completions'],
+    ['kimi', 'https://api.moonshot.ai/v1/chat/completions'],
+    ['minimax', 'https://api.minimax.io/v1/chat/completions'],
+  ] as const)('%s hits its fixed base URL', async (providerId, expectedUrl) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(jsonResponse({ choices: [{ message: { content: 'ok' } }] }))
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await chatForProvider(providerId, { apiKey: 'k', model: 'm' }, 'sys', 'hi')
+    expect(result).toEqual({ ok: true, content: 'ok' })
+    expect(fetchMock).toHaveBeenCalledWith(expectedUrl, expect.anything())
+  })
+
   it('OpenRouter uses its first-class endpoint and requested model', async () => {
     const fetchMock = vi
       .fn()

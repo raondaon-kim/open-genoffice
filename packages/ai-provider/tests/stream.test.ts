@@ -187,6 +187,18 @@ describe('streamForProvider: openai-compatible', () => {
     )
   })
 
+  it.each([
+    ['glm', 'https://api.z.ai/api/paas/v4/chat/completions'],
+    ['kimi', 'https://api.moonshot.ai/v1/chat/completions'],
+    ['minimax', 'https://api.minimax.io/v1/chat/completions'],
+  ] as const)('routes %s to its fixed base URL', async (providerId, expectedUrl) => {
+    const fetchMock = vi.fn().mockResolvedValue(okResponse(sseStream(['data: [DONE]'])))
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    await streamForProvider(providerId, { apiKey: 'k', model: 'm' }, 'sys', [], [], 100, cb)
+    expect(fetchMock).toHaveBeenCalledWith(expectedUrl, expect.anything())
+  })
+
   it('routes OpenRouter tool calls through its first-class endpoint with bearer auth', async () => {
     const fetchMock = vi.fn().mockResolvedValue(okResponse(sseStream(['data: [DONE]'])))
     vi.stubGlobal('fetch', fetchMock)

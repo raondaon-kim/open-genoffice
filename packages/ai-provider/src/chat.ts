@@ -1,5 +1,5 @@
 import { httpBodyDetail } from './http-error'
-import { GENSPARK_LLM_BASE_URLS, OPENROUTER_API_BASE_URL } from './providers'
+import { GENSPARK_LLM_BASE_URLS, OPENAI_COMPATIBLE_BASE_URLS } from './providers'
 import type { AiChatResponse, AiProviderConfig, AiProviderId } from './types'
 
 async function chatAnthropic(
@@ -102,12 +102,6 @@ async function chatOpenAiCompatible(
   return { ok: true, content }
 }
 
-const OPENAI_COMPATIBLE_BASE_URLS: Partial<Record<AiProviderId, string>> = {
-  deepseek: 'https://api.deepseek.com/v1',
-  openai: 'https://api.openai.com/v1',
-  openrouter: OPENROUTER_API_BASE_URL,
-}
-
 /** route a one-shot (non-streaming, non-tool-calling) chat call by provider id */
 export async function chatForProvider(
   provider: AiProviderId,
@@ -129,6 +123,9 @@ export async function chatForProvider(
     case 'gemini':
       return chatGemini(config, system, user)
     case 'deepseek':
+    case 'glm':
+    case 'kimi':
+    case 'minimax':
     case 'openai':
     case 'openrouter':
       return chatOpenAiCompatible(OPENAI_COMPATIBLE_BASE_URLS[provider]!, config, system, user)

@@ -42,10 +42,25 @@ export type {
 } from '@genoffice/ai-provider'
 export { AI_PROVIDERS } from '@genoffice/ai-provider'
 
-export type PublicAiProviderId = Extract<
-  AiProviderId,
-  'genspark' | 'openrouter' | 'anthropic' | 'openai'
->
+/** Provider ids surfaced in settings and model pickers; single source of truth for main-process validation. */
+export const PUBLIC_AI_PROVIDER_IDS = [
+  'genspark',
+  'openrouter',
+  'anthropic',
+  'openai',
+  'deepseek',
+  'glm',
+  'kimi',
+  'minimax',
+] as const
+
+export type PublicAiProviderId = Extract<AiProviderId, (typeof PUBLIC_AI_PROVIDER_IDS)[number]>
+
+export function isPublicAiProviderId(value: unknown): value is PublicAiProviderId {
+  return (
+    typeof value === 'string' && (PUBLIC_AI_PROVIDER_IDS as readonly string[]).includes(value)
+  )
+}
 
 export interface AiConversationIdentity {
   projectId: string

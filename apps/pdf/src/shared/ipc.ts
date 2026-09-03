@@ -155,7 +155,7 @@ export const PROJECT_CHANNELS = {
 
 export type PublicAiProviderId = Extract<
   AiProviderId,
-  'genspark' | 'openrouter' | 'anthropic' | 'openai'
+  'genspark' | 'openrouter' | 'anthropic' | 'openai' | 'deepseek' | 'glm' | 'kimi' | 'minimax'
 >
 
 export interface AiConversationIdentity {

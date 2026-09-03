@@ -1,7 +1,16 @@
 import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 
 export type AiProviderId =
-  'genspark' | 'openrouter' | 'anthropic' | 'gemini' | 'deepseek' | 'openai' | 'custom'
+  | 'genspark'
+  | 'openrouter'
+  | 'anthropic'
+  | 'gemini'
+  | 'deepseek'
+  | 'glm'
+  | 'kimi'
+  | 'minimax'
+  | 'openai'
+  | 'custom'
 
 export type AiProviderProtocol = 'genspark' | 'anthropic' | 'gemini' | 'openai-compatible'
 
