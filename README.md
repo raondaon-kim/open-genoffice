@@ -7,8 +7,9 @@
 > available while adding first-class bring-your-own-provider support.
 
 An AI-native office suite for macOS and Windows: word processor, spreadsheet,
-presentations, and PDF — five Electron apps sharing one engine layer, built
-around AI editing as a first-class workflow rather than a bolted-on chat box.
+presentations, PDF, and Hangul (`.hwp`/`.hwpx`) — five Electron apps sharing one
+engine layer, built around AI editing as a first-class workflow rather than a
+bolted-on chat box.
 
 ## Download
 
@@ -22,7 +23,15 @@ Other versions are on the [Releases](https://github.com/sergedoub/open-genoffice
 ## What this fork changes
 
 - Keeps Genspark as a built-in provider and migration default.
-- Adds OpenRouter, Anthropic, and OpenAI with user-supplied API keys.
+- Adds OpenRouter, Anthropic, OpenAI, DeepSeek, GLM (Z.ai), Kimi (Moonshot),
+  and MiniMax with user-supplied API keys.
+- Adds a Hangul (`.hwp`/`.hwpx`) module as a fifth shell tab: open existing
+  documents, create new blank documents from Home, and ask the AI to format,
+  fill forms, or generate complete documents.
+- The Hangul AI can *create* rich documents (reports, syllabi, announcements)
+  — text **and real tables** in one file — by generating `.hwpx` through the
+  HwpForge engine (MIT/Apache-2.0), and ships a built-in K-12 school-form
+  pack (`가정통신문`, lesson plans, performance-assessment rubrics, …).
 - Encrypts provider keys through Electron `safeStorage`; raw keys remain in the
   main process and never enter office documents.
 - Adds one suite-wide default plus sticky per-document provider/model routes.
@@ -57,11 +66,11 @@ Mainfunc, Inc.; other names belong to their respective owners.
 | `apps/sheets` | **Open GenOffice Sheets** | `.xlsx` spreadsheet. UI built on the open-source [Univer](https://github.com/dream-num/univer) core (Apache-2.0) with a large layer of in-house extensions; xlsx import/export runs through an in-house Rust sidecar (calamine + IronCalc), charts are rendered in-house (Konva), plus pivot tables, slicers, conditional formatting, and formula tracing. |
 | `apps/slides` | **Open GenOffice Slides** | `.pptx` presentations. In-house pptx parse/render/edit engine with masters, charts, cropping, ink, and text shaping (HarfBuzz metrics).                                                                                                                                                                                                                    |
 | `apps/pdf`    | **Open GenOffice PDF**    | PDF viewer/editor on pdf.js + pdf-lib: annotations, forms, outlines, stamps, signatures, page operations, print.                                                                                                                                                                                                                                           |
-| `apps/hwp`    | **Open GenOffice HWP**    | Hangul word processor (`.hwp`/`.hwpx`) viewer/editor built on the MIT-licensed [rhwp](https://github.com/edwardkim/rhwp) engine (Rust + WASM, embedded as an iframe studio): text editing, formatting, tables, and save-back in the source format.                                                                                                         |
-| `apps/shell`  | **Open GenOffice**        | The suite shell: home screen and tabbed hosting of the four editors. Auto-update is optional and disabled unless a derivative update feed is configured at packaging time.                                                                                                                                                                                 |
+| `apps/hwp`    | **Open GenOffice HWP**    | Hangul word processor (`.hwp`/`.hwpx`) built on the MIT-licensed [rhwp](https://github.com/edwardkim/rhwp) engine (Rust + WASM, embedded as an iframe studio). Opens and edits existing documents (text, formatting, tables, save-back in the source format) and creates new blank documents from Home. The AI assistant can format paragraphs (color/alignment), fill 누름틀 form fields, and generate whole documents — including real tables — into a new tab via the [HwpForge](https://github.com/ai-screams/HwpForge) generator (Markdown → `.hwpx`). Includes a built-in Korean K-12 school-form pack (가정통신문, 교수·학습과정안, 수행평가·루브릭, 상담일지, 회의록, 출장복명서, 주간 학습 안내장, 방과후 운영계획) that starts from the AI panel. |
+| `apps/shell`  | **Open GenOffice**        | The suite shell: home screen and tabbed hosting of the editors. Auto-update is optional and disabled unless a derivative update feed is configured at packaging time.                                                                                                                                                                                 |
 
 Every app embeds the same AI panel: block-granular AI editing with version
-snapshots and diffs in docs, a tool-calling agent over workbook/slide/PDF
+snapshots and diffs in docs, a tool-calling agent over workbook/slide/PDF/Hangul
 state in the others.
 
 **AI providers.** Genspark remains available through its account sign-in. The
@@ -70,6 +79,15 @@ GLM (Z.ai), Kimi (Moonshot), and MiniMax keys, with a suite default and sticky
 per-document provider/model routes. Bring-your-own keys are encrypted in the
 Electron main process and are not exposed to renderers or stored in office
 documents.
+
+**Hangul document creation.** In a Hangul tab, ask the AI to write a document
+(e.g. "강의 실라버스 만들어줘" or "주간 보고서 작성해줘") and it produces a
+finished `.hwpx` — headings, paragraphs, and real tables with cell text — that
+opens in a new tab. The same engine backs the K-12 school-form buttons in the
+AI panel's empty state ("문서 양식으로 바로 만들기"). Because the engine
+cannot yet edit arbitrary text or table cells inside an open document, AI edits
+that are not creation/formatting are clearly labeled as out of scope rather
+than silently attempted.
 
 ## Engine packages
 
@@ -97,7 +115,7 @@ npm ci
 npm run fixtures     # generate test .docx fixtures
 npm test             # engine + app unit tests (docs/sheets/slides need no display)
 npm run typecheck    # tsc --noEmit across every workspace
-npm run dev          # all four editors + shell against Vite dev servers
+npm run dev          # all five editors + shell against Vite dev servers
 npm run dev:docs     # a single app (same pattern works per workspace)
 npm run dist:mac     # package macOS dmg (regenerates third-party notices)
 npm run dist:win     # package Windows nsis installer
