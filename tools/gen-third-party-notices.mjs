@@ -56,7 +56,7 @@ function extraResourceSeeds() {
   const entries = [build.extraResources, build.mac?.extraResources, build.win?.extraResources]
   const names = []
   for (const e of entries.flat()) {
-    const m = e?.from && /node_modules\/((?:@[^/]+\/)?[^/]+)$/.exec(e.from)
+    const m = e?.from && /node_modules\/((?:@[^/]+\/)?[^/]+)(?:\/|$)/.exec(e.from)
     if (m) names.push(m[1])
   }
   return names
@@ -294,6 +294,16 @@ for (const [name, spdx, copyright] of FONTS) out += sub(`${name} — ${spdx}`) +
 out += sub('SIL Open Font License 1.1 — full text')
 out +=
   readFileSync(join(ROOT, 'apps/docs/src/renderer/fonts/LICENSE-OFL.txt'), 'utf8').trim() + '\n'
+
+// The bundled rhwp studio is built from an upstream clone whose npm tree is not
+// ours; tools/build-hwp-studio.mjs assembles its notices into dist/studio.
+const studioNotices = join(ROOT, 'apps/hwp/dist/studio/THIRD-PARTY.md')
+if (existsSync(studioNotices)) {
+  out += hr('4. Bundled rhwp studio (Hangul editor) and its dependencies')
+  out += readFileSync(studioNotices, 'utf8').trim() + '\n'
+} else {
+  console.warn('apps/hwp/dist/studio/THIRD-PARTY.md not found — run npm run build:hwp-studio first')
+}
 
 const dest = join(ROOT, 'apps/shell/build/THIRD-PARTY-NOTICES.txt')
 mkdirSync(dirname(dest), { recursive: true })

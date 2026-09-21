@@ -43,18 +43,46 @@ function normalizeForkUpdateUrl(value) {
 const updateUrl = normalizeForkUpdateUrl(process.env[FORK_UPDATE_URL_ENV])
 const macIdentity = process.env.OPEN_GENOFFICE_MAC_IDENTITY?.trim() || null
 
-// The gsk CLI tree below is copied verbatim from node_modules, and the
-// nested commander path depends on npm's current hoisting layout — fail the
-// build with a clear message if an install ever changes it, instead of
-// shipping an installer with a broken gsk runtime.
+// Resources below are copied verbatim rather than bundled, so a missing source
+// would ship a silently broken installer. Fail the build with a clear message
+// instead: the gsk CLI tree (its nested commander path depends on npm's current
+// hoisting), the built rhwp studio (tools/build-hwp-studio.mjs), the HwpForge
+// platform binary for the OS we are packaging on (npm installs only the current
+// platform's optional package), and the rhwp CLI fetched by
+// tools/fetch-rhwp-cli.mjs for that platform.
+// Note: electron-builder also copies the ROOT package.json `dependencies` into
+// app.asar. HwpForge used to ride along that way (@hwpforge/mcp at the root);
+// it now ships explicitly here, so that dependency must stay in apps/hwp — at
+// the root it would be packaged twice.
+// Only the two packaging targets check for native binaries. This module is
+// also required outside packaging (tools/gen-third-party-notices.mjs reads
+// extraResources), possibly on Linux, where nothing is packaged.
+const HWPFORGE_PKG =
+  process.platform === 'win32'
+    ? 'mcp-win32-x64'
+    : process.platform === 'darwin'
+      ? 'mcp-darwin-arm64'
+      : null
+const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
+const HWPFORGE_SRC = HWPFORGE_PKG
+  ? `../../node_modules/@hwpforge/${HWPFORGE_PKG}/bin/${HWPFORGE_EXE}`
+  : null
+const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
+const RHWP_SRC = HWPFORGE_PKG
+  ? `../hwp/native/rhwp/${process.platform}-${process.arch}/${RHWP_EXE}`
+  : null
 for (const rel of [
   '../../node_modules/@genspark/cli',
   '../../node_modules/@genspark/cli/node_modules/commander',
   '../../node_modules/ws',
+  '../hwp/dist/studio/index.html',
+  ...(HWPFORGE_SRC ? [HWPFORGE_SRC] : []),
+  ...(RHWP_SRC ? [RHWP_SRC] : []),
 ]) {
   if (!existsSync(join(__dirname, rel))) {
     throw new Error(
-      `electron-builder extraResources source missing: ${rel} (npm hoisting changed?)`,
+      `electron-builder extraResources source missing: ${rel} ` +
+        `(npm hoisting changed? run npm run build -w @genoffice/hwp?)`,
     )
   }
 }
@@ -98,6 +126,10 @@ const config = {
       to: 'modules/hwp',
     },
     {
+      from: '../hwp/dist/studio',
+      to: 'modules/hwp-studio',
+    },
+    {
       from: '../../node_modules/@genspark/cli',
       to: 'gsk/node_modules/@genspark/cli',
     },
@@ -126,6 +158,14 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+      {
+        from: '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
+        to: 'native/hwpforge-mcp',
+      },
+      {
+        from: '../hwp/native/rhwp/darwin-arm64/rhwp',
+        to: 'native/rhwp',
+      },
     ],
   },
   win: {
@@ -142,6 +182,14 @@ const config = {
         // statically links the CRT (see xlsx-engine/.cargo/config.toml).
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar.exe',
         to: 'native/xlsx-sidecar.exe',
+      },
+      {
+        from: '../../node_modules/@hwpforge/mcp-win32-x64/bin/hwpforge-mcp.exe',
+        to: 'native/hwpforge-mcp.exe',
+      },
+      {
+        from: '../hwp/native/rhwp/win32-x64/rhwp.exe',
+        to: 'native/rhwp.exe',
       },
     ],
   },
