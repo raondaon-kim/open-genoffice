@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { delimiter, join } from 'node:path'
+import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 
 const args = process.argv.slice(2)
@@ -78,24 +78,20 @@ if (changedFiles.length === 0) {
   process.exit(0)
 }
 
-const prettierExecutable = join(
-  repoRoot,
-  'node_modules',
-  '.bin',
-  process.platform === 'win32' ? 'prettier.cmd' : 'prettier',
-)
+// Run prettier's JS entry point through the current Node binary. Spawning the
+// node_modules/.bin/prettier.cmd shim directly fails with EINVAL on Windows
+// since Node 20.12 (CVE-2024-27980 hardening), and going through a shell would
+// need quoting for every path.
+const prettierBin = join(repoRoot, 'node_modules', 'prettier', 'bin', 'prettier.cjs')
+if (!existsSync(prettierBin)) {
+  console.error(`Unable to run Prettier: ${prettierBin} not found (run npm ci)`)
+  process.exit(1)
+}
 const prettierMode = mode === '--write' ? '--write' : '--check'
 const result = spawnSync(
-  prettierExecutable,
-  [prettierMode, '--ignore-unknown', '--', ...changedFiles],
-  {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      PATH: `${join(repoRoot, 'node_modules', '.bin')}${delimiter}${process.env.PATH}`,
-    },
-  },
+  process.execPath,
+  [prettierBin, prettierMode, '--ignore-unknown', '--', ...changedFiles],
+  { cwd: repoRoot, stdio: 'inherit' },
 )
 
 if (result.error) {
