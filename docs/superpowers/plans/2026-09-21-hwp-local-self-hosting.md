@@ -19,7 +19,7 @@
 - 호스트 CSP `frame-src 'self' http://127.0.0.1:*`. 호스트 CSP에 `'wasm-unsafe-eval'`을 넣지 않는다.
 - 스튜디오는 `/rhwp/` prefix, SPA 폴백 없음(미존재 → 404). 렌더러 root(`/`)만 `index.html` 폴백.
 - HwpForge는 플랫폼 바이너리를 **직접** spawn한다. npm 런처 JS·`process.execPath`·`ELECTRON_RUN_AS_NODE`를 쓰지 않는다.
-- `@hwpforge/mcp` 의존성은 `apps/hwp/package.json`에만 둔다(루트에서 제거). 이 패키지는 import되지 않으며, optionalDependencies로 플랫폼 바이너리 패키지를 끌어오는 용도다.
+- `@hwpforge/mcp` 의존성은 `apps/hwp/package.json`에만 둔다(루트에서 제거). 이 패키지는 import되지 않으며, optionalDependencies로 플랫폼 바이너리 패키지를 끌어오는 용도다. **루트 `dependencies`는 electron-builder가 `app.asar`에 자동 수집하므로**, 바이너리를 `extraResources`로 명시 배포하는 이상 루트에 남기면 `asar.unpacked`와 `native/`에 두 번 실린다.
 - 코드 스타일: prettier `semi: false, singleQuote, trailingComma: all, printWidth: 100`. 커밋 전 `npm run format`.
 - 커밋 메시지는 리포 관례 `HWP: <imperative summary>` + 본문, 마지막 줄 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 - 작업 브랜치 `feat/hwp-local-self-hosting`(이미 체크아웃됨). `main`은 건드리지 않는다.
@@ -56,7 +56,7 @@
 **Interfaces:**
 - Produces: 스파이크 판정(go / wasm-pack 폴백 필요), 수정 전 설치본에서 K-12 서식 버튼이 실패한다는 기록(에러 문구).
 
-- [ ] **Step 1: 의존성 설치**
+- [x] **Step 1: 의존성 설치** (완료 2026-09-21)
 
 Run (리포 루트 `D:\genoffice`):
 ```bash
@@ -65,42 +65,42 @@ ls node_modules/@rhwp/core/rhwp_bg.wasm node_modules/@rhwp/editor/index.js node_
 ```
 Expected: 세 파일 모두 존재. `@hwpforge/mcp-win32-x64`만 있고 darwin/linux는 없는 것이 정상(npm은 현재 OS의 optional 플랫폼 패키지만 설치).
 
-- [ ] **Step 2: 수정 전 설치본에서 HwpForge 결함 재현 (스펙 §8 수용 1)**
+- [x] **Step 2: 수정 전 기준선 — 패키지 앱에서 HwpForge 경로가 동작함을 확인 (스펙 §8 수용 1)**
 
-현재 HEAD는 스펙 문서만 추가된 상태라 코드는 `main`과 동일하다.
+현재 HEAD는 스펙·계획 문서만 추가된 상태라 코드는 `main`과 동일하다. 설계 초기의 "설치본에서
+`create_document`가 실패한다"는 가설을 검증하는 단계였고, **결과는 반대(동작함)**였다 — 스펙 §1·§2에
+반영됨. 이후 Task 3·7은 결함 수정이 아니라 명시적 패키징 계약으로의 구조 개선이다.
 
 Run:
 ```bash
 npm run dist:win
+node scripts/drivers/driver.hwp-k12.mjs   # release/win-unpacked/Open GenOffice.exe 를 구동
 ```
-Expected: `apps/shell/release/OpenGenOfficeSetup-v0.4.0-x64.exe` 생성 (sheets Rust 사이드카 컴파일 포함, 첫 실행 10~20분).
+드라이버(`scripts/drivers/driver.hwp-k12.mjs`, gitignored, 리포 관례 `_electron.launch`)는 Home → "New HWP"
+카드 → HWP 탭에서 `window.hwpApi.createDocument(markdown, name)`을 호출한다 — K-12 버튼이 호출하는
+것과 동일한 IPC이며, 버튼 자체는 AI 모델이 0개인 새 설치본에서는 렌더되지 않는다(`AiPanel.tsx:575`).
 
-PowerShell로 무인 설치·기동 (release-windows.yml 39-57과 동일 패턴):
-```powershell
-$installer = Get-ChildItem 'apps/shell/release/OpenGenOfficeSetup-v*-x64.exe' | Select-Object -First 1
-$installDir = 'C:\Temp\OpenGenOffice-prefix'
-Start-Process -FilePath $installer.FullName -ArgumentList '/S', "/D=$installDir" -Wait
-Start-Process -FilePath (Join-Path $installDir 'Open GenOffice.exe')
-```
-앱에서: Home → 새 문서 카드 중 **`.hwp`** → HWP 탭이 열리면 AI 패널(우측) 빈 상태의 "문서 양식으로 바로 만들기" 아래 **가정통신문** 버튼 클릭.
-Expected: 새 탭이 열리지 **않고** AI 패널에 오류 표시. 오류 문구를 그대로 기록한다(예상: `Cannot find module '@hwpforge/mcp/package.json'` 계열). 이 문구가 §12 수용 로그의 "수정 전" 항목이 된다.
+결과(2026-09-21): `{ ok: true, path: "…ai-created드라이버_테스트-<ts>.hwpx" }`, 8,197바이트 `.hwpx` 생성,
+새 탭 `Open GenOffice HWP` 오픈. asar 헤더 파싱: `node_modules/@hwpforge/mcp`, `@hwpforge/mcp-win32-x64`,
+`ws` 포함(= 루트 `dependencies`), `.exe`는 `app.asar.unpacked`에 서명되어 존재.
 
-정리:
-```powershell
-Start-Process -FilePath (Join-Path $installDir 'Uninstall Open GenOffice.exe') -ArgumentList '/S' -Wait
-```
+정리: 설치하지 않았으므로 제거할 것이 없다. 드라이버가 만든 `%APPDATA%Open GenOfficeapp-settings.json`과
+`ai-created` 산출물은 앱의 정상 userData이며 그대로 둔다.
 
-- [ ] **Step 3: 스파이크 — rhwp-studio를 `@rhwp/core` WASM으로 빌드해 로컬 서빙 확인 (스펙 §9)**
+- [x] **Step 3: 스파이크 — rhwp-studio를 `@rhwp/core` WASM으로 빌드해 로컬 서빙 확인 (스펙 §9)**
 
 작업 폴더 생성 후 sparse clone (`samples`는 스파이크용 샘플 문서 확보를 위해 추가):
 ```bash
 mkdir -p "C:/Temp/claude/d--genoffice/1644438f-7f48-4eb2-a9d1-60920d831374/scratchpad/hwp-spike"
 cd "C:/Temp/claude/d--genoffice/1644438f-7f48-4eb2-a9d1-60920d831374/scratchpad/hwp-spike"
 git clone --filter=blob:none --sparse --depth 1 --branch v0.8.6 https://github.com/edwardkim/rhwp rhwp
+# git < 2.37: clone --sparse leaves cone mode off, and pattern-mode `set` drops the root files
+git -C rhwp config core.sparseCheckoutCone true
 git -C rhwp sparse-checkout set rhwp-studio npm/hwpctrl-ocx npm/editor assets/fonts assets/logo samples
+ls rhwp/LICENSE rhwp/THIRD_PARTY_LICENSES.md rhwp/rhwp-studio/vite.config.ts
 ls rhwp/samples | grep -iE "\.hwpx?$" | head
 ```
-Expected: `rhwp/rhwp-studio/vite.config.ts` 존재, samples에 `.hwp`/`.hwpx` 파일 목록 출력. 하나를 골라 `SAMPLE` 경로로 기억한다.
+Expected: 루트 파일 2개와 `vite.config.ts` 존재, samples에 `.hwp`/`.hwpx` 파일 목록 출력. 하나를 골라 `SAMPLE` 경로로 기억한다. (`samples/`는 약 500MB — 스파이크 전용이며 프로덕션 스크립트의 sparse 집합에는 없다.)
 
 WASM·폰트 배치:
 ```bash
@@ -122,7 +122,7 @@ PWA 제거 래퍼 설정 작성 — `rhwp/rhwp-studio/vite.config.genoffice.ts` 
 // served from a loopback origin whose port changes on every launch, so a
 // service worker would only accumulate registrations and WASM caches in
 // userData.
-import base from './vite.config'
+import base from './vite.config.ts'
 
 type PluginLike = { name?: unknown } | null | undefined | false
 
@@ -145,11 +145,11 @@ export default {
 }
 ```
 
-빌드:
+빌드 (Git Bash에서는 `MSYS_NO_PATHCONV=1`이 필수 — 없으면 MSYS가 `--base=/rhwp/`를 `/Program Files/Git/rhwp/`로 변환해 `index.html` 참조가 깨진다; 프로덕션 스크립트는 Node→cmd.exe로 실행하므로 영향 없음):
 ```bash
 cd rhwp/rhwp-studio
 npm ci
-RHWP_DISABLE_EXTERNAL_WEBFONTS=1 npx vite build --base=/rhwp/ --config vite.config.genoffice.ts --outDir ../dist-staging --emptyOutDir
+MSYS_NO_PATHCONV=1 RHWP_DISABLE_EXTERNAL_WEBFONTS=1 npx vite build --base=/rhwp/ --config vite.config.genoffice.ts --outDir ../dist-staging --emptyOutDir
 ls ../dist-staging
 ls ../dist-staging/sw.js ../dist-staging/registerSW.js ../dist-staging/manifest.webmanifest 2>&1 | grep -c "No such file"
 cd ../..
@@ -216,7 +216,7 @@ node serve.mjs rhwp/dist-staging /d/genoffice/node_modules/@rhwp/editor "rhwp/sa
 브라우저(Edge/Chrome)로 `http://127.0.0.1:7790/` 열기.
 Expected: 한글 문서가 렌더되고 탭 제목이 `pages=N`. DevTools 콘솔에 `SPIKE OK pages= N`, 빨간 오류 없음. Network 탭에서 `edwardkim.github.io` 요청 0건, WASM은 `127.0.0.1:7790/rhwp/rhwp_bg.wasm`에서 로드.
 
-- [ ] **Step 4: 판정**
+- [x] **Step 4: 판정** — GO (2026-09-21)
 
 - 렌더 성공 → Task 1로 진행.
 - 스튜디오가 WASM 로드/초기화에서 실패(콘솔에 `rhwp_bg.wasm` 관련 오류, export 누락 등) → **여기서 멈추고 보고한다.** 스펙 §9 폴백(wasm-pack으로 `pkg/` 직접 빌드)을 Task 5 스크립트에 반영하는 설계 변경이 필요하며, 이는 사용자 승인 사안이다.
@@ -1150,10 +1150,12 @@ git add apps/hwp/src/main/hwpforge-client.ts apps/hwp/src/main/hwp-main.ts apps/
 git commit -m "$(cat <<'EOF'
 HWP: spawn the HwpForge binary directly instead of the npm launcher
 
-Installed builds ship no node_modules, so require.resolve('@hwpforge/mcp')
-in the main process always failed and AI document creation was broken in
-every packaged app. Drive the platform binary over stdio directly, take its
-path from the caller, and reject with that path when it cannot be spawned.
+The launcher path worked only because electron-builder copies the root
+package.json dependencies into app.asar and Electron resolves the unpacked
+.exe through it — an implicit contract, with an Electron-as-Node process in
+between. Drive the platform binary over stdio directly, take its path from
+the caller (explicit extraResource, like the sheets sidecar), and reject
+with that path when it cannot be spawned.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -1386,7 +1388,8 @@ EOF
 // served from a loopback origin whose port changes on every launch, so a
 // service worker would only accumulate registrations and WASM caches in
 // userData.
-import base from './vite.config'
+// The explicit .ts extension keeps Vite's native config loader quiet.
+import base from './vite.config.ts'
 
 type PluginLike = { name?: unknown } | null | undefined | false
 
@@ -1523,28 +1526,43 @@ function ensureClone() {
     REPO_URL,
     WORK_DIR,
   ])
+  // git < 2.37 leaves cone mode off after `clone --sparse`; without it `set`
+  // treats the paths as patterns and drops the top-level files (LICENSE, …)
+  run('git', ['-C', WORK_DIR, 'config', 'core.sparseCheckoutCone', 'true'])
   run('git', ['-C', WORK_DIR, 'sparse-checkout', 'set', ...SPARSE_PATHS])
   writeFileSync(tagFile, tag)
 }
 
-/** the WASM package that upstream's deploy workflow produces with wasm-pack */
+/**
+ * The WASM package that upstream's deploy workflow produces with wasm-pack.
+ * The studio bundles it through the `@wasm` alias → pkg/ and references the
+ * hashed assets/rhwp_bg-*.wasm at runtime; the copies upstream also drops into
+ * public/ (and the stale ones committed there) are never fetched, so they are
+ * removed instead of shipped (~10 MB).
+ */
 function placeWasm() {
   mkdirSync(PKG_DIR, { recursive: true })
   for (const file of ['rhwp.js', 'rhwp_bg.wasm', 'rhwp.d.ts', 'rhwp_bg.wasm.d.ts']) {
     cpSync(join(coreDir, file), join(PKG_DIR, file))
   }
   const publicDir = join(STUDIO_DIR, 'public')
-  cpSync(join(PKG_DIR, 'rhwp_bg.wasm'), join(publicDir, 'rhwp_bg.wasm'))
-  cpSync(join(PKG_DIR, 'rhwp.js'), join(publicDir, 'rhwp.js'))
+  for (const stale of ['rhwp.js', 'rhwp_bg.wasm', 'rhwp.d.ts', 'rhwp_bg.wasm.d.ts']) {
+    removeAny(join(publicDir, stale))
+  }
 }
 
-/** public/fonts is a symlink upstream; Windows checkouts turn it into a text file */
+/**
+ * public/fonts is a symlink upstream; Windows checkouts turn it into a text
+ * file. public/samples (demo documents, ~7 MB) is not referenced by the built
+ * studio and is dropped from the embedded bundle.
+ */
 function placeFontsAndIcon() {
   const publicDir = join(STUDIO_DIR, 'public')
   const fonts = join(publicDir, 'fonts')
   removeAny(fonts)
   cpSync(join(WORK_DIR, 'assets', 'fonts'), fonts, { recursive: true })
   cpSync(join(WORK_DIR, 'assets', 'logo', 'favicon.ico'), join(publicDir, 'favicon.ico'))
+  removeAny(join(publicDir, 'samples'))
 }
 
 function buildStudio() {
@@ -1607,12 +1625,22 @@ function thirdPartyNotices() {
 }
 
 function verifyStaging() {
-  for (const file of ['index.html', 'rhwp_bg.wasm']) {
-    if (!existsSync(join(STAGING_DIR, file))) throw new Error(`studio build is missing ${file}`)
+  if (!existsSync(join(STAGING_DIR, 'index.html'))) throw new Error('studio build is missing index.html')
+  const assets = existsSync(join(STAGING_DIR, 'assets')) ? readdirSync(join(STAGING_DIR, 'assets')) : []
+  if (!assets.some((f) => /^rhwp_bg-.*\.wasm$/.test(f))) {
+    throw new Error('studio build is missing the bundled assets/rhwp_bg-*.wasm')
+  }
+  if (!assets.some((f) => /^studio-plugin-.*\.js$/.test(f))) {
+    throw new Error('studio build is missing the hwpctrl studio-plugin chunk (RHWP_WITHOUT_HWPCTRL set?)')
   }
   for (const file of ['sw.js', 'registerSW.js', 'manifest.webmanifest']) {
     if (existsSync(join(STAGING_DIR, file))) {
       throw new Error(`studio build must not contain the PWA artifact ${file}`)
+    }
+  }
+  for (const file of ['rhwp_bg.wasm', 'rhwp.js', 'samples']) {
+    if (existsSync(join(STAGING_DIR, file))) {
+      throw new Error(`studio build should not contain the unreferenced ${file} (pruning failed)`)
     }
   }
 }
@@ -1695,14 +1723,16 @@ Expected: lock 변경은 `apps/hwp` 워크스페이스 항목에 `@hwpforge/mcp`
 Run:
 ```bash
 npm run build:hwp-studio
-ls apps/hwp/studio-dist
+ls -a apps/hwp/studio-dist
+ls apps/hwp/studio-dist/assets | grep -E "rhwp_bg-.*\.wasm|studio-plugin-.*\.js"
 cat apps/hwp/studio-dist/.rhwp-version
 grep -c "/rhwp/" apps/hwp/studio-dist/index.html
-ls apps/hwp/studio-dist/sw.js apps/hwp/studio-dist/registerSW.js apps/hwp/studio-dist/manifest.webmanifest 2>&1 | grep -c "No such file"
+ls apps/hwp/studio-dist/sw.js apps/hwp/studio-dist/registerSW.js apps/hwp/studio-dist/manifest.webmanifest apps/hwp/studio-dist/rhwp_bg.wasm apps/hwp/studio-dist/samples 2>&1 | grep -c "No such file"
 grep -c "^## " apps/hwp/studio-dist/THIRD-PARTY.md
+du -sh apps/hwp/studio-dist | cut -f1
 grep -rl "edwardkim.github.io" apps/hwp/studio-dist || echo "no occurrences"
 ```
-Expected: `index.html`, `rhwp_bg.wasm`, `assets/`, `fonts/`, `THIRD-PARTY.md`, `.rhwp-version` 존재. 스탬프 JSON에 `"rhwpVersion":"0.8.6"`. `index.html`에 `/rhwp/` 경로 ≥1. PWA 3개 부재(`3`). THIRD-PARTY 섹션 ≥ 6(rhwp, 폰트, canvaskit-wasm, @noble/hashes, pixelmatch, pngjs). `edwardkim.github.io` 발생은 정보로만 기록(스튜디오 내부 링크 텍스트일 수 있음; 호스트 CSP가 iframe 로드를 막으므로 기능 영향 없음).
+Expected: `index.html`, `assets/`, `fonts/`, `icons/`, `images/`, `print.html`, `theme-init.js`, `favicon.ico`, `THIRD-PARTY.md`, `.rhwp-version` 존재. `assets/`에 `rhwp_bg-<hash>.wasm`과 `studio-plugin-<hash>.js`(hwpctrl) 존재. 스탬프 JSON에 `"rhwpVersion":"0.8.6"`. `index.html`에 `/rhwp/` 경로 ≥1. PWA 3개 + 정리 대상 2개 부재(`5`). THIRD-PARTY 섹션 ≥ 6(rhwp, 폰트, canvaskit-wasm, @noble/hashes, pixelmatch, pngjs). 크기 약 42MB(폰트 22 + assets 19; 스파이크에서 정리 전 59MB 실측). `edwardkim.github.io` 발생은 정보로만 기록(스튜디오 내부 링크 텍스트일 수 있음; 호스트 CSP가 iframe 로드를 막으므로 기능 영향 없음).
 
 두 번째 실행:
 ```bash
@@ -1853,6 +1883,10 @@ EOF
 // hoisting), the built rhwp studio (tools/build-hwp-studio.mjs), and the
 // HwpForge platform binary for the OS we are packaging on (npm installs only the
 // current platform's optional package).
+// Note: electron-builder also copies the ROOT package.json `dependencies` into
+// app.asar. HwpForge used to ride along that way (@hwpforge/mcp at the root);
+// it now ships explicitly here, so that dependency must stay in apps/hwp — at
+// the root it would be packaged twice.
 // Only the two packaging targets check for a HwpForge binary. This module is
 // also required outside packaging (tools/gen-third-party-notices.mjs reads
 // extraResources), possibly on Linux, where no platform package is installed
@@ -2041,57 +2075,24 @@ same exact version in `apps/hwp/package.json`, run `npm install`, then
 the network disconnected. The SDK, the studio and the WASM must share one
 version; mixed versions fall back to the SDK's legacy handshake and are not
 supported here.
+
+## Packaged native helpers
+
+electron-builder copies the root `package.json` `dependencies` into
+`app.asar` automatically. Native helper binaries are deliberately not shipped
+that way: the sheets xlsx sidecar and the HwpForge MCP binary (`@hwpforge/mcp`,
+declared in `apps/hwp`) are listed as platform `extraResources` in
+`apps/shell/electron-builder.cjs`, which fails the build when a binary is
+missing, and the main process spawns them directly from `resources/native/`.
 ```
 
-- [ ] **Step 5: 스펙 §8 CI 단락 정정**
-
-스펙의
-```
-### CI
-
-스튜디오 빌드가 hwp `build`에 체인되므로 `.github/workflows/ci.yml`의 기존 단계가 스크립트를
-자동 검증한다. 추가 잡 없음. (네트워크 필요 — `npm ci`·cargo와 같은 조건.)
-```
-을 다음으로 교체:
-```
-### CI
-
-`.github/workflows/ci.yml`은 `build`를 실행하지 않는다(lint/typecheck/fixtures/test만). 따라서
-`npm ci` 직후 `npm run build:hwp-studio` 단계를 추가해 스크립트를 매 푸시마다 검증한다. Rust는
-필요 없다(WASM은 `@rhwp/core`에서 온다). 네트워크는 `npm ci`와 같은 조건으로 필요하다. 릴리스
-워크플로(`release-windows.yml`)는 `dist:win` → `build:all` → hwp `build`를 거치므로 자동 포함된다.
-```
-
-- [ ] **Step 6: 스펙 §5.3·§7 정정 — `getStudioUrl`은 reject가 아니라 결과 객체**
-
-구현(Task 4)은 IPC 핸들러가 reject하는 대신 `StudioUrlResult`를 반환한다. Electron은 `ipcMain.handle`의
-reject를 렌더러에서 `Error invoking remote method 'hwp:get-studio-url': Error: …`로 감싸므로 사용자에게
-보이는 문구가 더러워진다. 스펙을 구현에 맞춘다.
-
-§5.3의
-```
-- `hwp-main.ts` 핸들러: `ensureLoopbackOrigin().then(o => \`${o}/rhwp/\`)`. `studioDir`가 없거나
-  `studioDir/index.html`이 없으면 reject — 메시지는 dev와 packaged를 구분한다(§7).
-```
-을 다음으로 교체:
-```
-- `hwp-main.ts` 핸들러: `StudioUrlResult = { ok: true; url } | { ok: false; error }`를 반환한다.
-  `studioDir`가 없거나 `studioDir/index.html`이 없으면 `{ ok: false, error }` — 메시지는 dev와
-  packaged를 구분한다(§7). reject 대신 결과 객체를 쓰는 이유: Electron이 `ipcMain.handle`의 reject를
-  `Error invoking remote method …` 접두어로 감싸 사용자 문구를 오염시키기 때문. 렌더러는
-  `if (!studio.ok) throw new Error(studio.error)`로 기존 오류 화면 경로에 합류한다.
-```
-
-§7 표의 첫 행 `| \`studioDir\` 미지정 또는 \`studioDir/index.html\` 부재 | \`getStudioUrl\` reject. dev: …`에서
-`\`getStudioUrl\` reject.`를 `\`getStudioUrl\` → \`{ ok: false, error }\`.`로 바꾼다.
-
-- [ ] **Step 7: 검증·커밋**
+- [ ] **Step 5: 검증·커밋**
 
 Run: `npm run format && npm run format:check && npm run lint`
 Expected: 통과.
 
 ```bash
-git add .github/workflows/ci.yml README.md MODIFICATIONS.md docs/upstream-provenance.md docs/superpowers/specs/2026-09-21-hwp-local-self-hosting-design.md
+git add .github/workflows/ci.yml README.md MODIFICATIONS.md docs/upstream-provenance.md
 git commit -m "$(cat <<'EOF'
 HWP: document the bundled studio and build it in CI
 
@@ -2131,15 +2132,16 @@ Test-Path (Join-Path $installDir 'resources\modules\hwp-studio\index.html')
 Test-Path (Join-Path $installDir 'resources\modules\hwp-studio\rhwp_bg.wasm')
 Test-Path (Join-Path $installDir 'resources\native\hwpforge-mcp.exe')
 Select-String -Path (Join-Path $installDir 'resources\THIRD-PARTY-NOTICES.txt') -Pattern 'Bundled rhwp studio' -Quiet
+-not (Test-Path (Join-Path $installDir 'resources\app.asar.unpacked\node_modules\@hwpforge'))
 ```
-Expected: 네 줄 모두 `True`.
+Expected: 다섯 줄 모두 `True` — 마지막 줄은 HwpForge가 더는 asar 경로로 **중복** 배포되지 않음을 뜻한다.
 
 - [ ] **Step 3: 오프라인 기능 검증**
 
 **네트워크를 끊은 뒤** `Open GenOffice.exe` 실행.
 1. Home → 새 문서 **`.hwp`** → 스튜디오가 뜬다. 텍스트 입력 → 저장(`.hwpx`) → 탭 닫기 → Home 최근 파일에서 재열기 → 내용 유지.
 2. Task 0에서 고른 샘플 `.hwp`(rhwp `samples/`)를 Home → 열기로 연다 → 렌더된다.
-3. HWP 탭 AI 패널 → "문서 양식으로 바로 만들기" → **가정통신문** 클릭 → **새 탭에 `.hwpx`가 열린다**(파일명 `가정통신문_현장체험학습-<timestamp>.hwpx`, 표 포함). 이것이 Task 0 Step 2의 실패에 대한 수정 검증이다.
+3. HwpForge 회귀: 앱을 닫고 오프라인 상태에서 `node scripts/drivers/driver.hwp-k12.mjs "C:\Temp\OpenGenOffice-accept\Open GenOffice.exe"` → `notice.ok: true`, `newTab.ok: true`. 이제 바이너리는 `resources/native/hwpforge-mcp.exe`에서 직접 spawn된다(Task 0 Step 2의 기준선과 같은 결과, 다른 경로). AI 프로바이더가 설정된 환경이면 AI 패널의 **가정통신문** 버튼으로도 확인한다(`가정통신문_현장체험학습-<timestamp>.hwpx`, 표 포함).
 4. 앱 종료 후 네트워크 복구.
 
 Expected: 1~3 모두 성공. 실패 시 어느 단계인지와 오류 문구를 기록하고 해당 Task로 돌아간다.
@@ -2184,8 +2186,8 @@ Task 0 Step 2와 Task 9에서 채운다.
 
 | 항목 | 결과 | 비고 |
 |---|---|---|
-| 수정 전 설치본: K-12 버튼 | | 오류 문구: |
-| 스파이크: `@rhwp/core` WASM으로 스튜디오 렌더 | | `public/rhwp.js` vs core: SAME/DIFFERENT |
+| 수정 전 패키지 앱: `createDocument` IPC | **성공** (2026-09-21) | 가설(실패) 반증. asar에 루트 deps 수집됨. K-12 버튼은 AI 모델 0개라 숨김 |
+| 스파이크: `@rhwp/core` WASM으로 스튜디오 렌더 | **GO** (2026-09-21) | 23페이지 렌더, 외부 요청 0, CDN 폰트→동봉 폰트. `public/rhwp.js` vs core: DIFFERENT(커밋본 stale, 빌드 무관). 발견: git 2.35 cone 모드, MSYS 경로 변환, 미참조 17MB |
 | 설치본 리소스 4종 존재 | | |
 | 오프라인: 새 문서 → 저장 → 재열기 | | |
 | 오프라인: 샘플 `.hwp` 열기 | | |

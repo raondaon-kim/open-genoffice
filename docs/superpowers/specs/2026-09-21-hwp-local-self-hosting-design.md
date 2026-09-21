@@ -17,14 +17,19 @@
 2. 가용성이 서드파티 정적 호스팅에 종속된다.
 3. 문서 바이트를 다루는 컨텍스트에서 원격 서드파티 JS가 실행된다 (보안 경계 구멍).
 
-두 번째 결함은 AI 문서 생성 경로에 있다. `create_document`와 K-12 서식 8종은
-HwpForge MCP 바이너리를 호출하는데, `apps/hwp/src/main/hwpforge-client.ts:24`가
-런타임에 `require.resolve('@hwpforge/mcp/package.json')`을 한다. 셸은 hwp main을
-소스째 번들하고(`apps/shell/electron.vite.config.ts:6-9`), 패키징은
-`files: ['out/**']`에 `dependencies: {}`라 **설치본에는 node_modules가 없다**.
-따라서 설치된 앱에서 `create_document`는 항상 실패한다. 같은 성격의 `@genspark/cli`는
-`apps/shell/electron-builder.cjs:100-111`에서 수동 복사하는데, 뒤에 추가된 HwpForge만
-그 단계가 누락되었다. (패키징 빌드로 실측 재현은 구현 계획의 첫 검증 항목.)
+두 번째 주제는 AI 문서 생성 경로의 **패키징 계약**이다. `create_document`와 K-12 서식 8종은
+HwpForge MCP 바이너리를 호출하는데, `apps/hwp/src/main/hwpforge-client.ts:24`가 런타임에
+`require.resolve('@hwpforge/mcp/package.json')`으로 npm 런처를 찾아 `process.execPath`를
+`ELECTRON_RUN_AS_NODE=1`로 띄우고, 그 런처가 플랫폼 바이너리를 `execFileSync`한다. 설계 초기에는
+이 경로가 설치본에서 실패한다고 판단했으나 **실측 결과 동작한다**(§2): electron-builder가 워크스페이스
+루트 `package.json`의 `dependencies`(`@hwpforge/mcp`, `ws`)를 `app.asar/node_modules`에 수집하고
+`.exe`를 `asar.unpacked`로 꺼내 서명하며, Electron의 asar 인식 `require`/`execFile`이 그 경로를
+해석한다. 즉 결함은 없다. 다만 이 경로는 (a) "루트 `dependencies`가 곧 패키징 목록"이라는 암묵적
+규약에 의존하고(빌더 설정 어디에도 적혀 있지 않음 — `@genspark/cli`는 루트 dep이 아니라서 수동
+복사된 것), (b) optional 플랫폼 패키지 설치 실패를 빌드 시점에 잡지 못해 깨진 설치본을 조용히 만들 수
+있으며, (c) Electron을 Node로 한 번 더 띄우는 중간 프로세스를 거친다. 이 스펙은 이를 sheets Rust
+사이드카와 같은 **명시적 `extraResources` + 바이너리 직접 spawn** 계약으로 바꾼다 — 결함 수정이
+아니라 구조 개선이다.
 
 ## 2. 조사 요약 (설계의 근거)
 
