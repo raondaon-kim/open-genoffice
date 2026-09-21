@@ -10,6 +10,7 @@ import { createI18n, getUiLang } from '@genoffice/i18n'
 import { HWP_CHANNELS } from '../shared/ipc'
 import type { SaveHwpRequest, SaveHwpResult } from '../shared/ipc'
 import { createHwpFromMarkdown } from './hwpforge-client'
+import { resolveNativeBinary } from './native-binary-path'
 
 const tDlg = createI18n({
   zh: {
@@ -203,6 +204,8 @@ interface RuntimePaths {
   onSaved?: (webContentsId: number, path: string) => void
   /** called when the HwpForge generator created a new document so the shell can open it in a tab */
   onCreateDocument?: (path: string) => void
+  /** HwpForge MCP platform binary; the shell injects it, dev falls back to node_modules */
+  hwpforgePath?: string
 }
 
 let runtime: RuntimePaths = { preloadPath: '' }
@@ -362,6 +365,18 @@ function registerHwpIpc(): void {
         markdown,
         join(app.getPath('userData'), 'ai-created'),
         baseName,
+        {
+          binPath: resolveNativeBinary('hwpforge-mcp', {
+            runtimePath: runtime.hwpforgePath,
+            envPath: process.env.HWPFORGE_MCP_PATH,
+            isPackaged: app.isPackaged,
+            resourcesPath: process.resourcesPath,
+            // apps/shell or apps/hwp → repo root
+            repoRoot: join(app.getAppPath(), '..', '..'),
+            platform: process.platform,
+            arch: process.arch,
+          }),
+        },
       )
       if (result.ok && result.path) runtime.onCreateDocument?.(result.path)
       return result

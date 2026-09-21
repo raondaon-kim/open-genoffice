@@ -1,16 +1,19 @@
-import { spawn } from 'node:child_process'
+import { spawn as nodeSpawn } from 'node:child_process'
+import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 /**
  * Minimal MCP stdio client for the HwpForge document generator.
  *
  * HwpForge compiles Markdown (GFM tables included) into valid HWPX documents
  * with real tables/cells — the "write text + tables into one document"
- * capability the rhwp engine automation does not expose. We drive its
- * prebuilt binary over MCP (JSON-RPC lines on stdio) and call
- * hwpforge_convert.
+ * capability the rhwp engine automation does not expose. We spawn its prebuilt
+ * platform binary directly (no npm launcher script, no ELECTRON_RUN_AS_NODE),
+ * speak JSON-RPC lines over stdio and call hwpforge_convert. The binary path
+ * comes from the caller (see native-binary-path.ts) so packaged builds can ship
+ * it as an extraResource next to the sheets sidecar.
  */
 
 interface McpJsonRpc {
@@ -19,10 +22,18 @@ interface McpJsonRpc {
   error?: { message: string }
 }
 
-/** path of the MCP wrapper JS that execs the platform binary */
-function forgeWrapperPath(): string {
-  const pkgJson = require.resolve('@hwpforge/mcp/package.json')
-  return join(dirname(pkgJson), 'bin', 'hwpforge-mcp.js')
+/** spawn(3)-shaped hook so tests can substitute a scripted child process */
+export type SpawnLike = (
+  command: string,
+  args: readonly string[],
+  options: { stdio: ['pipe', 'pipe', 'pipe'] },
+) => ChildProcessWithoutNullStreams
+
+export interface McpCallOptions {
+  /** absolute path of the HwpForge MCP platform binary */
+  binPath: string
+  spawnImpl?: SpawnLike
+  timeoutMs?: number
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
@@ -41,17 +52,14 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   })
 }
 
-async function mcpCall(
+export async function mcpCall(
   toolName: string,
   args: Record<string, unknown>,
-  timeoutMs = 90_000,
+  options: McpCallOptions,
 ): Promise<string> {
-  const child = spawn(process.execPath, [forgeWrapperPath()], {
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
-    stdio: ['pipe', 'pipe', 'pipe'],
-  })
-  child.on('error', () => undefined)
-  child.on('close', () => undefined)
+  const { binPath, timeoutMs = 90_000 } = options
+  const spawnImpl: SpawnLike = options.spawnImpl ?? (nodeSpawn as unknown as SpawnLike)
+  const child = spawnImpl(binPath, [], { stdio: ['pipe', 'pipe', 'pipe'] })
 
   let buffer = ''
   let nextId = 0
@@ -59,6 +67,23 @@ async function mcpCall(
     number,
     { resolve: (m: McpJsonRpc) => void; reject: (e: Error) => void }
   >()
+  const failAll = (err: Error) => {
+    for (const entry of pending.values()) entry.reject(err)
+    pending.clear()
+  }
+  // ENOENT/EACCES arrive here; surface the path so a broken install is diagnosable
+  child.on('error', (err: NodeJS.ErrnoException) => {
+    failAll(
+      new Error(
+        `hwpforge binary not found or not executable: ${binPath} (${err.code ?? err.message})`,
+      ),
+    )
+  })
+  child.on('close', (code) => {
+    failAll(new Error(`hwpforge exited before responding (code ${code ?? 'signal'})`))
+  })
+  // a dead stdin must not turn into an unhandled 'error' event
+  child.stdin.on('error', () => undefined)
 
   child.stdout.on('data', (chunk: Buffer) => {
     buffer += chunk.toString()
@@ -82,11 +107,18 @@ async function mcpCall(
     }
   })
 
+  const send = (payload: Record<string, unknown>) => {
+    try {
+      child.stdin.write(`${JSON.stringify(payload)}\n`)
+    } catch {
+      /* stdin already gone; the 'error'/'close' handlers reject the caller */
+    }
+  }
   const request = (method: string, params: unknown): Promise<McpJsonRpc> =>
     new Promise((resolve, reject) => {
       const id = ++nextId
       pending.set(id, { resolve, reject })
-      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`)
+      send({ jsonrpc: '2.0', id, method, params })
     })
 
   try {
@@ -99,9 +131,7 @@ async function mcpCall(
       timeoutMs,
       'hwpforge initialize',
     )
-    child.stdin.write(
-      `${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`,
-    )
+    send({ jsonrpc: '2.0', method: 'notifications/initialized' })
     const res = await withTimeout(
       request('tools/call', { name: toolName, arguments: args }),
       timeoutMs,
@@ -130,6 +160,7 @@ export async function createHwpFromMarkdown(
   markdown: string,
   destDir: string,
   baseName: string,
+  options: McpCallOptions,
 ): Promise<CreateHwpResult> {
   try {
     if (!markdown.trim()) return { ok: false, error: 'hwpforge: markdown is empty' }
@@ -143,12 +174,11 @@ export async function createHwpFromMarkdown(
     const mdPath = join(destDir, `${safe || 'document'}-${stamp}.md`)
     const outPath = join(destDir, `${safe || 'document'}-${stamp}.hwpx`)
     await writeFile(mdPath, markdown, 'utf8')
-    const text = await mcpCall('hwpforge_convert', {
-      markdown: mdPath,
-      is_file: true,
-      output_path: outPath,
-    })
-    void text
+    await mcpCall(
+      'hwpforge_convert',
+      { markdown: mdPath, is_file: true, output_path: outPath },
+      options,
+    )
     if (!existsSync(outPath)) {
       return { ok: false, error: 'hwpforge did not produce an output file' }
     }
