@@ -322,6 +322,12 @@ describe('resolveFile', () => {
       path: join(renderer, 'index.html'),
     })
   })
+  it('never resolves to a file outside the root', () => {
+    // absolute path (forbidden on Windows drive letters, stripped to a miss on POSIX)
+    expect(resolveFile(roots[1], `/rhwp/${join(outside, 'secret.txt')}`).kind).not.toBe('file')
+    // dot segments are stripped, so the path stays inside the root
+    expect(resolveFile(roots[1], '/rhwp/../../outside/secret.txt').kind).not.toBe('file')
+  })
 })
 
 describe('mimeFor', () => {
@@ -367,8 +373,10 @@ describe('createStaticServer', () => {
     expect(await res.text()).toBe('')
   })
   it('never serves files outside a root', async () => {
+    // Encoded separators and absolute paths reach the server verbatim and must
+    // be refused there. Plain dot segments are collapsed by the URL parser
+    // before the request leaves the client, so that form only proves the body.
     for (const path of [
-      '/rhwp/../../outside/secret.txt',
       '/rhwp/..%2F..%2Foutside%2Fsecret.txt',
       `/rhwp/${encodeURIComponent(join(outside, 'secret.txt'))}`,
     ]) {
@@ -376,6 +384,8 @@ describe('createStaticServer', () => {
       expect([403, 404]).toContain(res.status)
       expect(await res.text()).not.toBe('SECRET')
     }
+    const collapsed = await get('/rhwp/../../outside/secret.txt')
+    expect(await collapsed.text()).not.toBe('SECRET')
   })
   it('returns 400 on malformed percent-encoding', async () => {
     expect((await get('/rhwp/%E0%A4%A')).status).toBe(400)
