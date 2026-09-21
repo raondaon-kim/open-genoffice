@@ -244,7 +244,7 @@ Expected: 한글 문서가 렌더되고 탭 제목이 `pages=N`. DevTools 콘솔
   ```
   Task 4의 `hwp-main.ts`가 `createStaticServer`와 `StaticRoot`를 사용한다.
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `apps/hwp/tests/static-server.test.ts`:
 ```ts
@@ -393,12 +393,12 @@ describe('createStaticServer', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `npm test -w @genoffice/hwp`
 Expected: FAIL — `Cannot find module '../src/main/static-server'` (또는 동등한 해석 오류).
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `apps/hwp/src/main/static-server.ts`:
 ```ts
@@ -542,7 +542,7 @@ export function createStaticServer(opts: { roots: StaticRoot[] }): Promise<Stati
 }
 ```
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `npm test -w @genoffice/hwp`
 Expected: PASS, `static-server.test.ts` 전 케이스 녹색.
@@ -550,7 +550,7 @@ Expected: PASS, `static-server.test.ts` 전 케이스 녹색.
 Run: `npm run typecheck -w @genoffice/hwp`
 Expected: 오류 없음.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 npm run format
@@ -589,7 +589,7 @@ EOF
   ```
   Task 3의 `hwp-main.ts` 호출 지점(`'hwpforge-mcp'`), Task 4의 셸 주입, 그리고 Phase 2의 `rhwp` 호출이 사용한다.
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `apps/hwp/tests/native-binary-path.test.ts`:
 ```ts
@@ -656,12 +656,12 @@ describe('resolveNativeBinary', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `npm test -w @genoffice/hwp -- native-binary-path`
 Expected: FAIL — 모듈 없음.
 
-- [ ] **Step 3: 구현**
+- [x] **Step 3: 구현**
 
 `apps/hwp/src/main/native-binary-path.ts`:
 ```ts
@@ -712,12 +712,12 @@ export function resolveNativeBinary(name: NativeBinaryName, input: NativeBinaryI
 }
 ```
 
-- [ ] **Step 4: 통과 확인**
+- [x] **Step 4: 통과 확인**
 
 Run: `npm test -w @genoffice/hwp -- native-binary-path`
 Expected: PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 npm run format
@@ -755,7 +755,7 @@ EOF
   ```
   `RuntimePaths.hwpforgePath?: string` 추가(Task 4의 셸 주입이 채움).
 
-- [ ] **Step 1: 실패하는 테스트 작성**
+- [x] **Step 1: 실패하는 테스트 작성**
 
 `apps/hwp/tests/hwpforge-client.test.ts`:
 ```ts
@@ -921,12 +921,12 @@ describe('createHwpFromMarkdown', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- [x] **Step 2: 실패 확인**
 
 Run: `npm test -w @genoffice/hwp -- hwpforge-client`
 Expected: FAIL — `mcpCall`이 export되지 않음 / 시그니처 불일치.
 
-- [ ] **Step 3: 클라이언트 구현 (전체 교체)**
+- [x] **Step 3: 클라이언트 구현 (전체 교체)**
 
 `apps/hwp/src/main/hwpforge-client.ts`:
 ```ts
@@ -1121,7 +1121,7 @@ export async function createHwpFromMarkdown(
 }
 ```
 
-- [ ] **Step 4: 호출 지점 갱신 — `hwp-main.ts`**
+- [x] **Step 4: 호출 지점 갱신 — `hwp-main.ts`**
 
 (a) import (12행 근처) — 기존 `import { createHwpFromMarkdown } from './hwpforge-client'` 아래에 추가:
 ```ts
@@ -1163,7 +1163,7 @@ import { resolveNativeBinary } from './native-binary-path'
       )
 ```
 
-- [ ] **Step 5: 통과 확인**
+- [x] **Step 5: 통과 확인**
 
 Run: `npm test -w @genoffice/hwp`
 Expected: PASS (static-server, native-binary-path, hwpforge-client 전부).
@@ -1171,7 +1171,7 @@ Expected: PASS (static-server, native-binary-path, hwpforge-client 전부).
 Run: `npm run typecheck -w @genoffice/hwp && npm run typecheck -w @genoffice/shell`
 Expected: 오류 없음.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 npm run format
@@ -1214,7 +1214,7 @@ EOF
   ```
   Task 6의 `App.tsx`가 `getStudioUrl`을 호출한다.
 
-- [ ] **Step 1: `shared/ipc.ts`**
+- [x] **Step 1: `shared/ipc.ts`**
 
 `HWP_CHANNELS`에 추가(`createDocument` 아래):
 ```ts
@@ -1233,14 +1233,14 @@ export type StudioUrlResult = { ok: true; url: string } | { ok: false; error: st
   getStudioUrl(): Promise<StudioUrlResult>
 ```
 
-- [ ] **Step 2: `preload/index.ts`**
+- [x] **Step 2: `preload/index.ts`**
 
 `createDocument` 항목 아래에 추가:
 ```ts
   getStudioUrl: () => ipcRenderer.invoke(HWP_CHANNELS.getStudioUrl),
 ```
 
-- [ ] **Step 3: `hwp-main.ts` — imports**
+- [x] **Step 3: `hwp-main.ts` — imports**
 
 1-5행의 Node import를 다음으로 교체(`createServer`, `AddressInfo`, `normalize`, `sep` 제거):
 ```ts
@@ -1256,7 +1256,7 @@ import type { StaticRoot } from './static-server'
 ```
 (기존 `import type { SaveHwpRequest, SaveHwpResult } from '../shared/ipc'` 줄은 위 줄로 대체.)
 
-- [ ] **Step 4: `hwp-main.ts` — `RuntimePaths`**
+- [x] **Step 4: `hwp-main.ts` — `RuntimePaths`**
 
 `hwpforgePath` 필드 아래에 추가:
 ```ts
@@ -1266,7 +1266,7 @@ import type { StaticRoot } from './static-server'
   rhwpPath?: string
 ```
 
-- [ ] **Step 5: `hwp-main.ts` — 서버 블록 교체**
+- [x] **Step 5: `hwp-main.ts` — 서버 블록 교체**
 
 `/** The embedded rhwp studio iframe rejects postMessage …` 주석(409행)부터 `rendererLoadUrl()` 함수 끝(480행)까지를 다음으로 통째로 교체:
 ```ts
@@ -1331,14 +1331,14 @@ async function studioUrl(): Promise<StudioUrlResult> {
 }
 ```
 
-- [ ] **Step 6: `hwp-main.ts` — IPC 핸들러**
+- [x] **Step 6: `hwp-main.ts` — IPC 핸들러**
 
 `registerHwpIpc()` 안, `ipcMain.handle(HWP_CHANNELS.getLanguage, …)` 줄 바로 아래에 추가:
 ```ts
   ipcMain.handle(HWP_CHANNELS.getStudioUrl, () => studioUrl())
 ```
 
-- [ ] **Step 7: `hwp-main.ts` — standalone 구성**
+- [x] **Step 7: `hwp-main.ts` — standalone 구성**
 
 `startHwpStandalone()`의 `configureHwpRuntime({...})`에 필드 추가:
 ```ts
@@ -1348,7 +1348,7 @@ async function studioUrl(): Promise<StudioUrlResult> {
 
 또 `createHwpView`와 `startHwpStandalone`의 `.catch` 주석 `// last resort: file:// still renders the shell of the page (no studio bridge)`는 그대로 둔다 — 여전히 참이다.
 
-- [ ] **Step 8: 셸 주입 — `apps/shell/src/main/index.ts`**
+- [x] **Step 8: 셸 주입 — `apps/shell/src/main/index.ts`**
 
 `SIDECAR_BIN` 상수(133-135행) 아래에 추가:
 ```ts
@@ -1380,12 +1380,12 @@ const RHWP_BIN = app.isPackaged
   rhwpPath: RHWP_BIN,
 ```
 
-- [ ] **Step 9: 검증**
+- [x] **Step 9: 검증**
 
 Run: `npm run typecheck -w @genoffice/hwp && npm run typecheck -w @genoffice/shell && npm test -w @genoffice/hwp && npm run lint`
 Expected: 모두 통과. (`dist/studio`가 아직 없으므로 런타임에서 `getStudioUrl`은 `ok:false`로 dev 안내 문구를 돌려준다 — 의도된 상태.)
 
-- [ ] **Step 10: 커밋**
+- [x] **Step 10: 커밋**
 
 ```bash
 npm run format
@@ -1415,7 +1415,7 @@ EOF
 **Interfaces:**
 - Produces: `apps/hwp/dist/studio/{index.html, rhwp_bg.wasm, assets/, fonts/, THIRD-PARTY.md, .rhwp-version}`; npm 스크립트 `build:hwp-studio`(루트), `build:studio`(hwp); hwp `build`가 스튜디오 빌드를 선행.
 
-- [ ] **Step 1: 래퍼 Vite 설정**
+- [x] **Step 1: 래퍼 Vite 설정**
 
 `tools/hwp-studio/vite.config.genoffice.ts` (Task 0 스파이크와 동일 내용):
 ```ts
@@ -1448,7 +1448,7 @@ export default {
 }
 ```
 
-- [ ] **Step 2: 빌드 스크립트**
+- [x] **Step 2: 빌드 스크립트**
 
 `tools/build-hwp-studio.mjs`:
 ```js
@@ -1698,7 +1698,7 @@ try {
 }
 ```
 
-- [ ] **Step 2b: `rhwp` CLI 획득 스크립트**
+- [x] **Step 2b: `rhwp` CLI 획득 스크립트**
 
 `tools/fetch-rhwp-cli.mjs`:
 ```js
@@ -1807,7 +1807,7 @@ try {
 }
 ```
 
-- [ ] **Step 3: 의존성·스크립트**
+- [x] **Step 3: 의존성·스크립트**
 
 `apps/hwp/package.json` — `dependencies`를 다음으로 교체(정확 고정, `@hwpforge/mcp` 추가):
 ```json
@@ -1833,7 +1833,7 @@ try {
     "fetch:rhwp-cli": "node tools/fetch-rhwp-cli.mjs",
 ```
 
-- [ ] **Step 4: 무시 규칙**
+- [x] **Step 4: 무시 규칙**
 
 생성물은 eslint(`**/.build/**`, `**/dist/**`)·prettier(`.build/`, `dist/`)·git(`dist/`)이 **이미 무시하는 관례 경로**에 둔다
 — 클론은 `apps/hwp/.build/rhwp/`, 스튜디오는 `apps/hwp/dist/studio/`. 그래서 `eslint.config.mjs`·`.prettierignore`는
@@ -1847,7 +1847,7 @@ try {
 ```
 
 검증: 빌드 후 `git status --short`에 생성물이 나타나지 않고, `npm run lint`가 생성물을 건너뛴다(오류 0).
-- [ ] **Step 5: lock 갱신·확인**
+- [x] **Step 5: lock 갱신·확인**
 
 Run:
 ```bash
@@ -1858,7 +1858,7 @@ node -p "require('./node_modules/@rhwp/core/package.json').version"
 ```
 Expected: lock 변경은 `apps/hwp` 워크스페이스 항목에 `@hwpforge/mcp`가 추가되고 루트 항목에서 빠지는 수준(수십 줄 이내). 바이너리 존재. 버전 `0.8.6`.
 
-- [ ] **Step 6: 빌드 실행·검증**
+- [x] **Step 6: 빌드 실행·검증**
 
 Run:
 ```bash
@@ -1887,7 +1887,7 @@ ls apps/hwp/out/main/index.js apps/hwp/out/preload/index.js apps/hwp/out/rendere
 ```
 Expected: 스튜디오 skip 메시지 후 electron-vite build 성공, 세 산출물 존재.
 
-- [ ] **Step 6b: CLI 획득 실행·검증**
+- [x] **Step 6b: CLI 획득 실행·검증**
 
 Run:
 ```bash
@@ -1898,7 +1898,7 @@ npm run fetch:rhwp-cli
 ```
 Expected: 첫 실행이 `fetching rhwp-v0.8.6-windows-x86_64.zip`, SHA 검증 통과, 폴더에 `rhwp.exe`, `LICENSE`, `.rhwp-version`. `--version`은 `rhwp v0.8.6`. 두 번째 실행은 `up to date … skipping`. (SHA 불일치·미등재는 비-0 종료와 원인 출력 — 자산 이름을 바꿔 한 번 확인한다.)
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 npm run format && npm run lint
@@ -1931,7 +1931,7 @@ EOF
 **Interfaces:**
 - Consumes: `HwpApi.getStudioUrl()` (Task 4).
 
-- [ ] **Step 1: `App.tsx`**
+- [x] **Step 1: `App.tsx`**
 
 55-58행 주석을 다음으로 교체:
 ```ts
@@ -1961,7 +1961,7 @@ EOF
       )
 ```
 
-- [ ] **Step 2: `index.html` CSP**
+- [x] **Step 2: `index.html` CSP**
 
 5-9행을 다음으로 교체:
 ```html
@@ -1974,7 +1974,7 @@ EOF
     />
 ```
 
-- [ ] **Step 3: 정적 검증**
+- [x] **Step 3: 정적 검증**
 
 Run:
 ```bash
@@ -1985,7 +1985,7 @@ grep -rl "edwardkim.github.io" apps/hwp/out/main apps/hwp/out/preload || echo "m
 ```
 Expected: 렌더러 번들에 `https://edwardkim.github.io/rhwp/` **정확히 1건**(SDK의 미사용 기본값 `DEFAULT_STUDIO_URL`), main/preload에는 0건.
 
-- [ ] **Step 4: 오프라인 동작 검증 (스펙 §8 수용 2)**
+- [x] **Step 4: 오프라인 동작 검증 (스펙 §8 수용 2)**
 
 셸 dev로 기동:
 ```bash
@@ -1996,7 +1996,7 @@ Expected: HWP 탭에 스튜디오 UI(툴바·빈 페이지)가 뜬다 — 이전
 동일 세션에서 스튜디오가 `http://127.0.0.1:<port>/rhwp/`에서 로드되었는지 확인하려면 셸 창에서 `Ctrl+Shift+I`로 DevTools를 열고 `document.querySelector('iframe')?.src`를 평가한다(DevTools 단축키가 막혀 있으면 이 확인은 건너뛴다 — 오프라인 로드 성공 자체가 결정적 증거다).
 네트워크를 복구한다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 npm run format
@@ -2026,7 +2026,7 @@ EOF
 - Consumes: `apps/hwp/dist/studio/` (Task 5), `apps/hwp/dist/studio/THIRD-PARTY.md`.
 - Produces: 설치본 `resources/modules/hwp-studio/`, `resources/native/hwpforge-mcp[.exe]`.
 
-- [ ] **Step 1: `electron-builder.cjs` — 존재 검사**
+- [x] **Step 1: `electron-builder.cjs` — 존재 검사**
 
 46-60행의 검사 루프를 다음으로 교체:
 ```js
@@ -2074,7 +2074,7 @@ for (const rel of [
 }
 ```
 
-- [ ] **Step 2: `electron-builder.cjs` — extraResources**
+- [x] **Step 2: `electron-builder.cjs` — extraResources**
 
 `extraResources` 배열의 `{ from: '../hwp/out', to: 'modules/hwp' }` 항목 아래에 추가:
 ```js
@@ -2108,7 +2108,7 @@ for (const rel of [
       },
 ```
 
-- [ ] **Step 3: `gen-third-party-notices.mjs`**
+- [x] **Step 3: `gen-third-party-notices.mjs`**
 
 (a) `extraResourceSeeds()`의 정규식(57행)
 ```js
@@ -2132,7 +2132,7 @@ if (existsSync(studioNotices)) {
 }
 ```
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 Run:
 ```bash
@@ -2146,7 +2146,7 @@ Expected: 첫 명령은 `[ 'modules/hwp', 'modules/hwp-studio' ] [ 'native/xlsx-
 Run: `npm run lint`
 Expected: 통과.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 npm run format
@@ -2176,7 +2176,7 @@ EOF
 - Modify: `docs/upstream-provenance.md` (절 추가)
 - Modify: `docs/superpowers/specs/2026-09-21-hwp-local-self-hosting-design.md` §8 CI 단락
 
-- [ ] **Step 1: `ci.yml`**
+- [x] **Step 1: `ci.yml`**
 
 `Install dependencies` 단계 바로 아래에 추가:
 ```yaml
@@ -2192,7 +2192,7 @@ EOF
         run: npm run fetch:rhwp-cli
 ```
 
-- [ ] **Step 2: `README.md`**
+- [x] **Step 2: `README.md`**
 
 HWP 행(69행)의 `(Rust + WASM, embedded as an iframe studio)`를 다음으로 교체:
 ```
@@ -2205,7 +2205,7 @@ npm run build:hwp-studio  # build the bundled Hangul editor (rhwp studio); needs
 npm run fetch:rhwp-cli    # download + verify the matching rhwp CLI binary for this platform
 ```
 
-- [ ] **Step 3: `MODIFICATIONS.md`**
+- [x] **Step 3: `MODIFICATIONS.md`**
 
 ```
 - a Hangul document (`.hwp`/`.hwpx`) editor module built on the MIT-licensed
@@ -2220,7 +2220,7 @@ npm run fetch:rhwp-cli    # download + verify the matching rhwp CLI binary for t
   packaged as an application resource;
 ```
 
-- [ ] **Step 4: `docs/upstream-provenance.md`**
+- [x] **Step 4: `docs/upstream-provenance.md`**
 
 파일 끝에 추가:
 ```markdown
@@ -2259,7 +2259,7 @@ release by `tools/fetch-rhwp-cli.mjs` and verified against its
 missing, and the main process spawns them directly from `resources/native/`.
 ```
 
-- [ ] **Step 5: 검증·커밋**
+- [x] **Step 5: 검증·커밋**
 
 Run: `npm run format && npm run format:check && npm run lint`
 Expected: 통과.
