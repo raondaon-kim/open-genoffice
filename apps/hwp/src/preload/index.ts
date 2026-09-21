@@ -20,6 +20,7 @@ const api: HwpApi = {
   saveAs: () => ipcRenderer.invoke(HWP_CHANNELS.saveAs),
   createDocument: (markdown, fileName) =>
     ipcRenderer.invoke(HWP_CHANNELS.createDocument, markdown, fileName),
+  getStudioUrl: () => ipcRenderer.invoke(HWP_CHANNELS.getStudioUrl),
   setDirty: (dirty) => ipcRenderer.send(HWP_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = () => handler()

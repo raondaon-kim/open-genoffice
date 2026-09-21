@@ -1,16 +1,16 @@
 import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
-import { createServer } from 'node:http'
-import type { AddressInfo } from 'node:net'
-import { dirname, join, normalize, resolve, sep } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell } from 'electron'
 import type { WebContents } from 'electron'
 import { installNavigationGuard, safeExternalUrl } from '@genoffice/electron-utils'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { HWP_CHANNELS } from '../shared/ipc'
-import type { SaveHwpRequest, SaveHwpResult } from '../shared/ipc'
+import type { SaveHwpRequest, SaveHwpResult, StudioUrlResult } from '../shared/ipc'
 import { createHwpFromMarkdown } from './hwpforge-client'
 import { resolveNativeBinary } from './native-binary-path'
+import { createStaticServer } from './static-server'
+import type { StaticRoot } from './static-server'
 
 const tDlg = createI18n({
   zh: {
@@ -206,6 +206,10 @@ interface RuntimePaths {
   onCreateDocument?: (path: string) => void
   /** HwpForge MCP platform binary; the shell injects it, dev falls back to node_modules */
   hwpforgePath?: string
+  /** built rhwp studio (index.html + wasm + fonts); served under STUDIO_PREFIX on the loopback origin */
+  studioDir?: string
+  /** rhwp native CLI (Phase 2 AI tools); injected by the shell, unused in Phase 1 */
+  rhwpPath?: string
 }
 
 let runtime: RuntimePaths = { preloadPath: '' }
@@ -397,6 +401,8 @@ function registerHwpIpc(): void {
   // Language channel shared with other modules; removeHandler tolerates duplicate registration
   ipcMain.removeHandler(HWP_CHANNELS.getLanguage)
   ipcMain.handle(HWP_CHANNELS.getLanguage, () => getUiLang())
+
+  ipcMain.handle(HWP_CHANNELS.getStudioUrl, () => studioUrl())
 }
 
 function grantAndTrack(wc: WebContents, openPath?: string | null): void {
@@ -421,77 +427,64 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   })
 }
 
-/**
- * The embedded rhwp studio iframe rejects postMessage from opaque origins
- * (file:/data:), so in production builds the renderer is served over a
- * loopback HTTP origin instead of loadFile(). Dev builds already run on the
- * Vite dev-server origin and bypass this entirely.
- */
-const MIME_BY_EXT: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.png': 'image/png',
-  '.ico': 'image/x-icon',
-  '.woff': 'font/woff',
-  '.woff2': 'font/woff2',
-  '.ttf': 'font/ttf',
-  '.map': 'application/json; charset=utf-8',
+/** URL prefix under which the bundled rhwp studio is served on the loopback origin */
+const STUDIO_PREFIX = '/rhwp/'
+
+let loopbackOriginPromise: Promise<string> | null = null
+
+function studioIndexExists(): boolean {
+  return Boolean(runtime.studioDir && existsSync(join(runtime.studioDir, 'index.html')))
 }
 
-let rendererOriginPromise: Promise<string> | null = null
-
-function ensureLoopbackRendererOrigin(): Promise<string> {
-  if (rendererOriginPromise) return rendererOriginPromise
-  rendererOriginPromise = new Promise<string>((resolveUrl, reject) => {
-    const root = runtime.rendererFile ? dirname(resolve(runtime.rendererFile)) : null
-    if (!root) {
-      reject(new Error('hwp: no renderer output configured'))
-      return
+/**
+ * One loopback HTTP origin serves the renderer (production builds; dev uses the
+ * Vite origin) and the bundled rhwp studio (always). The studio SDK rejects
+ * postMessage from opaque origins (file:/data:), and serving the studio locally
+ * is what makes Hangul editing work offline. The studio root is registered only
+ * when its assets exist so the renderer still comes up to show the error.
+ */
+function ensureLoopbackOrigin(): Promise<string> {
+  if (loopbackOriginPromise) return loopbackOriginPromise
+  loopbackOriginPromise = (async () => {
+    const roots: StaticRoot[] = []
+    if (runtime.rendererFile) {
+      roots.push({ prefix: '/', dir: dirname(resolve(runtime.rendererFile)), spaFallback: true })
     }
-    const server = createServer((req, res) => {
-      if (req.method !== 'GET' && req.method !== 'HEAD') {
-        res.writeHead(405).end()
-        return
-      }
-      const urlPath = decodeURIComponent(new URL(req.url ?? '/', 'http://127.0.0.1').pathname)
-      const relative = normalize(urlPath).replace(/^([/\\]|\.\.)+/, '')
-      const filePath = resolve(root, relative)
-      if (!filePath.startsWith(root + sep) && filePath !== root) {
-        res.writeHead(403).end()
-        return
-      }
-      const target =
-        existsSync(filePath) && !filePath.endsWith(sep) ? filePath : join(root, 'index.html')
-      void readFile(target)
-        .then((bytes) => {
-          const ext = target.slice(target.lastIndexOf('.')).toLowerCase()
-          res.writeHead(200, {
-            'content-type': MIME_BY_EXT[ext] ?? 'application/octet-stream',
-            'cache-control': 'no-store',
-          })
-          res.end(req.method === 'HEAD' ? undefined : bytes)
-        })
-        .catch(() => res.writeHead(404).end())
-    })
-    server.on('error', (err) => {
-      rendererOriginPromise = null
-      reject(err)
-    })
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address() as AddressInfo
-      resolveUrl(`http://127.0.0.1:${port}/index.html`)
-    })
+    if (runtime.studioDir && studioIndexExists()) {
+      roots.push({ prefix: STUDIO_PREFIX, dir: runtime.studioDir, spaFallback: false })
+    }
+    if (roots.length === 0) throw new Error('hwp: no renderer output configured')
+    const server = await createStaticServer({ roots })
+    return server.origin
+  })()
+  loopbackOriginPromise.catch(() => {
+    loopbackOriginPromise = null
   })
-  return rendererOriginPromise
+  return loopbackOriginPromise
 }
 
 /** resolve the URL to load for the hwp renderer: dev server, or the loopback origin */
 function rendererLoadUrl(): Promise<string> {
   if (runtime.rendererUrl) return Promise.resolve(runtime.rendererUrl)
-  return ensureLoopbackRendererOrigin()
+  return ensureLoopbackOrigin().then((origin) => `${origin}/index.html`)
+}
+
+/** loopback URL of the bundled studio, or a message telling the user/dev what is missing */
+async function studioUrl(): Promise<StudioUrlResult> {
+  if (!studioIndexExists()) {
+    return {
+      ok: false,
+      error: app.isPackaged
+        ? 'Bundled HWP editor assets are missing — reinstall Open GenOffice.'
+        : 'HWP studio is not built — run: npm run build -w @genoffice/hwp',
+    }
+  }
+  try {
+    const origin = await ensureLoopbackOrigin()
+    return { ok: true, url: `${origin}${STUDIO_PREFIX}` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 export function createHwpView(openPath?: string | null): WebContentsView {
@@ -525,6 +518,8 @@ export function startHwpStandalone(): void {
     preloadPath: join(__dirname, '../preload/index.js'),
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
     rendererFile: join(__dirname, '../renderer/index.html'),
+    // dev: apps/hwp/out/main → apps/hwp/studio-dist
+    studioDir: join(__dirname, '../../studio-dist'),
   })
   void app.whenReady().then(() => {
     registerHwpIpc()

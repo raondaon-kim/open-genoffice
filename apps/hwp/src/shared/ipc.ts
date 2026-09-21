@@ -13,6 +13,7 @@ export const HWP_CHANNELS = {
   saveResult: 'hwp:save-result',
   dirtyChanged: 'hwp:dirty-changed',
   createDocument: 'hwp:create-document',
+  getStudioUrl: 'hwp:get-studio-url',
   getLanguage: 'hwp:get-language',
   languageChanged: 'hwp:language-changed',
 } as const
@@ -51,6 +52,9 @@ export interface CreateDocumentResult {
   path?: string
   error?: string
 }
+
+/** Where the renderer should point the rhwp studio iframe (served from the loopback origin). */
+export type StudioUrlResult = { ok: true; url: string } | { ok: false; error: string }
 
 /** What this tab should do once its renderer mounts. */
 export type HwpOpenIntent = { mode: 'open'; path: string } | { mode: 'blank' }
@@ -105,6 +109,8 @@ export interface HwpApi {
    * HwpForge generator and open it in a new tab. Returns the created path.
    */
   createDocument(markdown: string, fileName?: string): Promise<CreateDocumentResult>
+  /** loopback URL of the bundled rhwp studio; fails when studio assets are not built/installed */
+  getStudioUrl(): Promise<StudioUrlResult>
   /** mirror the editor's dirty flag into the main process (drives close guards) */
   setDirty(dirty: boolean): void
   /** main → renderer: write pending edits to disk (menu Save / close guard) */

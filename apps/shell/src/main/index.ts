@@ -133,6 +133,25 @@ const HWP_OUT = app.isPackaged
 const SIDECAR_BIN = app.isPackaged
   ? join(process.resourcesPath, 'native', SIDECAR_EXE)
   : join(APPS_ROOT, 'sheets', 'native', 'xlsx-engine', 'target', 'release', SIDECAR_EXE)
+const HWP_STUDIO_DIR = app.isPackaged
+  ? join(process.resourcesPath, 'modules', 'hwp-studio')
+  : join(APPS_ROOT, 'hwp', 'studio-dist')
+const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
+const HWPFORGE_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', HWPFORGE_EXE)
+  : join(
+      APPS_ROOT,
+      '..',
+      'node_modules',
+      '@hwpforge',
+      `mcp-${process.platform}-${process.arch}`,
+      'bin',
+      HWPFORGE_EXE,
+    )
+const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
+const RHWP_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', RHWP_EXE)
+  : join(APPS_ROOT, 'hwp', 'native', 'rhwp', `${process.platform}-${process.arch}`, RHWP_EXE)
 
 configureDocsRuntime({
   preloadPath: join(DOCS_OUT, 'preload', 'index.js'),
@@ -159,6 +178,9 @@ configureHwpRuntime({
   preloadPath: join(HWP_OUT, 'preload', 'index.js'),
   rendererUrl: process.env.HWP_RENDERER_URL,
   rendererFile: join(HWP_OUT, 'renderer', 'index.html'),
+  studioDir: HWP_STUDIO_DIR,
+  hwpforgePath: HWPFORGE_BIN,
+  rhwpPath: RHWP_BIN,
   onSaved: (webContentsId, path) => {
     tabManager?.setHwpTabSaved(webContentsId, path)
     recordRecentFile(path)
