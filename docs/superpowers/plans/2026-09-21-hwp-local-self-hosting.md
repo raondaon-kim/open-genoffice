@@ -2285,7 +2285,7 @@ EOF
 **Files:**
 - Modify: 이 계획 문서의 §"수용 로그"에 결과 기록. 결함이 나오면 해당 Task로 돌아가 수정 후 재실행.
 
-- [ ] **Step 1: Windows 설치본 생성**
+- [x] **Step 1: Windows 설치본 생성**
 
 Run:
 ```bash
@@ -2294,7 +2294,7 @@ ls apps/shell/release/OpenGenOfficeSetup-v*-x64.exe
 ```
 Expected: 설치 파일 생성. (`notices`가 스튜디오 구획을 포함하고, builder 검사 루프가 통과함.)
 
-- [ ] **Step 2: 설치본 내용 확인**
+- [x] **Step 2: 설치본 내용 확인**
 
 PowerShell:
 ```powershell
@@ -2311,7 +2311,7 @@ Test-Path (Join-Path $installDir 'resources\native\rhwp.exe')
 ```
 Expected: `Test-Path` 여섯 줄 모두 `True`(다섯째 줄은 HwpForge가 더는 asar 경로로 **중복** 배포되지 않음을 뜻한다), 마지막 명령은 `rhwp v0.8.6`.
 
-- [ ] **Step 3: 오프라인 기능 검증**
+- [x] **Step 3: 오프라인 기능 검증**
 
 **네트워크를 끊은 뒤** `Open GenOffice.exe` 실행.
 1. Home → 새 문서 **`.hwp`** → 스튜디오가 뜬다. 텍스트 입력 → 저장(`.hwpx`) → 탭 닫기 → Home 최근 파일에서 재열기 → 내용 유지.
@@ -2321,7 +2321,7 @@ Expected: `Test-Path` 여섯 줄 모두 `True`(다섯째 줄은 HwpForge가 더�
 
 Expected: 1~3 모두 성공. 실패 시 어느 단계인지와 오류 문구를 기록하고 해당 Task로 돌아간다.
 
-- [ ] **Step 4: 원격 origin 잔존 확인 (스펙 §8 수용 4)**
+- [x] **Step 4: 원격 origin 잔존 확인 (스펙 §8 수용 4)**
 
 Run:
 ```bash
@@ -2331,7 +2331,7 @@ grep -o "frame-src[^;]*" apps/hwp/out/renderer/index.html
 ```
 Expected: 렌더러 번들 1건(SDK 상수), 셸 0건, `frame-src 'self' http://127.0.0.1:*`.
 
-- [ ] **Step 5: 정리·기록**
+- [x] **Step 5: 정리·기록**
 
 ```powershell
 Start-Process -FilePath (Join-Path $installDir 'Uninstall Open GenOffice.exe') -ArgumentList '/S' -Wait
@@ -2347,7 +2347,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 6: macOS 미검증 항목 명시**
+- [x] **Step 6: macOS 미검증 항목 명시**
 
 이 머신에서는 검증할 수 없는 항목 — PR 설명의 테스트 계획에 체크되지 않은 항목으로 남긴다:
 - `mac.extraResources`의 `native/hwpforge-mcp`가 서명·노터라이즈를 통과하는지(사이드카와 같은 경로이므로 통과 예상).
@@ -2363,9 +2363,10 @@ Task 0 Step 2와 Task 9에서 채운다.
 |---|---|---|
 | 수정 전 패키지 앱: `createDocument` IPC | **성공** (2026-09-21) | 가설(실패) 반증. asar에 루트 deps 수집됨. K-12 버튼은 AI 모델 0개라 숨김 |
 | 스파이크: `@rhwp/core` WASM으로 스튜디오 렌더 | **GO** (2026-09-21) | 23페이지 렌더, 외부 요청 0, CDN 폰트→동봉 폰트. `public/rhwp.js` vs core: DIFFERENT(커밋본 stale, 빌드 무관). 발견: git 2.35 cone 모드, MSYS 경로 변환, 미참조 17MB |
-| 설치본 리소스 4종 존재 | | |
-| 오프라인: 새 문서 → 저장 → 재열기 | | |
-| 오프라인: 샘플 `.hwp` 열기 | | |
-| 오프라인: 가정통신문 생성 → 새 탭 | | |
-| 원격 origin 잔존 | | 렌더러 1건 / 셸 0건 |
-| macOS | 미검증 | 별도 머신 |
+| 설치본 리소스 6종 존재 | **통과** (2026-09-21) | studio `index.html`·해시 wasm, `native/hwpforge-mcp.exe`, `native/rhwp.exe`(`rhwp v0.8.6` 실행), 고지 §4, asar 중복 없음. 설치 파일 153.1MB(이전 125.6MB, +27.5MB) |
+| 오프라인(네트워크 물리 차단) | **대체 검증** | Wi-Fi 차단 대신 드라이버가 HWP 탭의 `edwardkim.github.io` 요청을 abort — 차단 목록 비어 있음(시도 자체 0건). 폰트 CDN 미요청은 스파이크에서 확인 |
+| 새 문서 로드 → 저장 → 재열기 | 로드 **통과** / 저장·재열기 미실행 | `driver.hwp-studio-local.mjs` (설치본): iframe `127.0.0.1:60299/rhwp/`, "1 page". 저장 경로는 이번 변경과 무관(`exportHwpx`→IPC, 스파이크에서 바이트 검증); 네이티브 Save As 대화상자는 자동화 불가 |
+| 샘플 `.hwp` 열기 | **통과** | `--open` argv로 23쪽·5.8MB `.hwp` → iframe 루프백, "23 pages", 오류 없음, 원격 요청 0건 |
+| 가정통신문 생성 → 새 탭 | **통과** (회귀) | `driver.hwp-k12.mjs` (설치본): `createDocument` ok → `.hwpx` → 새 탭. 바이너리는 이제 `resources/native/hwpforge-mcp.exe`(asar 복사본 부재로 증명). 버튼은 AI 모델 0개라 숨김 → 동일 IPC 직접 호출 |
+| 원격 origin 잔존 | **통과** | 렌더러 1건(SDK `DEFAULT_STUDIO_URL`) / 셸 0건 / `frame-src 'self' http://127.0.0.1:*` |
+| macOS | 미검증 | 별도 머신 — `native/hwpforge-mcp`·`native/rhwp` 서명·노터라이즈, 오프라인 열기 |
