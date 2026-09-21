@@ -2560,3 +2560,13 @@ Task 0 Step 2와 Task 9에서 채운다.
 | 가정통신문 생성 → 새 탭                       | **통과** (회귀)                    | `driver.hwp-k12.mjs` (설치본): `createDocument` ok → `.hwpx` → 새 탭. 바이너리는 이제 `resources/native/hwpforge-mcp.exe`(asar 복사본 부재로 증명). 버튼은 AI 모델 0개라 숨김 → 동일 IPC 직접 호출  |
 | 원격 origin 잔존                              | **통과**                           | 렌더러 1건(SDK `DEFAULT_STUDIO_URL`) / 셸 0건 / `frame-src 'self' http://127.0.0.1:*`                                                                                                               |
 | macOS                                         | 미검증                             | 별도 머신 — `native/hwpforge-mcp`·`native/rhwp` 서명·노터라이즈, 오프라인 열기                                                                                                                      |
+
+### 병합 전 검증에서 드러난 보정 (Task 6 Step 1 대체)
+
+`apps/shell` 테스트 2건(`updater.test.ts` "Open GenOffice builder configuration")이 실패했다: 테스트가
+`process.platform`을 `darwin`으로 고정한 채 `electron-builder.cjs`를 require하므로, 모듈 최상위의
+존재 검사가 Windows 머신에서 `@hwpforge/mcp-darwin-arm64`를 찾다 throw했다. 검사를 모듈 로드
+시점에서 electron-builder `beforePack` 훅(`apps/shell/build/verify-extra-resources.js`)으로 옮겼다 —
+실제 패키징되는 플랫폼의 `extraResources` 소스(공통 + `mac`/`win`)만, 하드코딩 목록 없이 전부
+검사하고(빈 디렉터리 포함), 누락을 한 번에 나열한다. 설정 로드는 더 이상 이 머신의 빌드 상태에
+의존하지 않는다. 훅 단위 테스트 6건 + 설정 테스트 1건 추가.

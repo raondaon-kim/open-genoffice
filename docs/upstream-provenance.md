@@ -63,5 +63,9 @@ that way: the sheets xlsx sidecar, the HwpForge MCP binary (`@hwpforge/mcp`,
 declared in `apps/hwp`) and the rhwp CLI (fetched from the pinned upstream
 release by `tools/fetch-rhwp-cli.mjs` and verified against its
 `SHA256SUMS.txt`) are listed as platform `extraResources` in
-`apps/shell/electron-builder.cjs`, which fails the build when a binary is
-missing, and the main process spawns them directly from `resources/native/`.
+`apps/shell/electron-builder.cjs`, and the main process spawns them directly
+from `resources/native/`. electron-builder only warns about a missing
+`extraResources` source, so the `beforePack` hook
+(`apps/shell/build/verify-extra-resources.js`) fails the build when any source
+for the platform being packaged — module `out` trees, the studio, a native
+binary — is missing or an empty directory.

@@ -13,9 +13,6 @@
  * app-update.yml into the app and in-app auto-update stays disabled.
  */
 
-const { existsSync } = require('node:fs')
-const { join } = require('node:path')
-
 const FORK_UPDATE_URL_ENV = 'OPEN_GENOFFICE_UPDATE_URL'
 
 function normalizeForkUpdateUrl(value) {
@@ -43,49 +40,18 @@ function normalizeForkUpdateUrl(value) {
 const updateUrl = normalizeForkUpdateUrl(process.env[FORK_UPDATE_URL_ENV])
 const macIdentity = process.env.OPEN_GENOFFICE_MAC_IDENTITY?.trim() || null
 
-// Resources below are copied verbatim rather than bundled, so a missing source
-// would ship a silently broken installer. Fail the build with a clear message
-// instead: the gsk CLI tree (its nested commander path depends on npm's current
-// hoisting), the built rhwp studio (tools/build-hwp-studio.mjs), the HwpForge
-// platform binary for the OS we are packaging on (npm installs only the current
-// platform's optional package), and the rhwp CLI fetched by
-// tools/fetch-rhwp-cli.mjs for that platform.
+// extraResources are copied verbatim rather than bundled, and electron-builder
+// only warns when a source is missing. build/verify-extra-resources.js
+// (beforePack) fails the build instead, for the sources of the platform being
+// packaged: the module `out` trees, the built rhwp studio
+// (tools/build-hwp-studio.mjs), the gsk CLI tree (its nested commander path
+// depends on npm's current hoisting), and the native helpers — the sheets xlsx
+// sidecar, the HwpForge platform binary (npm installs only the current
+// platform's optional package) and the rhwp CLI (tools/fetch-rhwp-cli.mjs).
 // Note: electron-builder also copies the ROOT package.json `dependencies` into
 // app.asar. HwpForge used to ride along that way (@hwpforge/mcp at the root);
 // it now ships explicitly here, so that dependency must stay in apps/hwp — at
 // the root it would be packaged twice.
-// Only the two packaging targets check for native binaries. This module is
-// also required outside packaging (tools/gen-third-party-notices.mjs reads
-// extraResources), possibly on Linux, where nothing is packaged.
-const HWPFORGE_PKG =
-  process.platform === 'win32'
-    ? 'mcp-win32-x64'
-    : process.platform === 'darwin'
-      ? 'mcp-darwin-arm64'
-      : null
-const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
-const HWPFORGE_SRC = HWPFORGE_PKG
-  ? `../../node_modules/@hwpforge/${HWPFORGE_PKG}/bin/${HWPFORGE_EXE}`
-  : null
-const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
-const RHWP_SRC = HWPFORGE_PKG
-  ? `../hwp/native/rhwp/${process.platform}-${process.arch}/${RHWP_EXE}`
-  : null
-for (const rel of [
-  '../../node_modules/@genspark/cli',
-  '../../node_modules/@genspark/cli/node_modules/commander',
-  '../../node_modules/ws',
-  '../hwp/dist/studio/index.html',
-  ...(HWPFORGE_SRC ? [HWPFORGE_SRC] : []),
-  ...(RHWP_SRC ? [RHWP_SRC] : []),
-]) {
-  if (!existsSync(join(__dirname, rel))) {
-    throw new Error(
-      `electron-builder extraResources source missing: ${rel} ` +
-        `(npm hoisting changed? run npm run build -w @genoffice/hwp?)`,
-    )
-  }
-}
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
@@ -200,6 +166,7 @@ const config = {
   dmg: {
     sign: Boolean(macIdentity),
   },
+  beforePack: 'build/verify-extra-resources.js',
   afterSign: 'build/adhoc-sign.js',
   afterAllArtifactBuild: 'build/notarize-dmg.js',
 }

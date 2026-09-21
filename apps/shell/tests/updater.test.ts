@@ -328,10 +328,35 @@ describe('Open GenOffice builder configuration', () => {
           from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar.exe',
           to: 'native/xlsx-sidecar.exe',
         },
+        {
+          from: '../../node_modules/@hwpforge/mcp-win32-x64/bin/hwpforge-mcp.exe',
+          to: 'native/hwpforge-mcp.exe',
+        },
+        { from: '../hwp/native/rhwp/win32-x64/rhwp.exe', to: 'native/rhwp.exe' },
       ],
     })
     expect(config.dmg).toMatchObject({ sign: false })
     expect(config.afterSign).toBe('build/adhoc-sign.js')
+  })
+
+  it('ships the self-hosted HWP studio and verifies every extraResources source before packing', () => {
+    const config = loadBuilderConfig()
+    expect(config.extraResources).toContainEqual({
+      from: '../hwp/dist/studio',
+      to: 'modules/hwp-studio',
+    })
+    expect(config.mac).toMatchObject({
+      extraResources: expect.arrayContaining([
+        {
+          from: '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
+          to: 'native/hwpforge-mcp',
+        },
+        { from: '../hwp/native/rhwp/darwin-arm64/rhwp', to: 'native/rhwp' },
+      ]),
+    })
+    // loading the config must not depend on what is built on this machine — the
+    // existence check runs as the beforePack hook for the platform being packaged
+    expect(config.beforePack).toBe('build/verify-extra-resources.js')
   })
 
   it('does not import user data from other product identities', () => {
