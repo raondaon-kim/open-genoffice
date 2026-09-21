@@ -53,9 +53,10 @@ export function App() {
   const [aiPath, setAiPath] = useState<string | null>(null)
 
   // One-shot boot: consume the queued intent (file path or blank), embed the
-  // rhwp editor iframe, and either load the file or start on the studio's
-  // blank document. The container div stays mounted for the whole tab lifetime;
-  // the iframe is owned by the rhwp editor and must not be re-parented.
+  // rhwp editor iframe from the bundled studio (served by main on the loopback
+  // origin), and either load the file or start on the studio's blank document.
+  // The container div stays mounted for the whole tab lifetime; the iframe is
+  // owned by the rhwp editor and must not be re-parented.
   useEffect(() => {
     let disposed = false
     void (async () => {
@@ -66,10 +67,12 @@ export function App() {
       setPhase('loading')
       const container = containerRef.current
       if (!container) throw new Error('Editor container is missing.')
+      const studio = await api.getStudioUrl()
+      if (!studio.ok) throw new Error(studio.error)
       const editor = await withTimeout(
-        createEditor(container),
+        createEditor(container, { studioUrl: studio.url }),
         STUDIO_TIMEOUT_MS,
-        'Cannot reach the embedded HWP editor studio — check the network connection and reopen the file.',
+        'The bundled HWP editor could not be loaded — the installation may be damaged. Reinstall Open GenOffice and reopen the file.',
       )
       if (disposed) {
         editor.destroy()
