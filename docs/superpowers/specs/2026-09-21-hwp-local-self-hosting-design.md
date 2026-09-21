@@ -35,26 +35,26 @@ HwpForge MCP 바이너리를 호출하는데, `apps/hwp/src/main/hwpforge-client
 
 모두 2026-09-21 직접 확인.
 
-| 사실 | 근거 |
-|---|---|
-| `@rhwp/editor`는 `studioUrl` 옵션으로 스튜디오 URL 교체를 공식 지원 | 타르볼 `index.js:50` `options.studioUrl \|\| DEFAULT_STUDIO_URL`, README:135 |
-| 현재 호스트는 옵션을 넘기지 않음 | `apps/hwp/src/renderer/App.tsx:70` `createEditor(container)` |
-| `studioUrl`은 `http:`/`https:`만 허용, `file:`/`data:` 거부 | `transport.js:71`, README:16-17 |
-| 그 조건을 만족하는 루프백 HTTP 정적 서버가 이미 존재 | `apps/hwp/src/main/hwp-main.ts:431-474` |
-| 스튜디오 소스는 rhwp 리포 `rhwp-studio/`에 공개, 태그 `v0.8.6`이 npm 버전과 일치 | `git ls-remote --tags` |
-| 컴파일된 WASM(9.9MB)을 `@rhwp/core@0.8.6`이 배포 — Rust 툴체인 불필요 | `npm pack --dry-run`: `rhwp.js`, `rhwp_bg.wasm`, `.d.ts` |
-| 업스트림 배포 레시피: `pkg/` → `public/` 복사 후 `vite build --base=/rhwp/` | `.github/workflows/deploy-pages.yml` |
-| 셀프호스팅 시 CDN 웹폰트를 꺼야 함 — **함초롬체 CDN은 비상업 조건** | README:599-606, `RHWP_DISABLE_EXTERNAL_WEBFONTS=1` |
-| 스튜디오 `main.ts`(v0.8.6)는 `virtual:pwa-register`를 import하지 않음 | 소스 grep — PWA 플러그인 제거 시 스텁 불필요 |
-| `public/fonts`는 `../../assets/fonts` 심볼릭 링크 | GitHub contents API `type: symlink` |
-| `@hwpforge/mcp` 런처는 플랫폼 패키지를 `require.resolve` 후 `execFileSync`하는 껍데기 | 타르볼 `bin/hwpforge-mcp.js` |
-| HwpForge는 네트워크를 쓰지 않음 — 바이너리만 있으면 오프라인 동작 | `hwpforge-client.ts` stdio JSON-RPC만 사용 |
-| 대안 엔진 없음: rhwp(MIT, 3,825★, 당일 커밋)가 파싱·렌더·편집·저장을 갖춘 유일한 WASM HWP 에디터. hwp.js 20개월 정체·쓰기 불가, hwpers 쓰기 불가, hwp-rs 방치, pyhwp AGPL | GitHub API 실측 |
-| git 2.35의 `clone --sparse`는 cone 모드를 켜지 않아 `sparse-checkout set`이 패턴 모드로 동작, 루트 파일(LICENSE 등)이 빠짐 → `git config core.sparseCheckoutCone true` 필요 | 스파이크 실측 |
-| 스튜디오는 `pkg/`를 번들해 런타임에 해시된 `assets/rhwp_bg-*.wasm`만 참조. `public/`의 WASM·js·d.ts 복사본과 `public/samples`는 미참조(약 17MB) | 스파이크 dist grep + 렌더 검증 |
-| **수정 전 패키지 앱에서 `createDocument` 성공** — electron-builder가 루트 `dependencies`(`@hwpforge/mcp`, `ws`)를 `app.asar/node_modules`에 수집, `.exe`는 `asar.unpacked`에 서명되어 존재 | `scripts/drivers/driver.hwp-k12.mjs`로 `release/win-unpacked` 구동, asar 헤더 파싱 |
-| K-12 서식 버튼은 AI 모델이 0개면 렌더되지 않음(`AiPanel.tsx:575` `models.length > 0`) — HwpForge 자체는 LLM 불필요 | 실측; 이번 범위 밖 UX 메모 |
-| `rhwp` CLI v0.8.6 릴리스 자산: `rhwp-v0.8.6-windows-x86_64.zip`(9.8MB, 안에 `rhwp/rhwp.exe`), `macos-aarch64.tar.gz`(8.6MB), `macos-x86_64`, `linux-x86_64`, `linux-aarch64`, `SHA256SUMS.txt`. npm 패키지 없음 | GitHub releases API |
+| 사실                                                                                                                                                                                                            | 근거                                                                               |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `@rhwp/editor`는 `studioUrl` 옵션으로 스튜디오 URL 교체를 공식 지원                                                                                                                                             | 타르볼 `index.js:50` `options.studioUrl \|\| DEFAULT_STUDIO_URL`, README:135       |
+| 현재 호스트는 옵션을 넘기지 않음                                                                                                                                                                                | `apps/hwp/src/renderer/App.tsx:70` `createEditor(container)`                       |
+| `studioUrl`은 `http:`/`https:`만 허용, `file:`/`data:` 거부                                                                                                                                                     | `transport.js:71`, README:16-17                                                    |
+| 그 조건을 만족하는 루프백 HTTP 정적 서버가 이미 존재                                                                                                                                                            | `apps/hwp/src/main/hwp-main.ts:431-474`                                            |
+| 스튜디오 소스는 rhwp 리포 `rhwp-studio/`에 공개, 태그 `v0.8.6`이 npm 버전과 일치                                                                                                                                | `git ls-remote --tags`                                                             |
+| 컴파일된 WASM(9.9MB)을 `@rhwp/core@0.8.6`이 배포 — Rust 툴체인 불필요                                                                                                                                           | `npm pack --dry-run`: `rhwp.js`, `rhwp_bg.wasm`, `.d.ts`                           |
+| 업스트림 배포 레시피: `pkg/` → `public/` 복사 후 `vite build --base=/rhwp/`                                                                                                                                     | `.github/workflows/deploy-pages.yml`                                               |
+| 셀프호스팅 시 CDN 웹폰트를 꺼야 함 — **함초롬체 CDN은 비상업 조건**                                                                                                                                             | README:599-606, `RHWP_DISABLE_EXTERNAL_WEBFONTS=1`                                 |
+| 스튜디오 `main.ts`(v0.8.6)는 `virtual:pwa-register`를 import하지 않음                                                                                                                                           | 소스 grep — PWA 플러그인 제거 시 스텁 불필요                                       |
+| `public/fonts`는 `../../assets/fonts` 심볼릭 링크                                                                                                                                                               | GitHub contents API `type: symlink`                                                |
+| `@hwpforge/mcp` 런처는 플랫폼 패키지를 `require.resolve` 후 `execFileSync`하는 껍데기                                                                                                                           | 타르볼 `bin/hwpforge-mcp.js`                                                       |
+| HwpForge는 네트워크를 쓰지 않음 — 바이너리만 있으면 오프라인 동작                                                                                                                                               | `hwpforge-client.ts` stdio JSON-RPC만 사용                                         |
+| 대안 엔진 없음: rhwp(MIT, 3,825★, 당일 커밋)가 파싱·렌더·편집·저장을 갖춘 유일한 WASM HWP 에디터. hwp.js 20개월 정체·쓰기 불가, hwpers 쓰기 불가, hwp-rs 방치, pyhwp AGPL                                       | GitHub API 실측                                                                    |
+| git 2.35의 `clone --sparse`는 cone 모드를 켜지 않아 `sparse-checkout set`이 패턴 모드로 동작, 루트 파일(LICENSE 등)이 빠짐 → `git config core.sparseCheckoutCone true` 필요                                     | 스파이크 실측                                                                      |
+| 스튜디오는 `pkg/`를 번들해 런타임에 해시된 `assets/rhwp_bg-*.wasm`만 참조. `public/`의 WASM·js·d.ts 복사본과 `public/samples`는 미참조(약 17MB)                                                                 | 스파이크 dist grep + 렌더 검증                                                     |
+| **수정 전 패키지 앱에서 `createDocument` 성공** — electron-builder가 루트 `dependencies`(`@hwpforge/mcp`, `ws`)를 `app.asar/node_modules`에 수집, `.exe`는 `asar.unpacked`에 서명되어 존재                      | `scripts/drivers/driver.hwp-k12.mjs`로 `release/win-unpacked` 구동, asar 헤더 파싱 |
+| K-12 서식 버튼은 AI 모델이 0개면 렌더되지 않음(`AiPanel.tsx:575` `models.length > 0`) — HwpForge 자체는 LLM 불필요                                                                                              | 실측; 이번 범위 밖 UX 메모                                                         |
+| `rhwp` CLI v0.8.6 릴리스 자산: `rhwp-v0.8.6-windows-x86_64.zip`(9.8MB, 안에 `rhwp/rhwp.exe`), `macos-aarch64.tar.gz`(8.6MB), `macos-x86_64`, `linux-x86_64`, `linux-aarch64`, `SHA256SUMS.txt`. npm 패키지 없음 | GitHub releases API                                                                |
 
 ## 3. 목표와 비목표
 
@@ -103,7 +103,7 @@ Node 스크립트. 네트워크는 첫 실행(또는 `--force`, 버전 변경)�
    `v<version>`을 결정한다. `apps/hwp/package.json`의 `@rhwp/core`·`@rhwp/editor`는
    `^`를 제거하고 정확히 고정한다(`0.8.6`). SDK·스튜디오·WASM 세 버전이 강제로 일치한다.
 2. **sparse clone**: `git clone --filter=blob:none --sparse --depth 1 --branch v<version>
-   https://github.com/edwardkim/rhwp apps/hwp/.build/rhwp`, `git config core.sparseCheckoutCone true`
+https://github.com/edwardkim/rhwp apps/hwp/.build/rhwp`, `git config core.sparseCheckoutCone true`
    (git < 2.37은 cone 모드가 꺼져 있어 `set`이 패턴 모드로 동작하며 루트 파일을 잃는다), 그 뒤
    `git sparse-checkout set rhwp-studio npm/hwpctrl-ocx npm/editor assets/fonts assets/logo`.
    리포 전체는 2.9GB이지만 필요한 경로는 약 40MB다.
@@ -121,12 +121,12 @@ Node 스크립트. 네트워크는 첫 실행(또는 `--force`, 버전 변경)�
    이름이 `vite-plugin-pwa`로 시작하는 항목만 제거하고 나머지를 그대로 반환한다.
 7. **빌드**: 스테이징 디렉터리 `apps/hwp/.build/rhwp/dist-staging/`으로 빌드한다 —
    `RHWP_DISABLE_EXTERNAL_WEBFONTS=1 npx vite build --base=/rhwp/
-   --config vite.config.genoffice.ts --outDir <abs>/apps/hwp/.build/rhwp/dist-staging --emptyOutDir`.
+--config vite.config.genoffice.ts --outDir <abs>/apps/hwp/.build/rhwp/dist-staging --emptyOutDir`.
    `RHWP_WITHOUT_HWPCTRL`은 설정하지 않는다 — 우리 AI 도구가 `plugins.load('hwpctrl')`을
    호출하므로(`apps/hwp/src/renderer/ai/tools.ts:22`) hwpctrl 플러그인이 반드시 포함되어야 한다.
 8. **고지 파일**: §5.7의 `THIRD-PARTY.md`를 스테이징 디렉터리에 생성한다.
 9. **스탬프**: 스테이징 디렉터리의 `.rhwp-version`에 `{ rhwpVersion, disableExternalWebFonts: true,
-   hwpctrl: true, scriptVersion }` JSON을 쓴다. `scriptVersion`은 스크립트 안의 상수로, 산출물에
+hwpctrl: true, scriptVersion }` JSON을 쓴다. `scriptVersion`은 스크립트 안의 상수로, 산출물에
    영향을 주는 변경 시 올린다.
 10. **원자적 교체**: 기존 `apps/hwp/dist/studio/`를 제거하고 스테이징 디렉터리를 그 자리로 rename한다.
     실행 시작 시 기존 `dist/studio/.rhwp-version`이 계산한 스탬프와 일치하면 2~10단계를 건너뛴다(skip).
@@ -147,12 +147,13 @@ Node 스크립트. 네트워크는 첫 실행(또는 `--force`, 버전 변경)�
 
 ```ts
 export interface StaticRoot {
-  prefix: string          // '/rhwp/' 또는 '/'
-  dir: string             // 절대 경로
-  spaFallback: boolean    // 미존재 경로를 dir/index.html로 대체할지
+  prefix: string // '/rhwp/' 또는 '/'
+  dir: string // 절대 경로
+  spaFallback: boolean // 미존재 경로를 dir/index.html로 대체할지
 }
-export function createStaticServer(opts: { roots: StaticRoot[] }):
-  Promise<{ origin: string; close(): Promise<void> }>
+export function createStaticServer(opts: {
+  roots: StaticRoot[]
+}): Promise<{ origin: string; close(): Promise<void> }>
 ```
 
 - 라우팅: 요청 경로에 대해 **가장 긴 prefix**가 일치하는 root를 선택한다.
@@ -186,8 +187,8 @@ studio root는 `studioDir/index.html`이 존재할 때만 roots에 넣는다. �
   `createEditor(container, { studioUrl })`. 기존 `withTimeout(…, STUDIO_TIMEOUT_MS)`는 유지한다
   (첫 WASM 컴파일 수 초 예상, 45초 충분).
 - `App.tsx:72` 오류 문구: `"Cannot reach the embedded HWP editor studio — check the network
-  connection and reopen the file."` → `"The bundled HWP editor could not be loaded — the
-  installation may be damaged. Reinstall Open GenOffice and reopen the file."`
+connection and reopen the file."` → `"The bundled HWP editor could not be loaded — the
+installation may be damaged. Reinstall Open GenOffice and reopen the file."`
 - `apps/hwp/src/renderer/index.html:8` CSP: `frame-src https://edwardkim.github.io` →
   `frame-src 'self' http://127.0.0.1:*`. 프로덕션은 renderer·studio가 동일 origin이라 `'self'`로
   충분하고, `http://127.0.0.1:*`는 dev(렌더러가 Vite `localhost:5177`)용이다.
@@ -203,7 +204,7 @@ studio root는 `studioDir/index.html`이 존재할 때만 roots에 넣는다. �
 `apps/hwp/src/main/hwpforge-client.ts`:
 
 - `forgeWrapperPath()`(`require.resolve` 기반) 제거. `spawn(process.execPath, [wrapper],
-  { ELECTRON_RUN_AS_NODE })` → **`spawn(binPath, [], { stdio: ['pipe','pipe','pipe'] })`**.
+{ ELECTRON_RUN_AS_NODE })` → **`spawn(binPath, [], { stdio: ['pipe','pipe','pipe'] })`**.
   런처 JS는 플랫폼 바이너리를 찾아 `execFileSync`하는 껍데기라, 직접 실행해도 stdio JSON-RPC
   프로토콜은 동일하다.
 - 테스트 가능하도록 의존성 주입: `mcpCall(toolName, args, { binPath, spawnImpl?, timeoutMs? })`.
@@ -216,10 +217,15 @@ studio root는 `studioDir/index.html`이 존재할 때만 roots에 넣는다. �
 ```ts
 export type NativeBinaryName = 'hwpforge-mcp' | 'rhwp'
 export interface NativeBinaryInput {
-  runtimePath?: string; envPath?: string; isPackaged: boolean;
-  resourcesPath: string; repoRoot: string; platform: NodeJS.Platform; arch: string
+  runtimePath?: string
+  envPath?: string
+  isPackaged: boolean
+  resourcesPath: string
+  repoRoot: string
+  platform: NodeJS.Platform
+  arch: string
 }
-export function nativeExecutableName(name: NativeBinaryName, platform: NodeJS.Platform): string  // win32면 '.exe'
+export function nativeExecutableName(name: NativeBinaryName, platform: NodeJS.Platform): string // win32면 '.exe'
 export function resolveNativeBinary(name: NativeBinaryName, input: NativeBinaryInput): string
 ```
 
@@ -245,9 +251,9 @@ hwp 단독 dev(`hwp-main.ts:509` 자기 구성)는 `studioDir: join(__dirname, '
 
 - `extraResources` += `{ from: '../hwp/dist/studio', to: 'modules/hwp-studio' }`
 - `mac.extraResources` += `{ from: '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
-  to: 'native/hwpforge-mcp' }`, `{ from: '../hwp/native/rhwp/darwin-arm64/rhwp', to: 'native/rhwp' }`
+to: 'native/hwpforge-mcp' }`, `{ from: '../hwp/native/rhwp/darwin-arm64/rhwp', to: 'native/rhwp' }`
 - `win.extraResources` += `{ from: '../../node_modules/@hwpforge/mcp-win32-x64/bin/hwpforge-mcp.exe',
-  to: 'native/hwpforge-mcp.exe' }`, `{ from: '../hwp/native/rhwp/win32-x64/rhwp.exe', to: 'native/rhwp.exe' }`
+to: 'native/hwpforge-mcp.exe' }`, `{ from: '../hwp/native/rhwp/win32-x64/rhwp.exe', to: 'native/rhwp.exe' }`
 - 상단 존재 검사 루프(`:50-60`)에 `../hwp/dist/studio/index.html`과 **현재 빌드 OS의** HwpForge
   바이너리 경로를 추가한다. `npm ci`는 현재 OS의 optional 플랫폼 패키지만 설치하므로 플랫폼 분기가 필수다.
 - macOS 서명: 사이드카 바이너리가 이미 같은 `native/` 경로에서 서명·노터라이즈를 통과하고 있으므로
@@ -339,14 +345,14 @@ AI create_document
 
 ## 7. 에러 처리
 
-| 상황 | 동작 |
-|---|---|
-| `studioDir` 미지정 또는 `studioDir/index.html` 부재 | `getStudioUrl` → `{ ok: false, error }`. dev: `"HWP studio is not built — run: npm run build -w @genoffice/hwp"`. packaged: `"Bundled HWP editor assets are missing — reinstall Open GenOffice."` 렌더러는 이 메시지를 오류 화면에 그대로 표시 |
-| 스튜디오 로드 45초 초과 | 기존 `withTimeout` 경로, §5.3의 새 문구 |
-| HwpForge 바이너리 부재/실행 불가 | `child.on('error')` → `{ ok:false, error:'hwpforge binary not found or not executable: <path>' }`. 현재처럼 `Cannot find module`로 뭉개지지 않고 경로를 노출 |
-| 스튜디오 빌드 스크립트 실패(네트워크, 태그 없음, vite 오류) | 비-0 종료 + 원인 출력. `electron-vite build`로 진행하지 않음. 부분 산출물 없음(임시 디렉터리 빌드 후 rename) |
-| 이전 `dist/studio`가 다른 rhwp 버전 | `.rhwp-version` 불일치 → 자동 재빌드 |
-| electron-builder 실행 시 `dist/studio` 또는 HwpForge 바이너리 부재 | 설정 로드 시점에 throw — 깨진 설치본을 만들지 않음 |
+| 상황                                                               | 동작                                                                                                                                                                                                                                           |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `studioDir` 미지정 또는 `studioDir/index.html` 부재                | `getStudioUrl` → `{ ok: false, error }`. dev: `"HWP studio is not built — run: npm run build -w @genoffice/hwp"`. packaged: `"Bundled HWP editor assets are missing — reinstall Open GenOffice."` 렌더러는 이 메시지를 오류 화면에 그대로 표시 |
+| 스튜디오 로드 45초 초과                                            | 기존 `withTimeout` 경로, §5.3의 새 문구                                                                                                                                                                                                        |
+| HwpForge 바이너리 부재/실행 불가                                   | `child.on('error')` → `{ ok:false, error:'hwpforge binary not found or not executable: <path>' }`. 현재처럼 `Cannot find module`로 뭉개지지 않고 경로를 노출                                                                                   |
+| 스튜디오 빌드 스크립트 실패(네트워크, 태그 없음, vite 오류)        | 비-0 종료 + 원인 출력. `electron-vite build`로 진행하지 않음. 부분 산출물 없음(임시 디렉터리 빌드 후 rename)                                                                                                                                   |
+| 이전 `dist/studio`가 다른 rhwp 버전                                | `.rhwp-version` 불일치 → 자동 재빌드                                                                                                                                                                                                           |
+| electron-builder 실행 시 `dist/studio` 또는 HwpForge 바이너리 부재 | 설정 로드 시점에 throw — 깨진 설치본을 만들지 않음                                                                                                                                                                                             |
 
 ## 8. 테스트
 
@@ -420,11 +426,11 @@ Rust는 필요 없다(WASM은 `@rhwp/core`, CLI는 릴리스 바이너리). 네�
 
 조사 중 확인한 사실: rhwp는 포크가 거의 쓰지 않는 에이전트 표면을 세 겹 갖고 있다.
 
-| rhwp 표면 (v0.8.6) | 포크의 현재 사용 |
-|---|---|
+| rhwp 표면 (v0.8.6)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | 포크의 현재 사용                                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | **문서 에이전트 exact command** — `editor.applyTextCommand()`/`revertTextCommand()`, `getSelectionContext()`, `focusTarget()`, `onDocumentChanged()` (`@rhwp/editor@0.8.6` `index.d.ts:319-327`; capability `document-agent-command-v1`, `selection-context-v1`, `target-navigation-v1`, `document-change-events-v1`). 본문 문단 텍스트 치환(≤4,000 code point), epoch·changeSeq·문서/원문/서식/인접문맥 SHA-256 전제조건, 스냅샷 트랜잭션, `error.recovered`. v1 제한: control·field·혼합 글자서식 없는 문단 전체 | **미사용.** `hwp-skill.ts:16-21`과 README는 "엔진이 기존 본문을 편집할 수 없다"고 선언 — 엔진 한계가 아니라 포크 쪽 공백 |
-| **hwpctrl** WebHwpCtrl v2.4 호환층 — `npm/hwpctrl-ocx/spec/api_ledger.json` 200KB, `actions.json` 57KB | 메서드 8개, 액션 ID 21개 |
-| **`rhwp` 네이티브 CLI + 내장 MCP 서버** — `hwp_info`/`hwp_search`/`hwp_fill_fields`, `hwp_open`→`hwp_doc_*` 세션 도구, `rhwp capabilities` 자기서술. 릴리스마다 win x64·mac arm64 프리빌트 | 미사용. `read_pages`는 SVG `<text>` 긁기(표 구조·이미지 불가시) |
+| **hwpctrl** WebHwpCtrl v2.4 호환층 — `npm/hwpctrl-ocx/spec/api_ledger.json` 200KB, `actions.json` 57KB                                                                                                                                                                                                                                                                                                                                                                                                             | 메서드 8개, 액션 ID 21개                                                                                                 |
+| **`rhwp` 네이티브 CLI + 내장 MCP 서버** — `hwp_info`/`hwp_search`/`hwp_fill_fields`, `hwp_open`→`hwp_doc_*` 세션 도구, `rhwp capabilities` 자기서술. 릴리스마다 win x64·mac arm64 프리빌트                                                                                                                                                                                                                                                                                                                         | 미사용. `read_pages`는 SVG `<text>` 긁기(표 구조·이미지 불가시)                                                          |
 
 Phase 2는 이 표면들 위에 AI 도구 10개를 재설계하는 작업이다. 방법론은 CLI-Anything
 (HKUDS/CLI-Anything) `HARNESS.md`를 **명세 템플릿으로만** 차용한다 — 실엔진 호출(재구현 금지),
@@ -445,6 +451,7 @@ Phase 1이 선행 조건인 이유: capability 협상과 hwpctrl 플러그인 �
 ## 12. 변경 파일 목록
 
 신규:
+
 - `tools/build-hwp-studio.mjs`
 - `tools/fetch-rhwp-cli.mjs`
 - `tools/hwp-studio/vite.config.genoffice.ts`
@@ -455,6 +462,7 @@ Phase 1이 선행 조건인 이유: capability 협상과 hwpctrl 플러그인 �
 - `apps/hwp/tests/hwpforge-client.test.ts`
 
 수정:
+
 - `apps/hwp/src/main/hwp-main.ts` — 서버 모듈 사용, `RuntimePaths` 확장, `getStudioUrl` 핸들러
 - `apps/hwp/src/main/hwpforge-client.ts` — 직접 spawn, 의존성 주입, error 이벤트 처리
 - `apps/hwp/src/shared/ipc.ts`, `apps/hwp/src/preload/index.ts` — `getStudioUrl`

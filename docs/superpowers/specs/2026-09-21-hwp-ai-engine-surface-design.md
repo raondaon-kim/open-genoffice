@@ -22,25 +22,25 @@
 
 ## 2. 조사 요약 (2026-09-21 실측, 설계의 근거)
 
-| 사실 | 근거 |
-|---|---|
-| `@rhwp/editor` 0.8.6 브리지: `commands.list/execute/isEnabled/menuModel`(커맨드 150+, `*`=대화상자), `plugins`, `hwpctrl.call/batch/undo/redo/exportBytes`, `chrome`, `exportHml`, 문서 에이전트 V1(`getDocumentState/getSelectionContext/applyTextCommand/revertTextCommand/focusTarget/onDocumentChanged`) | 타르볼 `index.d.ts`, `rhwp-studio/src/embed/rpc-router.ts` case 목록 |
-| hwpctrl 호환층 원장: 484항목 중 verified 333 — 메서드 56(`InitScan/GetText/ReleaseScan`, `MovePos/SetPos/GetPos`, `GetFieldList/PutFieldText/GetFieldText`, `InsertCtrl`, `CreateAction/Execute`+ParameterSet 49), 액션 201(서식 토글·정렬·간격·표 행열 삽입/삭제/병합/분할·Break*·Undo/Redo) | `npm/hwpctrl-ocx/spec/api_ledger.json` |
-| **`InsertText` 액션·`Insert` 메서드 unimplemented** — `Run('InsertText')`, `CreateAction('InsertText')` 모두 조용한 no-op | 원장 + 라이브 프로브 |
-| **문서 에이전트 exact command는 호스트가 쓸 수 없다**: `expectedFormatSha256`(charShapeId·paraShapeId·styleId)·`expectedAdjacentContextSha256`는 스튜디오 내부 WASM으로 계산되며 브리지에 "후보 생성" 메서드가 없다. CLI `capabilities`에도 `charShapeId`·`candidate` 언급 0 | `rhwp-studio/src/document-agent/controller.ts:150-247`, `rpc-router.ts`, `capabilities` grep |
-| `focusTarget`는 **CLI `search`의 IR 좌표**를 그대로 받는다: `(section 0, paragraph 5, length 4)` → `focused:true`, `getSelectionContext().editable:true`, `collapsed:false`(문단 전체 선택) → 이어서 `commands.execute('format:bold')` 적용됨 | 라이브 프로브 |
-| `sha256(exportHwpx()) === getDocumentState().documentSha256` | 라이브 프로브 (30쪽·1.7MB, 348ms) |
-| CLI 편집 후 재로드한 문서의 `documentSha256 === sha256(CLI 산출 바이트)` — CLI와 스튜디오 WASM의 직렬화가 바이트 동일 | 라이브 프로브 |
-| `commands.execute('insert:footnote')` → 31쪽, `hwpctrl.undo()` → 30쪽 + **원래 `documentSha256`으로 복귀** (직렬화 결정적) | 라이브 프로브 |
-| `loadFile(bytes, name, {skipUnsavedGuard:true})`: 445ms, `documentEpoch` +1, `dirty:false`로 리셋 | 라이브 프로브 |
-| `rhwp` CLI v0.8.6: 릴리스 자산 win x86_64 9.8MB(zip, `rhwp/rhwp.exe`)·mac aarch64 8.6MB·mac x86_64·linux ×2 + `SHA256SUMS.txt`; npm 패키지 없음 | GitHub releases API |
-| CLI 성능: `explain --json` 97ms, `edit replace-text --verify` 219~232ms (30쪽 문서) | 실측 |
-| CLI 읽기: `explain`(형식·쪽·문단·표 목록·병합 여부·필드·각주), `digest`(개요·발췌·`nextStep`), `export-text --json [-p N]`(쪽별), `search <q> --json`(`section/paragraph/charOffset/length/page/context`), `export-structure`, `export-tables`(rowSpan/colSpan/nested), `fields`, `extract-data`, `explore`(문서별 행동 순위 메뉴), `word-count`, `verify --expect-*`, `inspect` 3축, `armor`(nonce 격벽) | `rhwp --help`, 실행 |
-| CLI 편집 `edit` 하위 40+: `replace-text(--occurrence)`, `set-cell`, `insert-text/delete-text(--section --para --offset/--start --end)`, `insert-paragraph/delete-paragraph/merge-paragraph`, `insert-table/insert-row/insert-col/delete-row/delete-col/merge-cells/split-cell`, `insert-footnote/endnote`, `insert-page-break/column-break`, 머리말·꼬리말, 책갈피, `insert-image`, `redact/sanitize`; 공통 `--dry-run --verify -o --json` | `rhwp edit --help` |
-| CLI 편집 정합: `replace-text --verify` → `verify.identical:true`; `ir-diff` → `diffCount 3`(text/cc/char_offsets)만, `changedPages` 제공; 병합 셀 표에 `set-cell` 후 `export-tables`로 반영 확인 | 실행 |
-| `run` 선언적 계획 v1.2: step 5종(`fill_fields/replace_text/set_cell/set_checkbox/preview`), `preconditions.inputSha256`, `assertions.verify` — 전체 `edit` 표면을 덮지 않음 | `export-plan-schema` |
-| `capabilities --mcp`: 도구 162개, 각 `inputSchema` + `cli.args` 템플릿(`{path}` 치환) — 도구 선언의 단일 출처. 봉투 공통 필드 `schemaVersion/source/untrustedContent/untrustedFields`. exit 0 성공·1 런타임·2 사용법·3 부정적 결과(데이터) | 매니페스트, `mcp_integration_guide.md` |
-| `@rhwp/core` npm: `HwpDocument` 클래스 메서드 452(`getCharPropertiesAt`, `getParaShapeSet`, `getTextRange`, `replaceText`…) — 호스트 측 IR 접근은 기술적으로 가능(v2 옵션) | `rhwp.d.ts` |
+| 사실                                                                                                                                                                                                                                                                                                                                                                                                                                       | 근거                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `@rhwp/editor` 0.8.6 브리지: `commands.list/execute/isEnabled/menuModel`(커맨드 150+, `*`=대화상자), `plugins`, `hwpctrl.call/batch/undo/redo/exportBytes`, `chrome`, `exportHml`, 문서 에이전트 V1(`getDocumentState/getSelectionContext/applyTextCommand/revertTextCommand/focusTarget/onDocumentChanged`)                                                                                                                               | 타르볼 `index.d.ts`, `rhwp-studio/src/embed/rpc-router.ts` case 목록                         |
+| hwpctrl 호환층 원장: 484항목 중 verified 333 — 메서드 56(`InitScan/GetText/ReleaseScan`, `MovePos/SetPos/GetPos`, `GetFieldList/PutFieldText/GetFieldText`, `InsertCtrl`, `CreateAction/Execute`+ParameterSet 49), 액션 201(서식 토글·정렬·간격·표 행열 삽입/삭제/병합/분할·Break*·Undo/Redo)                                                                                                                                              | `npm/hwpctrl-ocx/spec/api_ledger.json`                                                       |
+| **`InsertText` 액션·`Insert` 메서드 unimplemented** — `Run('InsertText')`, `CreateAction('InsertText')` 모두 조용한 no-op                                                                                                                                                                                                                                                                                                                  | 원장 + 라이브 프로브                                                                         |
+| **문서 에이전트 exact command는 호스트가 쓸 수 없다**: `expectedFormatSha256`(charShapeId·paraShapeId·styleId)·`expectedAdjacentContextSha256`는 스튜디오 내부 WASM으로 계산되며 브리지에 "후보 생성" 메서드가 없다. CLI `capabilities`에도 `charShapeId`·`candidate` 언급 0                                                                                                                                                               | `rhwp-studio/src/document-agent/controller.ts:150-247`, `rpc-router.ts`, `capabilities` grep |
+| `focusTarget`는 **CLI `search`의 IR 좌표**를 그대로 받는다: `(section 0, paragraph 5, length 4)` → `focused:true`, `getSelectionContext().editable:true`, `collapsed:false`(문단 전체 선택) → 이어서 `commands.execute('format:bold')` 적용됨                                                                                                                                                                                              | 라이브 프로브                                                                                |
+| `sha256(exportHwpx()) === getDocumentState().documentSha256`                                                                                                                                                                                                                                                                                                                                                                               | 라이브 프로브 (30쪽·1.7MB, 348ms)                                                            |
+| CLI 편집 후 재로드한 문서의 `documentSha256 === sha256(CLI 산출 바이트)` — CLI와 스튜디오 WASM의 직렬화가 바이트 동일                                                                                                                                                                                                                                                                                                                      | 라이브 프로브                                                                                |
+| `commands.execute('insert:footnote')` → 31쪽, `hwpctrl.undo()` → 30쪽 + **원래 `documentSha256`으로 복귀** (직렬화 결정적)                                                                                                                                                                                                                                                                                                                 | 라이브 프로브                                                                                |
+| `loadFile(bytes, name, {skipUnsavedGuard:true})`: 445ms, `documentEpoch` +1, `dirty:false`로 리셋                                                                                                                                                                                                                                                                                                                                          | 라이브 프로브                                                                                |
+| `rhwp` CLI v0.8.6: 릴리스 자산 win x86_64 9.8MB(zip, `rhwp/rhwp.exe`)·mac aarch64 8.6MB·mac x86_64·linux ×2 + `SHA256SUMS.txt`; npm 패키지 없음                                                                                                                                                                                                                                                                                            | GitHub releases API                                                                          |
+| CLI 성능: `explain --json` 97ms, `edit replace-text --verify` 219~232ms (30쪽 문서)                                                                                                                                                                                                                                                                                                                                                        | 실측                                                                                         |
+| CLI 읽기: `explain`(형식·쪽·문단·표 목록·병합 여부·필드·각주), `digest`(개요·발췌·`nextStep`), `export-text --json [-p N]`(쪽별), `search <q> --json`(`section/paragraph/charOffset/length/page/context`), `export-structure`, `export-tables`(rowSpan/colSpan/nested), `fields`, `extract-data`, `explore`(문서별 행동 순위 메뉴), `word-count`, `verify --expect-*`, `inspect` 3축, `armor`(nonce 격벽)                                  | `rhwp --help`, 실행                                                                          |
+| CLI 편집 `edit` 하위 40+: `replace-text(--occurrence)`, `set-cell`, `insert-text/delete-text(--section --para --offset/--start --end)`, `insert-paragraph/delete-paragraph/merge-paragraph`, `insert-table/insert-row/insert-col/delete-row/delete-col/merge-cells/split-cell`, `insert-footnote/endnote`, `insert-page-break/column-break`, 머리말·꼬리말, 책갈피, `insert-image`, `redact/sanitize`; 공통 `--dry-run --verify -o --json` | `rhwp edit --help`                                                                           |
+| CLI 편집 정합: `replace-text --verify` → `verify.identical:true`; `ir-diff` → `diffCount 3`(text/cc/char_offsets)만, `changedPages` 제공; 병합 셀 표에 `set-cell` 후 `export-tables`로 반영 확인                                                                                                                                                                                                                                           | 실행                                                                                         |
+| `run` 선언적 계획 v1.2: step 5종(`fill_fields/replace_text/set_cell/set_checkbox/preview`), `preconditions.inputSha256`, `assertions.verify` — 전체 `edit` 표면을 덮지 않음                                                                                                                                                                                                                                                                | `export-plan-schema`                                                                         |
+| `capabilities --mcp`: 도구 162개, 각 `inputSchema` + `cli.args` 템플릿(`{path}` 치환) — 도구 선언의 단일 출처. 봉투 공통 필드 `schemaVersion/source/untrustedContent/untrustedFields`. exit 0 성공·1 런타임·2 사용법·3 부정적 결과(데이터)                                                                                                                                                                                                 | 매니페스트, `mcp_integration_guide.md`                                                       |
+| `@rhwp/core` npm: `HwpDocument` 클래스 메서드 452(`getCharPropertiesAt`, `getParaShapeSet`, `getTextRange`, `replaceText`…) — 호스트 측 IR 접근은 기술적으로 가능(v2 옵션)                                                                                                                                                                                                                                                                 | `rhwp.d.ts`                                                                                  |
 
 ## 3. 목표와 비목표
 
@@ -97,9 +97,23 @@ Phase 1이 `tools/fetch-rhwp-cli.mjs`(릴리스 자산 + `SHA256SUMS.txt` 검증
 **`apps/hwp/src/main/rhwp-cli.ts`** (Electron 의존 없음, `spawnImpl` 주입)
 
 ```ts
-export interface RhwpEnvelope { schemaVersion: string; source?: string; untrustedContent?: boolean; untrustedFields?: string[]; [k: string]: unknown }
-export interface RhwpResult { exitCode: 0 | 1 | 2 | 3; envelope: RhwpEnvelope | null; stderr: string }
-export function runRhwp(binPath: string, args: string[], opts?: { timeoutMs?: number; spawnImpl?: SpawnLike }): Promise<RhwpResult>
+export interface RhwpEnvelope {
+  schemaVersion: string
+  source?: string
+  untrustedContent?: boolean
+  untrustedFields?: string[]
+  [k: string]: unknown
+}
+export interface RhwpResult {
+  exitCode: 0 | 1 | 2 | 3
+  envelope: RhwpEnvelope | null
+  stderr: string
+}
+export function runRhwp(
+  binPath: string,
+  args: string[],
+  opts?: { timeoutMs?: number; spawnImpl?: SpawnLike },
+): Promise<RhwpResult>
 ```
 
 - 인자 배열 spawn, 셸 없음. stdout = JSON(`--json` 필수), stderr = 진단(`LAYOUT_OVERFLOW` 등 — 로그로만).
@@ -117,11 +131,11 @@ export function runRhwp(binPath: string, args: string[], opts?: { timeoutMs?: nu
 
 **IPC** (`shared/ipc.ts`, `preload`, `hwp-main.ts`)
 
-| 채널 | 요청 | 응답 |
-|---|---|---|
-| `hwp:ai-snapshot` | `{ sha, data: ArrayBuffer }` | `{ ok } \| { ok:false, error }` |
-| `hwp:ai-query` | `{ sha, tool, args }` — `tool`은 §6의 읽기 허용 목록, `args`는 매니페스트 `inputSchema`로 검증, `{path}`는 메인이 주입 | `RhwpResult` |
-| `hwp:ai-edit` | `{ sha, ops: EditOp[] }` | `{ ok:true, data: ArrayBuffer, outputSha, changedPages: number[], diffCount, journal: RhwpEnvelope[] } \| { ok:false, failedOp: number, result: RhwpResult }` |
+| 채널              | 요청                                                                                                                   | 응답                                                                                                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hwp:ai-snapshot` | `{ sha, data: ArrayBuffer }`                                                                                           | `{ ok } \| { ok:false, error }`                                                                                                                               |
+| `hwp:ai-query`    | `{ sha, tool, args }` — `tool`은 §6의 읽기 허용 목록, `args`는 매니페스트 `inputSchema`로 검증, `{path}`는 메인이 주입 | `RhwpResult`                                                                                                                                                  |
+| `hwp:ai-edit`     | `{ sha, ops: EditOp[] }`                                                                                               | `{ ok:true, data: ArrayBuffer, outputSha, changedPages: number[], diffCount, journal: RhwpEnvelope[] } \| { ok:false, failedOp: number, result: RhwpResult }` |
 
 `ai-edit` 실행: `t0 = snapshot`; op마다 `rhwp edit <sub> t(i-1) …flags -o t(i) --json`; 어느 op가 exit≠0이면 즉시 중단(임시파일만 남고
 스냅샷·원본은 무변경); 마지막 op에 `--verify`; `rhwp ir-diff t0 tN --json`으로 `changedPages`·`diffCount`; `tN` 바이트와 SHA를 돌려준다.
@@ -129,32 +143,32 @@ export function runRhwp(binPath: string, args: string[], opts?: { timeoutMs?: nu
 
 ### 5.3 렌더러 도구 층 — `apps/hwp/src/renderer/ai/`
 
-| 파일 | 책임 |
-|---|---|
-| `tools/read.ts` | `get_document_overview`, `read_pages`, `find`, `read_table`, `list_fields` — 스냅샷 확보 후 `ai-query` |
-| `tools/edit.ts` | `edit_text`, `edit_table`, `insert_element` — op 검증·`ai-edit`·fence·재로드·포커스 |
-| `tools/format.ts` | `apply_format`, `fill_fields` — 라이브 우선, CLI 폴백 |
-| `tools/query.ts` | `rhwp_query` — 허용 목록·스키마 검증 |
-| `router.ts` | 라이브/파일 결정표(§5.4) |
-| `fence.ts` | `withFence(editor, run)`: s0 → run → s1 비교 |
-| `snapshots.ts` | 바이트 스택(≤20), `capture(editor)`, `pop()`, sha 캐시(렌더러 측 "메인에 보냈음" 집합) |
-| `provenance.ts` | 봉투의 `untrustedFields` 경로를 따라 값 래핑 |
-| `hwp-skill.ts` | 시스템 프롬프트 재작성, `AGENT_TOOLS` 조립, `executeTool` 라우팅 |
+| 파일              | 책임                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| `tools/read.ts`   | `get_document_overview`, `read_pages`, `find`, `read_table`, `list_fields` — 스냅샷 확보 후 `ai-query` |
+| `tools/edit.ts`   | `edit_text`, `edit_table`, `insert_element` — op 검증·`ai-edit`·fence·재로드·포커스                    |
+| `tools/format.ts` | `apply_format`, `fill_fields` — 라이브 우선, CLI 폴백                                                  |
+| `tools/query.ts`  | `rhwp_query` — 허용 목록·스키마 검증                                                                   |
+| `router.ts`       | 라이브/파일 결정표(§5.4)                                                                               |
+| `fence.ts`        | `withFence(editor, run)`: s0 → run → s1 비교                                                           |
+| `snapshots.ts`    | 바이트 스택(≤20), `capture(editor)`, `pop()`, sha 캐시(렌더러 측 "메인에 보냈음" 집합)                 |
+| `provenance.ts`   | 봉투의 `untrustedFields` 경로를 따라 값 래핑                                                           |
+| `hwp-skill.ts`    | 시스템 프롬프트 재작성, `AGENT_TOOLS` 조립, `executeTool` 라우팅                                       |
 
 기존 `tools.ts`의 `svgToText`, `selectParagraph`, `CHAR_COLOR_PALETTE`, `add_table`/`write_content`/`set_text_color`/
 `set_paragraph_alignment`/`clear_character_format`/`fill_field`는 삭제한다. `create_document`·`get_document_state`는 유지한다.
 
 ### 5.4 라우터 — 라이브 vs 파일
 
-| 의도 | 경로 | 이유 |
-|---|---|---|
-| 읽기 전부 | 파일(스냅샷 + CLI) | 구조·좌표·표 격자는 CLI만 제공 |
-| 텍스트 삽입·치환·삭제, 문단 삽입·삭제 | 파일 | `InsertText` 라이브 미구현 |
-| 표 구조·셀 텍스트 | 파일 | 한 경로로 통일(라이브 표 액션은 hwpctrl 좌표계라 IR 좌표와 어긋남) |
-| 서식 토글(굵게·기울임·밑줄·취소선·위/아래첨자)·정렬 6종·팔레트 8색·크기 ±·줄간격 ±·서식 지우기 | **라이브** | `focusTarget` + `commands.execute('format:*')`, 네이티브 undo, 재로드 없음 |
-| 절대 글자 크기·임의 RGB·스타일 적용 | 파일 | `hwp_apply_char_format`/`hwp_apply_style` (`cli.args`는 Task 0에서 확정) |
-| 누름틀 채우기 | 라이브 → 실패 시 파일 | `PutFieldText` verified; `이름[N]` 쌍둥이는 CLI `fill-fields` |
-| 각주·미주·쪽/단 나눔·머리말/꼬리말 텍스트·책갈피 | 파일 | 텍스트를 함께 넣어야 하므로 CLI가 단순 |
+| 의도                                                                                           | 경로                  | 이유                                                                       |
+| ---------------------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------- |
+| 읽기 전부                                                                                      | 파일(스냅샷 + CLI)    | 구조·좌표·표 격자는 CLI만 제공                                             |
+| 텍스트 삽입·치환·삭제, 문단 삽입·삭제                                                          | 파일                  | `InsertText` 라이브 미구현                                                 |
+| 표 구조·셀 텍스트                                                                              | 파일                  | 한 경로로 통일(라이브 표 액션은 hwpctrl 좌표계라 IR 좌표와 어긋남)         |
+| 서식 토글(굵게·기울임·밑줄·취소선·위/아래첨자)·정렬 6종·팔레트 8색·크기 ±·줄간격 ±·서식 지우기 | **라이브**            | `focusTarget` + `commands.execute('format:*')`, 네이티브 undo, 재로드 없음 |
+| 절대 글자 크기·임의 RGB·스타일 적용                                                            | 파일                  | `hwp_apply_char_format`/`hwp_apply_style` (`cli.args`는 Task 0에서 확정)   |
+| 누름틀 채우기                                                                                  | 라이브 → 실패 시 파일 | `PutFieldText` verified; `이름[N]` 쌍둥이는 CLI `fill-fields`              |
+| 각주·미주·쪽/단 나눔·머리말/꼬리말 텍스트·책갈피                                               | 파일                  | 텍스트를 함께 넣어야 하므로 CLI가 단순                                     |
 
 ### 5.5 fence·스냅샷·dirty
 
@@ -193,42 +207,42 @@ export function runRhwp(binPath: string, args: string[], opts?: { timeoutMs?: nu
 
 ## 6. 도구 표면 (15개)
 
-| 도구 | 입력 | 경로 | 구현 |
-|---|---|---|---|
-| `get_document_overview` | — | CLI | `explain --json` + `export-structure --json` + `explore --json` 병합. 형식·쪽수·문단수·표 목록(index·rows·cols·hasMergedCells)·필드 수·각주·개요·행동 메뉴 |
-| `read_pages` | `start, end?` (1-based, ≤10쪽) | CLI | `export-text --json -p N` 쪽별 → `[Page N]` 마커, 24,000자 cap |
-| `find` | `query, limit?` | CLI | `search --json` → `matches[{section,paragraph,charOffset,length,page,context}]` — **편집 좌표의 유일한 출처** |
-| `read_table` | `index` | CLI | `export-tables --json` → 해당 표만: `rows, cols, cells[{row,col,rowSpan,colSpan,text,nested?}]`, 셀 400개 cap |
-| `list_fields` | — | CLI | `fields --json` → 이름·안내문·현재값·위치 |
-| `get_document_state` | — | 라이브 | 기존 유지 |
-| `edit_text` | `ops[]` | 파일 | 아래 op 표 |
-| `edit_table` | `ops[]` | 파일 | 아래 op 표 |
-| `apply_format` | `target{section,paragraph,length}, format{bold?,italic?,underline?,strike?,align?,color?,sizeDelta?,lineSpacingDelta?,clear?}` | 라이브(+파일) | `focusTarget` → `commands.execute('format:…')` 순차; `color`가 팔레트 밖 hex거나 `fontSize` 절대값이면 CLI `apply_char_format` |
-| `fill_fields` | `data{name: value}` | 라이브→파일 | `PutFieldText` 각각; false면 CLI `fill-fields --data` 일괄 |
-| `insert_element` | `kind ∈ {footnote,endnote,page_break,column_break,header_text,footer_text,bookmark}, at{section,paragraph,charOffset}, text?` | 파일 | 대응 `edit insert-*` |
-| `undo_ai_edit` | — | 라이브 | 스택 pop → `loadFile` → 상태 반환 |
-| `rhwp_query` | `name ∈ 허용목록, args` | CLI | 허용목록: `digest, extract_data, word_count, verify, inspect_injection, export_structure, explore`. `inputSchema`로 검증, `path` 주입 |
-| `create_document` | `markdown, file_name?` | main | 기존 HwpForge 유지 |
+| 도구                    | 입력                                                                                                                           | 경로          | 구현                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_document_overview` | —                                                                                                                              | CLI           | `explain --json` + `export-structure --json` + `explore --json` 병합. 형식·쪽수·문단수·표 목록(index·rows·cols·hasMergedCells)·필드 수·각주·개요·행동 메뉴 |
+| `read_pages`            | `start, end?` (1-based, ≤10쪽)                                                                                                 | CLI           | `export-text --json -p N` 쪽별 → `[Page N]` 마커, 24,000자 cap                                                                                             |
+| `find`                  | `query, limit?`                                                                                                                | CLI           | `search --json` → `matches[{section,paragraph,charOffset,length,page,context}]` — **편집 좌표의 유일한 출처**                                              |
+| `read_table`            | `index`                                                                                                                        | CLI           | `export-tables --json` → 해당 표만: `rows, cols, cells[{row,col,rowSpan,colSpan,text,nested?}]`, 셀 400개 cap                                              |
+| `list_fields`           | —                                                                                                                              | CLI           | `fields --json` → 이름·안내문·현재값·위치                                                                                                                  |
+| `get_document_state`    | —                                                                                                                              | 라이브        | 기존 유지                                                                                                                                                  |
+| `edit_text`             | `ops[]`                                                                                                                        | 파일          | 아래 op 표                                                                                                                                                 |
+| `edit_table`            | `ops[]`                                                                                                                        | 파일          | 아래 op 표                                                                                                                                                 |
+| `apply_format`          | `target{section,paragraph,length}, format{bold?,italic?,underline?,strike?,align?,color?,sizeDelta?,lineSpacingDelta?,clear?}` | 라이브(+파일) | `focusTarget` → `commands.execute('format:…')` 순차; `color`가 팔레트 밖 hex거나 `fontSize` 절대값이면 CLI `apply_char_format`                             |
+| `fill_fields`           | `data{name: value}`                                                                                                            | 라이브→파일   | `PutFieldText` 각각; false면 CLI `fill-fields --data` 일괄                                                                                                 |
+| `insert_element`        | `kind ∈ {footnote,endnote,page_break,column_break,header_text,footer_text,bookmark}, at{section,paragraph,charOffset}, text?`  | 파일          | 대응 `edit insert-*`                                                                                                                                       |
+| `undo_ai_edit`          | —                                                                                                                              | 라이브        | 스택 pop → `loadFile` → 상태 반환                                                                                                                          |
+| `rhwp_query`            | `name ∈ 허용목록, args`                                                                                                        | CLI           | 허용목록: `digest, extract_data, word_count, verify, inspect_injection, export_structure, explore`. `inputSchema`로 검증, `path` 주입                      |
+| `create_document`       | `markdown, file_name?`                                                                                                         | main          | 기존 HwpForge 유지                                                                                                                                         |
 
 **`edit_text` op**
 
-| op | 인자 | CLI 체인 |
-|---|---|---|
-| `replace_phrase` | `find, replace, occurrence?` | `edit replace-text --find --replace [--occurrence k]` |
-| `set_paragraph_text` | `section, paragraph, text` | `edit delete-text --section --para --start 0 --end <len>` → `edit insert-text --section --para --offset 0 --text` (`len`은 `find`/개요가 준 길이; 스파이크에서 code point 단위 확정) |
-| `insert_paragraph_after` | `section, paragraph, text` | `edit insert-paragraph --section --para --below` → `edit insert-text --section --para+1 --offset 0 --text` |
-| `delete_paragraph` | `section, paragraph` | `edit delete-paragraph --section --para` |
+| op                       | 인자                         | CLI 체인                                                                                                                                                                             |
+| ------------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `replace_phrase`         | `find, replace, occurrence?` | `edit replace-text --find --replace [--occurrence k]`                                                                                                                                |
+| `set_paragraph_text`     | `section, paragraph, text`   | `edit delete-text --section --para --start 0 --end <len>` → `edit insert-text --section --para --offset 0 --text` (`len`은 `find`/개요가 준 길이; 스파이크에서 code point 단위 확정) |
+| `insert_paragraph_after` | `section, paragraph, text`   | `edit insert-paragraph --section --para --below` → `edit insert-text --section --para+1 --offset 0 --text`                                                                           |
+| `delete_paragraph`       | `section, paragraph`         | `edit delete-paragraph --section --para`                                                                                                                                             |
 
 **`edit_table` op**
 
-| op | 인자 | CLI |
-|---|---|---|
-| `set_cell` | `table, row, col, text` | `edit set-cell --table --row --col --text` |
-| `insert_row` / `insert_col` | `table, row\|col, below?\|right?` | `edit insert-row/insert-col` |
-| `delete_row` / `delete_col` | `table, row\|col` | `edit delete-row/delete-col` |
-| `merge_cells` | `table, row, col, endRow, endCol` | `edit merge-cells --table --row --col --end-row --end-col` |
-| `split_cell` | `table, row, col, rows, cols` | `edit split-cell --table --row --col --rows --cols` |
-| `insert_table` | `section, paragraph, rows, cols` | `edit insert-table --section --para --rows --cols` |
+| op                          | 인자                              | CLI                                                        |
+| --------------------------- | --------------------------------- | ---------------------------------------------------------- |
+| `set_cell`                  | `table, row, col, text`           | `edit set-cell --table --row --col --text`                 |
+| `insert_row` / `insert_col` | `table, row\|col, below?\|right?` | `edit insert-row/insert-col`                               |
+| `delete_row` / `delete_col` | `table, row\|col`                 | `edit delete-row/delete-col`                               |
+| `merge_cells`               | `table, row, col, endRow, endCol` | `edit merge-cells --table --row --col --end-row --end-col` |
+| `split_cell`                | `table, row, col, rows, cols`     | `edit split-cell --table --row --col --rows --cols`        |
+| `insert_table`              | `section, paragraph, rows, cols`  | `edit insert-table --section --para --rows --cols`         |
 
 플래그 이름은 `rhwp edit --help`의 옵션 목록(`--section --para --offset --start --end --table --row --col --below --right --end-row --end-col --rows --cols --text --find --replace --occurrence --name --header --footer`)에 맞춘다. 정확한 조합은 계획 Task 0 스파이크에서 `--dry-run --json`으로 확정하고 골든 테스트에 고정한다.
 
@@ -244,17 +258,17 @@ export function runRhwp(binPath: string, args: string[], opts?: { timeoutMs?: nu
 
 ## 8. 에러 처리
 
-| 상황 | 동작 |
-|---|---|
-| `rhwpPath` 부재 | `ai-*` 전부 `{ ok:false, error:'rhwp binary not found: <path>' }`. 읽기 도구는 SVG 폴백 없이 실패한다 |
-| CLI exit 2 | `isError`, 문구 "도구 인자 오류(재시도 금지): <stderr 앞 400자>" — 계약 테스트가 잡아야 할 버그 |
-| CLI exit 1 / 30s 타임아웃 | `isError` + 봉투 또는 stderr 앞 800자 |
-| op 체인 중간 실패 | 디스크 무변경, `failedOp`·봉투 반환, 재로드 없음, 스택 pop 취소 |
-| fence 불일치 | 적용 안 함: "문서가 그새 편집되어 적용하지 않았습니다 — 다시 읽고 재시도" |
-| `loadFile` 실패 | 스택의 s0 바이트로 재로드 시도 → 실패면 오류 화면 문구·`aiDirty` 유지 |
-| `focusTarget` `TARGET_NOT_FOUND` | 편집은 이미 반영됨 — 포커스만 생략, 출력에 명시 |
-| 암호 문서(`explain.encrypted:true`) | 편집 도구 거절: "암호 문서는 AI 편집을 지원하지 않습니다" |
-| `untrustedContent` 봉투 | §5.6 래핑; 래핑 실패(필드 경로 미해석)는 봉투 전체 래핑으로 보수적 처리 |
+| 상황                                | 동작                                                                                                  |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `rhwpPath` 부재                     | `ai-*` 전부 `{ ok:false, error:'rhwp binary not found: <path>' }`. 읽기 도구는 SVG 폴백 없이 실패한다 |
+| CLI exit 2                          | `isError`, 문구 "도구 인자 오류(재시도 금지): <stderr 앞 400자>" — 계약 테스트가 잡아야 할 버그       |
+| CLI exit 1 / 30s 타임아웃           | `isError` + 봉투 또는 stderr 앞 800자                                                                 |
+| op 체인 중간 실패                   | 디스크 무변경, `failedOp`·봉투 반환, 재로드 없음, 스택 pop 취소                                       |
+| fence 불일치                        | 적용 안 함: "문서가 그새 편집되어 적용하지 않았습니다 — 다시 읽고 재시도"                             |
+| `loadFile` 실패                     | 스택의 s0 바이트로 재로드 시도 → 실패면 오류 화면 문구·`aiDirty` 유지                                 |
+| `focusTarget` `TARGET_NOT_FOUND`    | 편집은 이미 반영됨 — 포커스만 생략, 출력에 명시                                                       |
+| 암호 문서(`explain.encrypted:true`) | 편집 도구 거절: "암호 문서는 AI 편집을 지원하지 않습니다"                                             |
+| `untrustedContent` 봉투             | §5.6 래핑; 래핑 실패(필드 경로 미해석)는 봉투 전체 래핑으로 보수적 처리                               |
 
 ## 9. 테스트
 
