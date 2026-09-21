@@ -61,7 +61,10 @@ describe('matchRoot', () => {
 
 describe('resolveFile', () => {
   it('serves index.html for a directory request', () => {
-    expect(resolveFile(roots[1], '/rhwp/')).toEqual({ kind: 'file', path: join(studio, 'index.html') })
+    expect(resolveFile(roots[1], '/rhwp/')).toEqual({
+      kind: 'file',
+      path: join(studio, 'index.html'),
+    })
   })
   it('reports missing files under a root without SPA fallback', () => {
     expect(resolveFile(roots[1], '/rhwp/nope.js')).toEqual({ kind: 'missing' })

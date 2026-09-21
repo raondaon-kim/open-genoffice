@@ -26,9 +26,7 @@ export interface StaticServer {
 }
 
 export type Resolution =
-  | { kind: 'file'; path: string }
-  | { kind: 'forbidden' }
-  | { kind: 'missing' }
+  { kind: 'file'; path: string } | { kind: 'forbidden' } | { kind: 'missing' }
 
 const MIME_BY_EXT: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
