@@ -10,7 +10,10 @@ The fork's material changes include:
 - direct bring-your-own-key routes for DeepSeek, GLM (Z.ai), Kimi (Moonshot),
   and MiniMax through their OpenAI-compatible endpoints;
 - a Hangul document (`.hwp`/`.hwpx`) editor module built on the MIT-licensed
-  rhwp engine, embedded as a fifth shell tab;
+  rhwp engine, embedded as a fifth shell tab; the rhwp studio UI is built from
+  the pinned upstream release and bundled with the app (served from a loopback
+  origin, no remote dependency), and the HwpForge document generator and rhwp
+  CLI binaries are packaged as application resources;
 - encrypted device-local storage for user-supplied provider keys;
 - a global default model and sticky per-document provider/model selection;
 - model catalog discovery, compatibility filtering, and key verification;

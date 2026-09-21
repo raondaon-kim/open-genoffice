@@ -51,6 +51,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build HWP studio (bundled rhwp editor)
+        # Exercises tools/build-hwp-studio.mjs on every run: sparse-clones the
+        # pinned rhwp tag and builds the studio the hwp module serves locally.
+        # No Rust needed — the WASM comes from @rhwp/core.
+        run: npm run build:hwp-studio
+
+      - name: Fetch rhwp CLI (bundled Hangul engine binary)
+        # Exercises tools/fetch-rhwp-cli.mjs: downloads this platform's release
+        # binary at the same pinned version and verifies it against SHA256SUMS.
+        run: npm run fetch:rhwp-cli
+
       - name: Check dependency licenses
         run: npm run licenses
 

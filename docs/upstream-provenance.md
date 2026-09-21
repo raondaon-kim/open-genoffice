@@ -32,3 +32,36 @@ change the terms of any separately licensed directory or hosted service.
 Upstream source updates are not binary updates for this derivative. The
 derivative's signing and updater architecture remain separate release
 decisions.
+
+## Bundled rhwp studio (Hangul editor)
+
+The Hangul module embeds the rhwp studio UI from
+[`edwardkim/rhwp`](https://github.com/edwardkim/rhwp) (MIT). It is not
+vendored: `tools/build-hwp-studio.mjs` sparse-clones the upstream tag whose
+version equals the installed `@rhwp/core` (pinned exactly in
+`apps/hwp/package.json`), drops in that package's WASM, removes the PWA
+plugin, disables CDN web fonts (`RHWP_DISABLE_EXTERNAL_WEBFONTS=1`; the
+Hamchorom CDN is licensed for non-commercial use only), and builds into
+`apps/hwp/dist/studio/` (gitignored). electron-builder copies that directory
+to `resources/modules/hwp-studio`, and the hwp main process serves it under
+`/rhwp/` on its loopback origin. The studio's own third-party notices are
+assembled into `dist/studio/THIRD-PARTY.md` and merged into the installer's
+notices.
+
+To move to a new rhwp release: set `@rhwp/core` and `@rhwp/editor` to the
+same exact version in `apps/hwp/package.json`, run `npm install`, then
+`npm run build:hwp-studio -- --force` and `npm run fetch:rhwp-cli -- --force`,
+and open a `.hwp` and a `.hwpx` with the network disconnected. The SDK, the
+studio, the WASM and the CLI must share one version; mixed versions fall back
+to the SDK's legacy handshake and are not supported here.
+
+## Packaged native helpers
+
+electron-builder copies the root `package.json` `dependencies` into
+`app.asar` automatically. Native helper binaries are deliberately not shipped
+that way: the sheets xlsx sidecar, the HwpForge MCP binary (`@hwpforge/mcp`,
+declared in `apps/hwp`) and the rhwp CLI (fetched from the pinned upstream
+release by `tools/fetch-rhwp-cli.mjs` and verified against its
+`SHA256SUMS.txt`) are listed as platform `extraResources` in
+`apps/shell/electron-builder.cjs`, which fails the build when a binary is
+missing, and the main process spawns them directly from `resources/native/`.
