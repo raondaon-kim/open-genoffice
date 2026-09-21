@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 한글(.hwp/.hwpx) 편집기와 AI 문서 생성이 인터넷 없이, 설치본에서 동작하게 한다.
+**Goal:** 한글(.hwp/.hwpx) 편집기와 AI 문서 생성이 인터넷 없이, 설치본에서 동작하게 하고, `rhwp` CLI 바이너리를 같은 패키징 계약으로 동봉해 Phase 2(AI 엔진 표면)의 토대를 만든다.
 
-**Architecture:** `apps/hwp`가 iframe으로 띄우는 rhwp 스튜디오를 원격(`edwardkim.github.io`)에서 받는 대신, 빌드 시 업스트림 태그에서 빌드해 앱에 동봉하고 기존 루프백 HTTP 서버의 `/rhwp/` 경로로 서빙한다. AI 문서 생성이 쓰는 HwpForge MCP 바이너리는 sheets Rust 사이드카와 같은 `extraResources` 패턴으로 패키징하고 직접 spawn한다. 스튜디오↔호스트 런타임 계약은 바꾸지 않는다.
+**Architecture:** `apps/hwp`가 iframe으로 띄우는 rhwp 스튜디오를 원격(`edwardkim.github.io`)에서 받는 대신, 빌드 시 업스트림 태그에서 빌드해 앱에 동봉하고 기존 루프백 HTTP 서버의 `/rhwp/` 경로로 서빙한다. 네이티브 헬퍼 바이너리 두 개 — AI 문서 생성이 쓰는 HwpForge MCP, Phase 2가 쓸 `rhwp` CLI(릴리스 자산, SHA256SUMS 검증) — 는 sheets Rust 사이드카와 같은 `extraResources` 패턴으로 패키징하고 공용 리졸버로 경로를 얻는다. 스튜디오↔호스트 런타임 계약은 바꾸지 않는다.
 
 **Tech Stack:** Electron 41, electron-vite, Vite 8(스튜디오 빌드), `@rhwp/editor`/`@rhwp/core` 0.8.6, `@hwpforge/mcp` 0.16.x, vitest, electron-builder, Node ≥20(스튜디오 빌드는 `import.meta.dirname` 때문에 ≥20.11; 로컬은 22.17)
 
@@ -19,6 +19,7 @@
 - 호스트 CSP `frame-src 'self' http://127.0.0.1:*`. 호스트 CSP에 `'wasm-unsafe-eval'`을 넣지 않는다.
 - 스튜디오는 `/rhwp/` prefix, SPA 폴백 없음(미존재 → 404). 렌더러 root(`/`)만 `index.html` 폴백.
 - HwpForge는 플랫폼 바이너리를 **직접** spawn한다. npm 런처 JS·`process.execPath`·`ELECTRON_RUN_AS_NODE`를 쓰지 않는다.
+- `rhwp` CLI는 GitHub 릴리스 자산(`rhwp-v0.8.6-<os>-<arch>.{zip,tar.gz}`)을 `SHA256SUMS.txt`로 검증해 `apps/hwp/native/rhwp/<platform>-<arch>/`(gitignore)에 두고 `native/rhwp[.exe]`로 패키징한다. 버전은 `@rhwp/core`와 동일. **Phase 1에서는 경로를 주입하기만 하고 호출하지 않는다.**
 - `@hwpforge/mcp` 의존성은 `apps/hwp/package.json`에만 둔다(루트에서 제거). 이 패키지는 import되지 않으며, optionalDependencies로 플랫폼 바이너리 패키지를 끌어오는 용도다. **루트 `dependencies`는 electron-builder가 `app.asar`에 자동 수집하므로**, 바이너리를 `extraResources`로 명시 배포하는 이상 루트에 남기면 `asar.unpacked`와 `native/`에 두 번 실린다.
 - 코드 스타일: prettier `semi: false, singleQuote, trailingComma: all, printWidth: 100`. 커밋 전 `npm run format`.
 - 커밋 메시지는 리포 관례 `HWP: <imperative summary>` + 본문, 마지막 줄 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
@@ -34,7 +35,8 @@
 | `tools/build-hwp-studio.mjs` (신규) | rhwp 태그 sparse clone → WASM·폰트 배치 → PWA 제거 빌드 → `apps/hwp/studio-dist/` 원자적 교체 → 고지 파일·스탬프 |
 | `tools/hwp-studio/vite.config.genoffice.ts` (신규) | 업스트림 Vite 설정을 import해 PWA 플러그인만 제거하는 래퍼. 빌드 시 스튜디오 디렉터리로 복사됨 |
 | `apps/hwp/src/main/static-server.ts` (신규) | Electron 의존 없는 루프백 정적 서버. prefix별 root, 탈출 차단, MIME, SPA 폴백 정책 |
-| `apps/hwp/src/main/hwpforge-path.ts` (신규) | HwpForge 바이너리 경로 해석(순수 함수, 우선순위 4단계) |
+| `apps/hwp/src/main/native-binary-path.ts` (신규) | HwpForge·rhwp CLI 공용 바이너리 경로 해석(순수 함수, 우선순위 4단계) |
+| `tools/fetch-rhwp-cli.mjs` (신규) | `@rhwp/core` 버전의 rhwp CLI 릴리스 자산을 내려받아 `SHA256SUMS.txt`로 검증, `apps/hwp/native/rhwp/<platform>-<arch>/`에 배치 |
 | `apps/hwp/src/main/hwpforge-client.ts` (수정) | 바이너리 직접 spawn, spawn 주입, `error` 이벤트 처리 |
 | `apps/hwp/src/main/hwp-main.ts` (수정) | 서버 모듈 사용, `RuntimePaths` 확장, `getStudioUrl` IPC, 표준 경로 조립 |
 | `apps/hwp/src/shared/ipc.ts`, `apps/hwp/src/preload/index.ts` (수정) | `getStudioUrl` 채널/API |
@@ -44,7 +46,7 @@
 | `tools/gen-third-party-notices.mjs` (수정) | 스튜디오 고지 병합, extraResources 패키지 추출 정규식 |
 | `package.json`(루트), `apps/hwp/package.json`, `.gitignore`, `eslint.config.mjs`, `.prettierignore` | 의존성 이동·고정, 스크립트, 무시 규칙 |
 | `.github/workflows/ci.yml`, `README.md`, `MODIFICATIONS.md`, `docs/upstream-provenance.md`, 스펙 §8 | CI 단계, 문서 |
-| `apps/hwp/tests/{static-server,hwpforge-path,hwpforge-client}.test.ts` (신규) | 유닛 테스트 |
+| `apps/hwp/tests/{static-server,native-binary-path,hwpforge-client}.test.ts` (신규) | 유닛 테스트 |
 
 ---
 
@@ -558,32 +560,33 @@ EOF
 
 ---
 
-### Task 2: HwpForge 바이너리 경로 해석
+### Task 2: 네이티브 바이너리 경로 해석 (HwpForge · rhwp CLI 공용)
 
 **Files:**
-- Create: `apps/hwp/src/main/hwpforge-path.ts`
-- Test: `apps/hwp/tests/hwpforge-path.test.ts`
+- Create: `apps/hwp/src/main/native-binary-path.ts`
+- Test: `apps/hwp/tests/native-binary-path.test.ts`
 
 **Interfaces:**
 - Produces:
   ```ts
-  export interface HwpforgePathInput {
+  export type NativeBinaryName = 'hwpforge-mcp' | 'rhwp'
+  export interface NativeBinaryInput {
     runtimePath?: string; envPath?: string; isPackaged: boolean
     resourcesPath: string; repoRoot: string; platform: NodeJS.Platform; arch: string
   }
-  export function hwpforgeExecutableName(platform: NodeJS.Platform): string
-  export function resolveHwpforgePath(input: HwpforgePathInput): string
+  export function nativeExecutableName(name: NativeBinaryName, platform: NodeJS.Platform): string
+  export function resolveNativeBinary(name: NativeBinaryName, input: NativeBinaryInput): string
   ```
-  Task 3의 `hwp-main.ts` 호출 지점과 Task 4의 셸 주입이 사용한다.
+  Task 3의 `hwp-main.ts` 호출 지점(`'hwpforge-mcp'`), Task 4의 셸 주입, 그리고 Phase 2의 `rhwp` 호출이 사용한다.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
-`apps/hwp/tests/hwpforge-path.test.ts`:
+`apps/hwp/tests/native-binary-path.test.ts`:
 ```ts
 /** @vitest-environment node */
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { hwpforgeExecutableName, resolveHwpforgePath } from '../src/main/hwpforge-path'
+import { nativeExecutableName, resolveNativeBinary } from '../src/main/native-binary-path'
 
 const base = {
   isPackaged: false,
@@ -593,42 +596,51 @@ const base = {
   arch: 'x64',
 }
 
-describe('hwpforgeExecutableName', () => {
+describe('nativeExecutableName', () => {
   it('adds .exe on win32 only', () => {
-    expect(hwpforgeExecutableName('win32')).toBe('hwpforge-mcp.exe')
-    expect(hwpforgeExecutableName('darwin')).toBe('hwpforge-mcp')
-    expect(hwpforgeExecutableName('linux')).toBe('hwpforge-mcp')
+    expect(nativeExecutableName('hwpforge-mcp', 'win32')).toBe('hwpforge-mcp.exe')
+    expect(nativeExecutableName('hwpforge-mcp', 'darwin')).toBe('hwpforge-mcp')
+    expect(nativeExecutableName('rhwp', 'win32')).toBe('rhwp.exe')
+    expect(nativeExecutableName('rhwp', 'linux')).toBe('rhwp')
   })
 })
 
-describe('resolveHwpforgePath', () => {
+describe('resolveNativeBinary', () => {
   it('prefers the runtime-injected path over everything', () => {
     expect(
-      resolveHwpforgePath({ ...base, runtimePath: 'R', envPath: 'E', isPackaged: true }),
+      resolveNativeBinary('hwpforge-mcp', { ...base, runtimePath: 'R', envPath: 'E', isPackaged: true }),
     ).toBe('R')
   })
   it('falls back to the environment override', () => {
-    expect(resolveHwpforgePath({ ...base, envPath: 'E', isPackaged: true })).toBe('E')
+    expect(resolveNativeBinary('rhwp', { ...base, envPath: 'E', isPackaged: true })).toBe('E')
   })
   it('uses resources/native in packaged builds', () => {
-    expect(resolveHwpforgePath({ ...base, isPackaged: true })).toBe(
+    expect(resolveNativeBinary('hwpforge-mcp', { ...base, isPackaged: true })).toBe(
       join(base.resourcesPath, 'native', 'hwpforge-mcp.exe'),
     )
-    expect(resolveHwpforgePath({ ...base, isPackaged: true, platform: 'darwin' })).toBe(
-      join(base.resourcesPath, 'native', 'hwpforge-mcp'),
+    expect(resolveNativeBinary('rhwp', { ...base, isPackaged: true, platform: 'darwin' })).toBe(
+      join(base.resourcesPath, 'native', 'rhwp'),
     )
   })
-  it('uses the hoisted platform package in dev', () => {
-    expect(resolveHwpforgePath(base)).toBe(
+  it('uses the hoisted platform package for HwpForge in dev', () => {
+    expect(resolveNativeBinary('hwpforge-mcp', base)).toBe(
       join(base.repoRoot, 'node_modules', '@hwpforge', 'mcp-win32-x64', 'bin', 'hwpforge-mcp.exe'),
     )
-    expect(resolveHwpforgePath({ ...base, platform: 'darwin', arch: 'arm64' })).toBe(
+    expect(resolveNativeBinary('hwpforge-mcp', { ...base, platform: 'darwin', arch: 'arm64' })).toBe(
       join(base.repoRoot, 'node_modules', '@hwpforge', 'mcp-darwin-arm64', 'bin', 'hwpforge-mcp'),
     )
   })
+  it('uses apps/hwp/native/rhwp for the rhwp CLI in dev', () => {
+    expect(resolveNativeBinary('rhwp', base)).toBe(
+      join(base.repoRoot, 'apps', 'hwp', 'native', 'rhwp', 'win32-x64', 'rhwp.exe'),
+    )
+    expect(resolveNativeBinary('rhwp', { ...base, platform: 'darwin', arch: 'arm64' })).toBe(
+      join(base.repoRoot, 'apps', 'hwp', 'native', 'rhwp', 'darwin-arm64', 'rhwp'),
+    )
+  })
   it('ignores empty strings for runtime and env overrides', () => {
-    expect(resolveHwpforgePath({ ...base, runtimePath: '', envPath: '', isPackaged: true })).toBe(
-      join(base.resourcesPath, 'native', 'hwpforge-mcp.exe'),
+    expect(resolveNativeBinary('rhwp', { ...base, runtimePath: '', envPath: '', isPackaged: true })).toBe(
+      join(base.resourcesPath, 'native', 'rhwp.exe'),
     )
   })
 })
@@ -636,25 +648,28 @@ describe('resolveHwpforgePath', () => {
 
 - [ ] **Step 2: 실패 확인**
 
-Run: `npm test -w @genoffice/hwp -- hwpforge-path`
+Run: `npm test -w @genoffice/hwp -- native-binary-path`
 Expected: FAIL — 모듈 없음.
 
 - [ ] **Step 3: 구현**
 
-`apps/hwp/src/main/hwpforge-path.ts`:
+`apps/hwp/src/main/native-binary-path.ts`:
 ```ts
 import { join } from 'node:path'
 
 /**
- * Where the HwpForge MCP platform binary lives. Mirrors
+ * Where the native helper binaries live. Mirrors
  * apps/sheets/src/main/sheets-main.ts resolveSidecarPath(): the shell injects
- * the path, an env var can override it, packaged builds carry it as an
- * extraResource under resources/native, and dev runs use the platform package
- * that `@hwpforge/mcp` pulls in through optionalDependencies. That npm package
- * is never imported — it exists in apps/hwp/package.json only to install the
- * binary.
+ * the path, an env var can override it, packaged builds carry each binary as an
+ * extraResource under resources/native, and dev runs use the build-time
+ * location — for HwpForge the platform package that `@hwpforge/mcp` pulls in
+ * through optionalDependencies (never imported; declared in apps/hwp only to
+ * install the binary), for the rhwp CLI apps/hwp/native/rhwp filled by
+ * tools/fetch-rhwp-cli.mjs from the pinned upstream release.
  */
-export interface HwpforgePathInput {
+export type NativeBinaryName = 'hwpforge-mcp' | 'rhwp'
+
+export interface NativeBinaryInput {
   runtimePath?: string
   envPath?: string
   isPackaged: boolean
@@ -664,41 +679,45 @@ export interface HwpforgePathInput {
   arch: string
 }
 
-export function hwpforgeExecutableName(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
+export function nativeExecutableName(name: NativeBinaryName, platform: NodeJS.Platform): string {
+  return platform === 'win32' ? `${name}.exe` : name
 }
 
-export function resolveHwpforgePath(input: HwpforgePathInput): string {
-  const exe = hwpforgeExecutableName(input.platform)
+function devPath(name: NativeBinaryName, input: NativeBinaryInput, exe: string): string {
+  const target = `${input.platform}-${input.arch}`
+  switch (name) {
+    case 'hwpforge-mcp':
+      return join(input.repoRoot, 'node_modules', '@hwpforge', `mcp-${target}`, 'bin', exe)
+    case 'rhwp':
+      return join(input.repoRoot, 'apps', 'hwp', 'native', 'rhwp', target, exe)
+  }
+}
+
+export function resolveNativeBinary(name: NativeBinaryName, input: NativeBinaryInput): string {
+  const exe = nativeExecutableName(name, input.platform)
   if (input.runtimePath) return input.runtimePath
   if (input.envPath) return input.envPath
   if (input.isPackaged) return join(input.resourcesPath, 'native', exe)
-  return join(
-    input.repoRoot,
-    'node_modules',
-    '@hwpforge',
-    `mcp-${input.platform}-${input.arch}`,
-    'bin',
-    exe,
-  )
+  return devPath(name, input, exe)
 }
 ```
 
 - [ ] **Step 4: 통과 확인**
 
-Run: `npm test -w @genoffice/hwp -- hwpforge-path`
+Run: `npm test -w @genoffice/hwp -- native-binary-path`
 Expected: PASS.
 
 - [ ] **Step 5: 커밋**
 
 ```bash
 npm run format
-git add apps/hwp/src/main/hwpforge-path.ts apps/hwp/tests/hwpforge-path.test.ts
+git add apps/hwp/src/main/native-binary-path.ts apps/hwp/tests/native-binary-path.test.ts
 git commit -m "$(cat <<'EOF'
-HWP: resolve the HwpForge binary path like the sheets sidecar
+HWP: resolve native helper binaries like the sheets sidecar
 
-Runtime injection → env override → resources/native (packaged) → hoisted
-platform package (dev). Pure function so the priority order is unit-tested.
+Runtime injection → env override → resources/native (packaged) → build-time
+location (dev), shared by the HwpForge MCP binary and the rhwp CLI. Pure
+function so the priority order is unit-tested.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -715,7 +734,7 @@ EOF
 - Test: `apps/hwp/tests/hwpforge-client.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveHwpforgePath` (Task 2).
+- Consumes: `resolveNativeBinary('hwpforge-mcp', …)` (Task 2).
 - Produces:
   ```ts
   export type SpawnLike = (command: string, args: readonly string[], options: { stdio: ['pipe','pipe','pipe'] }) => ChildProcessWithoutNullStreams
@@ -915,7 +934,7 @@ import { join } from 'node:path'
  * capability the rhwp engine automation does not expose. We spawn its prebuilt
  * platform binary directly (no npm launcher script, no ELECTRON_RUN_AS_NODE),
  * speak JSON-RPC lines over stdio and call hwpforge_convert. The binary path
- * comes from the caller (see hwpforge-path.ts) so packaged builds can ship it
+ * comes from the caller (see native-binary-path.ts) so packaged builds can ship it
  * as an extraResource next to the sheets sidecar.
  */
 
@@ -1096,7 +1115,7 @@ export async function createHwpFromMarkdown(
 
 (a) import (12행 근처) — 기존 `import { createHwpFromMarkdown } from './hwpforge-client'` 아래에 추가:
 ```ts
-import { resolveHwpforgePath } from './hwpforge-path'
+import { resolveNativeBinary } from './native-binary-path'
 ```
 
 (b) `RuntimePaths`(198-206행) — `onCreateDocument` 아래에 필드 추가:
@@ -1120,7 +1139,7 @@ import { resolveHwpforgePath } from './hwpforge-path'
         join(app.getPath('userData'), 'ai-created'),
         baseName,
         {
-          binPath: resolveHwpforgePath({
+          binPath: resolveNativeBinary('hwpforge-mcp', {
             runtimePath: runtime.hwpforgePath,
             envPath: process.env.HWPFORGE_MCP_PATH,
             isPackaged: app.isPackaged,
@@ -1137,7 +1156,7 @@ import { resolveHwpforgePath } from './hwpforge-path'
 - [ ] **Step 5: 통과 확인**
 
 Run: `npm test -w @genoffice/hwp`
-Expected: PASS (static-server, hwpforge-path, hwpforge-client 전부).
+Expected: PASS (static-server, native-binary-path, hwpforge-client 전부).
 
 Run: `npm run typecheck -w @genoffice/hwp && npm run typecheck -w @genoffice/shell`
 Expected: 오류 없음.
@@ -1233,6 +1252,8 @@ import type { StaticRoot } from './static-server'
 ```ts
   /** built rhwp studio (index.html + wasm + fonts); served under STUDIO_PREFIX on the loopback origin */
   studioDir?: string
+  /** rhwp native CLI (Phase 2 AI tools); injected by the shell, unused in Phase 1 */
+  rhwpPath?: string
 ```
 
 - [ ] **Step 5: `hwp-main.ts` — 서버 블록 교체**
@@ -1336,12 +1357,17 @@ const HWPFORGE_BIN = app.isPackaged
       'bin',
       HWPFORGE_EXE,
     )
+const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
+const RHWP_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', RHWP_EXE)
+  : join(APPS_ROOT, 'hwp', 'native', 'rhwp', `${process.platform}-${process.arch}`, RHWP_EXE)
 ```
 
-`configureHwpRuntime({...})`(158-169행)에 두 필드 추가(`rendererFile` 아래):
+`configureHwpRuntime({...})`(158-169행)에 세 필드 추가(`rendererFile` 아래):
 ```ts
   studioDir: HWP_STUDIO_DIR,
   hwpforgePath: HWPFORGE_BIN,
+  rhwpPath: RHWP_BIN,
 ```
 
 - [ ] **Step 9: 검증**
@@ -1359,8 +1385,8 @@ HWP: serve the bundled studio from the loopback origin and expose its URL
 
 The loopback server now mounts studio-dist under /rhwp/ next to the
 renderer, starts in dev too, and the renderer can ask main for the studio
-URL. The shell injects studioDir and the HwpForge binary path the same way
-it injects the sheets sidecar.
+URL. The shell injects studioDir and the native binary paths (HwpForge,
+rhwp CLI) the same way it injects the sheets sidecar.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -1662,6 +1688,115 @@ try {
 }
 ```
 
+- [ ] **Step 2b: `rhwp` CLI 획득 스크립트**
+
+`tools/fetch-rhwp-cli.mjs`:
+```js
+#!/usr/bin/env node
+/**
+ * Fetch the rhwp native CLI matching the installed @rhwp/core from the upstream
+ * GitHub release, verify it against the release's SHA256SUMS.txt, and unpack it
+ * to apps/hwp/native/rhwp/<platform>-<arch>/rhwp[.exe] (gitignored).
+ *
+ *   node tools/fetch-rhwp-cli.mjs [--force]
+ *
+ * Only the current OS/arch is fetched — that is what electron-builder packages
+ * on this machine. Skipped when the .rhwp-version stamp matches.
+ */
+import { spawnSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const require = createRequire(import.meta.url)
+const FORCE = process.argv.includes('--force')
+const REPO = 'edwardkim/rhwp'
+
+/** release asset per Node platform-arch; archives contain a top-level rhwp/ directory */
+const ASSETS = {
+  'win32-x64': { file: (v) => `rhwp-v${v}-windows-x86_64.zip`, exe: 'rhwp.exe' },
+  'darwin-arm64': { file: (v) => `rhwp-v${v}-macos-aarch64.tar.gz`, exe: 'rhwp' },
+  'darwin-x64': { file: (v) => `rhwp-v${v}-macos-x86_64.tar.gz`, exe: 'rhwp' },
+  'linux-x64': { file: (v) => `rhwp-v${v}-linux-x86_64.tar.gz`, exe: 'rhwp' },
+  'linux-arm64': { file: (v) => `rhwp-v${v}-linux-aarch64.tar.gz`, exe: 'rhwp' },
+}
+
+const target = `${process.platform}-${process.arch}`
+const asset = ASSETS[target]
+if (!asset) {
+  console.error(`rhwp cli: no release asset for ${target}`)
+  process.exit(1)
+}
+
+const version = JSON.parse(readFileSync(require.resolve('@rhwp/core/package.json'), 'utf8')).version
+const outDir = join(ROOT, 'apps', 'hwp', 'native', 'rhwp', target)
+const exePath = join(outDir, asset.exe)
+const stampFile = join(outDir, '.rhwp-version')
+const stamp = JSON.stringify({ version, target })
+if (!FORCE && existsSync(exePath) && existsSync(stampFile) && readFileSync(stampFile, 'utf8') === stamp) {
+  console.log(`rhwp cli: up to date (v${version}, ${target}), skipping — pass --force to refetch`)
+  process.exit(0)
+}
+
+const base = `https://github.com/${REPO}/releases/download/v${version}/`
+const fileName = asset.file(version)
+
+async function download(url) {
+  const res = await fetch(url, { redirect: 'follow' })
+  if (!res.ok) throw new Error(`download failed: HTTP ${res.status} ${url}`)
+  return Buffer.from(await res.arrayBuffer())
+}
+
+try {
+  console.log(`rhwp cli: fetching ${fileName} (v${version})`)
+  const [archive, sums] = await Promise.all([download(base + fileName), download(`${base}SHA256SUMS.txt`)])
+  const expected = sums
+    .toString('utf8')
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .find((parts) => parts[1] === fileName || parts[1] === `*${fileName}`)?.[0]
+  if (!expected) throw new Error(`${fileName} is not listed in SHA256SUMS.txt`)
+  const actual = createHash('sha256').update(archive).digest('hex')
+  if (actual !== expected) {
+    throw new Error(`SHA-256 mismatch for ${fileName}: expected ${expected}, got ${actual}`)
+  }
+
+  rmSync(outDir, { recursive: true, force: true })
+  mkdirSync(outDir, { recursive: true })
+  if (fileName.endsWith('.zip')) {
+    // JSZip is already a hoisted dependency (docx-engine, sheets)
+    const JSZip = require('jszip')
+    const zip = await JSZip.loadAsync(archive)
+    for (const entry of Object.values(zip.files)) {
+      if (entry.dir) continue
+      const name = entry.name.split('/').pop()
+      if (name === asset.exe || /^LICENSE/i.test(name)) {
+        writeFileSync(join(outDir, name), await entry.async('nodebuffer'))
+      }
+    }
+  } else {
+    const archivePath = join(outDir, fileName)
+    writeFileSync(archivePath, archive)
+    const tar = spawnSync('tar', ['-xzf', archivePath, '-C', outDir, '--strip-components=1'], {
+      stdio: 'inherit',
+    })
+    rmSync(archivePath, { force: true })
+    if (tar.status !== 0) throw new Error(`tar failed (${tar.status ?? tar.signal})`)
+  }
+  if (!existsSync(exePath)) throw new Error(`archive did not contain ${asset.exe}`)
+  if (process.platform !== 'win32') chmodSync(exePath, 0o755)
+  writeFileSync(stampFile, stamp)
+  const check = spawnSync(exePath, ['--version'], { encoding: 'utf8' })
+  console.log(`rhwp cli: ${check.stdout.trim() || '(no --version output)'} → ${outDir}`)
+} catch (err) {
+  console.error(`rhwp cli: fetch failed — ${err instanceof Error ? err.message : err}`)
+  process.exit(1)
+}
+```
+
 - [ ] **Step 3: 의존성·스크립트**
 
 `apps/hwp/package.json` — `dependencies`를 다음으로 교체(정확 고정, `@hwpforge/mcp` 추가):
@@ -1675,36 +1810,41 @@ try {
     "@rhwp/editor": "0.8.6"
   },
 ```
-`scripts`의 `"build": "electron-vite build"`를 다음 두 줄로 교체:
+`scripts`의 `"build": "electron-vite build"`를 다음 세 줄로 교체:
 ```json
     "build:studio": "node ../../tools/build-hwp-studio.mjs",
-    "build": "npm run build:studio && electron-vite build",
+    "build:cli": "node ../../tools/fetch-rhwp-cli.mjs",
+    "build": "npm run build:studio && npm run build:cli && electron-vite build",
 ```
 
 루트 `package.json` — `dependencies`에서 `"@hwpforge/mcp": "^0.16.4",` 줄 삭제(`ws`는 gsk용이므로 유지). `scripts`의 `"fixtures"` 줄 아래에 추가:
 ```json
     "build:hwp-studio": "node tools/build-hwp-studio.mjs",
+    "fetch:rhwp-cli": "node tools/fetch-rhwp-cli.mjs",
 ```
 
 - [ ] **Step 4: 무시 규칙**
 
 `.gitignore` — `release/` 줄 아래에 추가:
 ```
-# rhwp studio: sparse upstream clone + built bundle (tools/build-hwp-studio.mjs)
+# rhwp: sparse upstream clone, built studio bundle, fetched CLI (tools/build-hwp-studio.mjs, tools/fetch-rhwp-cli.mjs)
 /apps/hwp/.rhwp/
 /apps/hwp/studio-dist/
+/apps/hwp/native/
 ```
 
 `eslint.config.mjs` `ignores` 배열에 추가:
 ```js
       'apps/hwp/.rhwp/**',
       'apps/hwp/studio-dist/**',
+      'apps/hwp/native/**',
 ```
 
 `.prettierignore` — `apps/shell/build/THIRD-PARTY-NOTICES.txt` 줄 아래에 추가:
 ```
 apps/hwp/.rhwp/
 apps/hwp/studio-dist/
+apps/hwp/native/
 ```
 
 - [ ] **Step 5: lock 갱신·확인**
@@ -1747,20 +1887,33 @@ ls apps/hwp/out/main/index.js apps/hwp/out/preload/index.js apps/hwp/out/rendere
 ```
 Expected: 스튜디오 skip 메시지 후 electron-vite build 성공, 세 산출물 존재.
 
+- [ ] **Step 6b: CLI 획득 실행·검증**
+
+Run:
+```bash
+npm run fetch:rhwp-cli
+ls -a apps/hwp/native/rhwp/win32-x64/
+./apps/hwp/native/rhwp/win32-x64/rhwp.exe --version
+npm run fetch:rhwp-cli
+```
+Expected: 첫 실행이 `fetching rhwp-v0.8.6-windows-x86_64.zip`, SHA 검증 통과, 폴더에 `rhwp.exe`, `LICENSE`, `.rhwp-version`. `--version`은 `rhwp v0.8.6`. 두 번째 실행은 `up to date … skipping`. (SHA 불일치·미등재는 비-0 종료와 원인 출력 — 자산 이름을 바꿔 한 번 확인한다.)
+
 - [ ] **Step 7: 커밋**
 
 ```bash
 npm run format && npm run lint
-git add tools/build-hwp-studio.mjs tools/hwp-studio/vite.config.genoffice.ts apps/hwp/package.json package.json package-lock.json .gitignore eslint.config.mjs .prettierignore
+git add tools/build-hwp-studio.mjs tools/fetch-rhwp-cli.mjs tools/hwp-studio/vite.config.genoffice.ts apps/hwp/package.json package.json package-lock.json .gitignore eslint.config.mjs .prettierignore
 git commit -m "$(cat <<'EOF'
-HWP: build the rhwp studio from the pinned upstream tag at build time
+HWP: build the rhwp studio and fetch the rhwp CLI at build time
 
 tools/build-hwp-studio.mjs sparse-clones edwardkim/rhwp at the tag matching
 the installed @rhwp/core, drops in that package's WASM, replaces the fonts
 symlink with a real copy, strips the PWA plugin, and builds with CDN web
 fonts disabled into apps/hwp/studio-dist (gitignored, stamped, atomically
-swapped). @rhwp/* are pinned exactly so SDK, studio and WASM share one
-version; @hwpforge/mcp moves to apps/hwp where its binary is used.
+swapped). tools/fetch-rhwp-cli.mjs downloads the same release's CLI binary
+for this platform and verifies it against SHA256SUMS.txt. @rhwp/* are pinned
+exactly so SDK, studio, WASM and CLI share one version; @hwpforge/mcp moves
+to apps/hwp where its binary is used.
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 EOF
@@ -1901,12 +2054,16 @@ const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpfor
 const HWPFORGE_SRC = HWPFORGE_PKG
   ? `../../node_modules/@hwpforge/${HWPFORGE_PKG}/bin/${HWPFORGE_EXE}`
   : null
+// rhwp CLI fetched by tools/fetch-rhwp-cli.mjs for this platform (same version as @rhwp/core)
+const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
+const RHWP_SRC = HWPFORGE_PKG ? `../hwp/native/rhwp/${process.platform}-${process.arch}/${RHWP_EXE}` : null
 for (const rel of [
   '../../node_modules/@genspark/cli',
   '../../node_modules/@genspark/cli/node_modules/commander',
   '../../node_modules/ws',
   '../hwp/studio-dist/index.html',
   ...(HWPFORGE_SRC ? [HWPFORGE_SRC] : []),
+  ...(RHWP_SRC ? [RHWP_SRC] : []),
 ]) {
   if (!existsSync(join(__dirname, rel))) {
     throw new Error(
@@ -1933,6 +2090,10 @@ for (const rel of [
         from: '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
         to: 'native/hwpforge-mcp',
       },
+      {
+        from: '../hwp/native/rhwp/darwin-arm64/rhwp',
+        to: 'native/rhwp',
+      },
 ```
 
 `win.extraResources`의 사이드카 항목 아래에 추가:
@@ -1940,6 +2101,10 @@ for (const rel of [
       {
         from: '../../node_modules/@hwpforge/mcp-win32-x64/bin/hwpforge-mcp.exe',
         to: 'native/hwpforge-mcp.exe',
+      },
+      {
+        from: '../hwp/native/rhwp/win32-x64/rhwp.exe',
+        to: 'native/rhwp.exe',
       },
 ```
 
@@ -1976,7 +2141,7 @@ mv apps/hwp/studio-dist apps/hwp/studio-dist.bak && (node -e "require('./apps/sh
 npm run notices
 grep -n "^=\+$\|^4\. Bundled rhwp studio\|hwpforge\|^## rhwp v" apps/shell/build/THIRD-PARTY-NOTICES.txt | head
 ```
-Expected: 첫 명령은 `[ 'modules/hwp', 'modules/hwp-studio' ] [ 'native/xlsx-sidecar.exe', 'native/hwpforge-mcp.exe' ]`. 두 번째는 `1`(studio-dist 부재 시 throw 메시지 출력). `npm run notices`는 완료하며 산출물에 `4. Bundled rhwp studio…` 구획, `@hwpforge/mcp-win32-x64` 항목, `## rhwp v0.8.6 — MIT`가 보인다. 경고는 정확히 하나 — `not installed, skipped: @hwpforge/mcp-darwin-arm64`(Windows에는 darwin 플랫폼 패키지가 설치되지 않으므로 정상; 기존 optional 의존성과 같은 처리).
+Expected: 첫 명령은 `[ 'modules/hwp', 'modules/hwp-studio' ] [ 'native/xlsx-sidecar.exe', 'native/hwpforge-mcp.exe', 'native/rhwp.exe' ]`. 두 번째는 `1`(studio-dist 부재 시 throw 메시지 출력). `npm run notices`는 완료하며 산출물에 `4. Bundled rhwp studio…` 구획, `@hwpforge/mcp-win32-x64` 항목, `## rhwp v0.8.6 — MIT`가 보인다. 경고는 정확히 하나 — `not installed, skipped: @hwpforge/mcp-darwin-arm64`(Windows에는 darwin 플랫폼 패키지가 설치되지 않으므로 정상; 기존 optional 의존성과 같은 처리).
 
 Run: `npm run lint`
 Expected: 통과.
@@ -1987,11 +2152,11 @@ Expected: 통과.
 npm run format
 git add apps/shell/electron-builder.cjs tools/gen-third-party-notices.mjs
 git commit -m "$(cat <<'EOF'
-HWP: package the studio bundle and the HwpForge binary as extraResources
+HWP: package the studio bundle and the native binaries as extraResources
 
-studio-dist ships under resources/modules/hwp-studio and the platform
-HwpForge binary under resources/native next to the sheets sidecar; the
-builder config fails fast when either source is missing. Third-party
+studio-dist ships under resources/modules/hwp-studio; the platform HwpForge
+binary and the rhwp CLI ship under resources/native next to the sheets
+sidecar; the builder config fails fast when any source is missing. Third-party
 notices pick up the studio's own notice file and packages referenced by a
 path inside node_modules.
 
@@ -2020,6 +2185,11 @@ EOF
         # pinned rhwp tag and builds the studio the hwp module serves locally.
         # No Rust needed — the WASM comes from @rhwp/core.
         run: npm run build:hwp-studio
+
+      - name: Fetch rhwp CLI (bundled Hangul engine binary)
+        # Exercises tools/fetch-rhwp-cli.mjs: downloads this platform's release
+        # binary at the same pinned version and verifies it against SHA256SUMS.
+        run: npm run fetch:rhwp-cli
 ```
 
 - [ ] **Step 2: `README.md`**
@@ -2032,6 +2202,7 @@ HWP 행(69행)의 `(Rust + WASM, embedded as an iframe studio)`를 다음으로 
 Development 블록의 `npm run fixtures     # generate test .docx fixtures` 줄 아래에 추가:
 ```bash
 npm run build:hwp-studio  # build the bundled Hangul editor (rhwp studio); needs git + network once, before npm run dev
+npm run fetch:rhwp-cli    # download + verify the matching rhwp CLI binary for this platform
 ```
 
 - [ ] **Step 3: `MODIFICATIONS.md`**
@@ -2080,8 +2251,10 @@ supported here.
 
 electron-builder copies the root `package.json` `dependencies` into
 `app.asar` automatically. Native helper binaries are deliberately not shipped
-that way: the sheets xlsx sidecar and the HwpForge MCP binary (`@hwpforge/mcp`,
-declared in `apps/hwp`) are listed as platform `extraResources` in
+that way: the sheets xlsx sidecar, the HwpForge MCP binary (`@hwpforge/mcp`,
+declared in `apps/hwp`) and the rhwp CLI (fetched from the pinned upstream
+release by `tools/fetch-rhwp-cli.mjs` and verified against its
+`SHA256SUMS.txt`) are listed as platform `extraResources` in
 `apps/shell/electron-builder.cjs`, which fails the build when a binary is
 missing, and the main process spawns them directly from `resources/native/`.
 ```
@@ -2133,8 +2306,10 @@ Test-Path (Join-Path $installDir 'resources\modules\hwp-studio\rhwp_bg.wasm')
 Test-Path (Join-Path $installDir 'resources\native\hwpforge-mcp.exe')
 Select-String -Path (Join-Path $installDir 'resources\THIRD-PARTY-NOTICES.txt') -Pattern 'Bundled rhwp studio' -Quiet
 -not (Test-Path (Join-Path $installDir 'resources\app.asar.unpacked\node_modules\@hwpforge'))
+Test-Path (Join-Path $installDir 'resources\native\rhwp.exe')
+& (Join-Path $installDir 'resources\native\rhwp.exe') --version
 ```
-Expected: 다섯 줄 모두 `True` — 마지막 줄은 HwpForge가 더는 asar 경로로 **중복** 배포되지 않음을 뜻한다.
+Expected: `Test-Path` 여섯 줄 모두 `True`(다섯째 줄은 HwpForge가 더는 asar 경로로 **중복** 배포되지 않음을 뜻한다), 마지막 명령은 `rhwp v0.8.6`.
 
 - [ ] **Step 3: 오프라인 기능 검증**
 
