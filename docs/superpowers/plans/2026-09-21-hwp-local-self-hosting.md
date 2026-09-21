@@ -32,7 +32,7 @@
 
 | 파일 | 책임 |
 |---|---|
-| `tools/build-hwp-studio.mjs` (신규) | rhwp 태그 sparse clone → WASM·폰트 배치 → PWA 제거 빌드 → `apps/hwp/studio-dist/` 원자적 교체 → 고지 파일·스탬프 |
+| `tools/build-hwp-studio.mjs` (신규) | rhwp 태그 sparse clone → WASM·폰트 배치 → PWA 제거 빌드 → `apps/hwp/dist/studio/` 원자적 교체 → 고지 파일·스탬프 |
 | `tools/hwp-studio/vite.config.genoffice.ts` (신규) | 업스트림 Vite 설정을 import해 PWA 플러그인만 제거하는 래퍼. 빌드 시 스튜디오 디렉터리로 복사됨 |
 | `apps/hwp/src/main/static-server.ts` (신규) | Electron 의존 없는 루프백 정적 서버. prefix별 root, 탈출 차단, MIME, SPA 폴백 정책 |
 | `apps/hwp/src/main/native-binary-path.ts` (신규) | HwpForge·rhwp CLI 공용 바이너리 경로 해석(순수 함수, 우선순위 4단계) |
@@ -1342,9 +1342,9 @@ async function studioUrl(): Promise<StudioUrlResult> {
 
 `startHwpStandalone()`의 `configureHwpRuntime({...})`에 필드 추가:
 ```ts
-    studioDir: join(__dirname, '../../studio-dist'),
+    studioDir: join(__dirname, '../../dist/studio'),
 ```
-(`__dirname`은 dev에서 `apps/hwp/out/main` → `apps/hwp/studio-dist`.)
+(`__dirname`은 dev에서 `apps/hwp/out/main` → `apps/hwp/dist/studio`.)
 
 또 `createHwpView`와 `startHwpStandalone`의 `.catch` 주석 `// last resort: file:// still renders the shell of the page (no studio bridge)`는 그대로 둔다 — 여전히 참이다.
 
@@ -1354,7 +1354,7 @@ async function studioUrl(): Promise<StudioUrlResult> {
 ```ts
 const HWP_STUDIO_DIR = app.isPackaged
   ? join(process.resourcesPath, 'modules', 'hwp-studio')
-  : join(APPS_ROOT, 'hwp', 'studio-dist')
+  : join(APPS_ROOT, 'hwp', 'dist', 'studio')
 const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
 const HWPFORGE_BIN = app.isPackaged
   ? join(process.resourcesPath, 'native', HWPFORGE_EXE)
@@ -1383,7 +1383,7 @@ const RHWP_BIN = app.isPackaged
 - [ ] **Step 9: 검증**
 
 Run: `npm run typecheck -w @genoffice/hwp && npm run typecheck -w @genoffice/shell && npm test -w @genoffice/hwp && npm run lint`
-Expected: 모두 통과. (`studio-dist`가 아직 없으므로 런타임에서 `getStudioUrl`은 `ok:false`로 dev 안내 문구를 돌려준다 — 의도된 상태.)
+Expected: 모두 통과. (`dist/studio`가 아직 없으므로 런타임에서 `getStudioUrl`은 `ok:false`로 dev 안내 문구를 돌려준다 — 의도된 상태.)
 
 - [ ] **Step 10: 커밋**
 
@@ -1393,7 +1393,7 @@ git add apps/hwp/src/main/hwp-main.ts apps/hwp/src/shared/ipc.ts apps/hwp/src/pr
 git commit -m "$(cat <<'EOF'
 HWP: serve the bundled studio from the loopback origin and expose its URL
 
-The loopback server now mounts studio-dist under /rhwp/ next to the
+The loopback server now mounts dist/studio under /rhwp/ next to the
 renderer, starts in dev too, and the renderer can ask main for the studio
 URL. The shell injects studioDir and the native binary paths (HwpForge,
 rhwp CLI) the same way it injects the sheets sidecar.
@@ -1413,7 +1413,7 @@ EOF
 - Modify: `apps/hwp/package.json`, `package.json`(루트), `.gitignore`, `eslint.config.mjs:10-20`, `.prettierignore`
 
 **Interfaces:**
-- Produces: `apps/hwp/studio-dist/{index.html, rhwp_bg.wasm, assets/, fonts/, THIRD-PARTY.md, .rhwp-version}`; npm 스크립트 `build:hwp-studio`(루트), `build:studio`(hwp); hwp `build`가 스튜디오 빌드를 선행.
+- Produces: `apps/hwp/dist/studio/{index.html, rhwp_bg.wasm, assets/, fonts/, THIRD-PARTY.md, .rhwp-version}`; npm 스크립트 `build:hwp-studio`(루트), `build:studio`(hwp); hwp `build`가 스튜디오 빌드를 선행.
 
 - [ ] **Step 1: 래퍼 Vite 설정**
 
@@ -1461,7 +1461,7 @@ export default {
  *
  *   node tools/build-hwp-studio.mjs [--force]
  *
- * Output: apps/hwp/studio-dist/ (gitignored). Skipped when the .rhwp-version
+ * Output: apps/hwp/dist/studio/ (gitignored). Skipped when the .rhwp-version
  * stamp already matches; --force rebuilds. Needs git and network on the first
  * run (sparse clone of edwardkim/rhwp + npm ci inside rhwp-studio). No Rust:
  * the WASM comes from the @rhwp/core npm package.
@@ -1486,11 +1486,11 @@ import { fileURLToPath } from 'node:url'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const HWP_DIR = join(ROOT, 'apps', 'hwp')
 /** sparse clone of edwardkim/rhwp at the pinned tag */
-const WORK_DIR = join(HWP_DIR, '.rhwp')
+const WORK_DIR = join(HWP_DIR, '.build', 'rhwp')
 const STUDIO_DIR = join(WORK_DIR, 'rhwp-studio')
 const PKG_DIR = join(WORK_DIR, 'pkg')
 const STAGING_DIR = join(WORK_DIR, 'dist-staging')
-const DIST_DIR = join(HWP_DIR, 'studio-dist')
+const DIST_DIR = join(HWP_DIR, 'dist', 'studio')
 const REPO_URL = 'https://github.com/edwardkim/rhwp'
 const SPARSE_PATHS = ['rhwp-studio', 'npm/hwpctrl-ocx', 'npm/editor', 'assets/fonts', 'assets/logo']
 const WRAPPER_CONFIG = join(ROOT, 'tools', 'hwp-studio', 'vite.config.genoffice.ts')
@@ -1835,28 +1835,18 @@ try {
 
 - [ ] **Step 4: 무시 규칙**
 
-`.gitignore` — `release/` 줄 아래에 추가:
+생성물은 eslint(`**/.build/**`, `**/dist/**`)·prettier(`.build/`, `dist/`)·git(`dist/`)이 **이미 무시하는 관례 경로**에 둔다
+— 클론은 `apps/hwp/.build/rhwp/`, 스튜디오는 `apps/hwp/dist/studio/`. 그래서 `eslint.config.mjs`·`.prettierignore`는
+건드리지 않는다(이 리포의 config-protection 훅이 `eslint.config.mjs` 수정을 차단하기도 한다). `.gitignore`에는
+`.build/`가 없고 `native/`는 새 경로이므로 두 줄만 추가한다 — `release/` 줄 아래:
 ```
-# rhwp: sparse upstream clone, built studio bundle, fetched CLI (tools/build-hwp-studio.mjs, tools/fetch-rhwp-cli.mjs)
-/apps/hwp/.rhwp/
-/apps/hwp/studio-dist/
+# rhwp: sparse upstream clone and fetched CLI (tools/build-hwp-studio.mjs, tools/fetch-rhwp-cli.mjs);
+# the built studio lands in apps/hwp/dist/studio, covered by dist/ above
+/apps/hwp/.build/
 /apps/hwp/native/
 ```
 
-`eslint.config.mjs` `ignores` 배열에 추가:
-```js
-      'apps/hwp/.rhwp/**',
-      'apps/hwp/studio-dist/**',
-      'apps/hwp/native/**',
-```
-
-`.prettierignore` — `apps/shell/build/THIRD-PARTY-NOTICES.txt` 줄 아래에 추가:
-```
-apps/hwp/.rhwp/
-apps/hwp/studio-dist/
-apps/hwp/native/
-```
-
+검증: 빌드 후 `git status --short`에 생성물이 나타나지 않고, `npm run lint`가 생성물을 건너뛴다(오류 0).
 - [ ] **Step 5: lock 갱신·확인**
 
 Run:
@@ -1873,14 +1863,14 @@ Expected: lock 변경은 `apps/hwp` 워크스페이스 항목에 `@hwpforge/mcp`
 Run:
 ```bash
 npm run build:hwp-studio
-ls -a apps/hwp/studio-dist
-ls apps/hwp/studio-dist/assets | grep -E "rhwp_bg-.*\.wasm|studio-plugin-.*\.js"
-cat apps/hwp/studio-dist/.rhwp-version
-grep -c "/rhwp/" apps/hwp/studio-dist/index.html
-ls apps/hwp/studio-dist/sw.js apps/hwp/studio-dist/registerSW.js apps/hwp/studio-dist/manifest.webmanifest apps/hwp/studio-dist/rhwp_bg.wasm apps/hwp/studio-dist/samples 2>&1 | grep -c "No such file"
-grep -c "^## " apps/hwp/studio-dist/THIRD-PARTY.md
-du -sh apps/hwp/studio-dist | cut -f1
-grep -rl "edwardkim.github.io" apps/hwp/studio-dist || echo "no occurrences"
+ls -a apps/hwp/dist/studio
+ls apps/hwp/dist/studio/assets | grep -E "rhwp_bg-.*\.wasm|studio-plugin-.*\.js"
+cat apps/hwp/dist/studio/.rhwp-version
+grep -c "/rhwp/" apps/hwp/dist/studio/index.html
+ls apps/hwp/dist/studio/sw.js apps/hwp/dist/studio/registerSW.js apps/hwp/dist/studio/manifest.webmanifest apps/hwp/dist/studio/rhwp_bg.wasm apps/hwp/dist/studio/samples 2>&1 | grep -c "No such file"
+grep -c "^## " apps/hwp/dist/studio/THIRD-PARTY.md
+du -sh apps/hwp/dist/studio | cut -f1
+grep -rl "edwardkim.github.io" apps/hwp/dist/studio || echo "no occurrences"
 ```
 Expected: `index.html`, `assets/`, `fonts/`, `icons/`, `images/`, `print.html`, `theme-init.js`, `favicon.ico`, `THIRD-PARTY.md`, `.rhwp-version` 존재. `assets/`에 `rhwp_bg-<hash>.wasm`과 `studio-plugin-<hash>.js`(hwpctrl) 존재. 스탬프 JSON에 `"rhwpVersion":"0.8.6"`. `index.html`에 `/rhwp/` 경로 ≥1. PWA 3개 + 정리 대상 2개 부재(`5`). THIRD-PARTY 섹션 ≥ 6(rhwp, 폰트, canvaskit-wasm, @noble/hashes, pixelmatch, pngjs). 크기 약 42MB(폰트 22 + assets 19; 스파이크에서 정리 전 59MB 실측). `edwardkim.github.io` 발생은 정보로만 기록(스튜디오 내부 링크 텍스트일 수 있음; 호스트 CSP가 iframe 로드를 막으므로 기능 영향 없음).
 
@@ -1919,7 +1909,7 @@ HWP: build the rhwp studio and fetch the rhwp CLI at build time
 tools/build-hwp-studio.mjs sparse-clones edwardkim/rhwp at the tag matching
 the installed @rhwp/core, drops in that package's WASM, replaces the fonts
 symlink with a real copy, strips the PWA plugin, and builds with CDN web
-fonts disabled into apps/hwp/studio-dist (gitignored, stamped, atomically
+fonts disabled into apps/hwp/dist/studio (gitignored, stamped, atomically
 swapped). tools/fetch-rhwp-cli.mjs downloads the same release's CLI binary
 for this platform and verifies it against SHA256SUMS.txt. @rhwp/* are pinned
 exactly so SDK, studio, WASM and CLI share one version; @hwpforge/mcp moves
@@ -2033,7 +2023,7 @@ EOF
 - Modify: `tools/gen-third-party-notices.mjs:52-62` (정규식), 폰트 섹션 뒤(`const dest = …` 앞)
 
 **Interfaces:**
-- Consumes: `apps/hwp/studio-dist/` (Task 5), `apps/hwp/studio-dist/THIRD-PARTY.md`.
+- Consumes: `apps/hwp/dist/studio/` (Task 5), `apps/hwp/dist/studio/THIRD-PARTY.md`.
 - Produces: 설치본 `resources/modules/hwp-studio/`, `resources/native/hwpforge-mcp[.exe]`.
 
 - [ ] **Step 1: `electron-builder.cjs` — 존재 검사**
@@ -2071,7 +2061,7 @@ for (const rel of [
   '../../node_modules/@genspark/cli',
   '../../node_modules/@genspark/cli/node_modules/commander',
   '../../node_modules/ws',
-  '../hwp/studio-dist/index.html',
+  '../hwp/dist/studio/index.html',
   ...(HWPFORGE_SRC ? [HWPFORGE_SRC] : []),
   ...(RHWP_SRC ? [RHWP_SRC] : []),
 ]) {
@@ -2089,7 +2079,7 @@ for (const rel of [
 `extraResources` 배열의 `{ from: '../hwp/out', to: 'modules/hwp' }` 항목 아래에 추가:
 ```js
     {
-      from: '../hwp/studio-dist',
+      from: '../hwp/dist/studio',
       to: 'modules/hwp-studio',
     },
 ```
@@ -2132,13 +2122,13 @@ for (const rel of [
 (b) 폰트 섹션이 끝나는 줄(`readFileSync(join(ROOT, 'apps/docs/src/renderer/fonts/LICENSE-OFL.txt'), 'utf8').trim() + '\n'`) 바로 아래, `const dest = …` 앞에 추가:
 ```js
 // The bundled rhwp studio is built from an upstream clone whose npm tree is not
-// ours; tools/build-hwp-studio.mjs assembles its notices into studio-dist.
-const studioNotices = join(ROOT, 'apps/hwp/studio-dist/THIRD-PARTY.md')
+// ours; tools/build-hwp-studio.mjs assembles its notices into dist/studio.
+const studioNotices = join(ROOT, 'apps/hwp/dist/studio/THIRD-PARTY.md')
 if (existsSync(studioNotices)) {
   out += hr('4. Bundled rhwp studio (Hangul editor) and its dependencies')
   out += readFileSync(studioNotices, 'utf8').trim() + '\n'
 } else {
-  console.warn('apps/hwp/studio-dist/THIRD-PARTY.md not found — run npm run build:hwp-studio first')
+  console.warn('apps/hwp/dist/studio/THIRD-PARTY.md not found — run npm run build:hwp-studio first')
 }
 ```
 
@@ -2147,11 +2137,11 @@ if (existsSync(studioNotices)) {
 Run:
 ```bash
 node -e "const c=require('./apps/shell/electron-builder.cjs'); console.log(c.extraResources.filter(e=>/hwp/.test(e.to)).map(e=>e.to), c.win.extraResources.map(e=>e.to))"
-mv apps/hwp/studio-dist apps/hwp/studio-dist.bak && (node -e "require('./apps/shell/electron-builder.cjs')" 2>&1 | grep -c "studio-dist/index.html"); mv apps/hwp/studio-dist.bak apps/hwp/studio-dist
+mv apps/hwp/dist/studio apps/hwp/dist/studio.bak && (node -e "require('./apps/shell/electron-builder.cjs')" 2>&1 | grep -c "dist/studio/index.html"); mv apps/hwp/dist/studio.bak apps/hwp/dist/studio
 npm run notices
 grep -n "^=\+$\|^4\. Bundled rhwp studio\|hwpforge\|^## rhwp v" apps/shell/build/THIRD-PARTY-NOTICES.txt | head
 ```
-Expected: 첫 명령은 `[ 'modules/hwp', 'modules/hwp-studio' ] [ 'native/xlsx-sidecar.exe', 'native/hwpforge-mcp.exe', 'native/rhwp.exe' ]`. 두 번째는 `1`(studio-dist 부재 시 throw 메시지 출력). `npm run notices`는 완료하며 산출물에 `4. Bundled rhwp studio…` 구획, `@hwpforge/mcp-win32-x64` 항목, `## rhwp v0.8.6 — MIT`가 보인다. 경고는 정확히 하나 — `not installed, skipped: @hwpforge/mcp-darwin-arm64`(Windows에는 darwin 플랫폼 패키지가 설치되지 않으므로 정상; 기존 optional 의존성과 같은 처리).
+Expected: 첫 명령은 `[ 'modules/hwp', 'modules/hwp-studio' ] [ 'native/xlsx-sidecar.exe', 'native/hwpforge-mcp.exe', 'native/rhwp.exe' ]`. 두 번째는 `1`(dist/studio 부재 시 throw 메시지 출력). `npm run notices`는 완료하며 산출물에 `4. Bundled rhwp studio…` 구획, `@hwpforge/mcp-win32-x64` 항목, `## rhwp v0.8.6 — MIT`가 보인다. 경고는 정확히 하나 — `not installed, skipped: @hwpforge/mcp-darwin-arm64`(Windows에는 darwin 플랫폼 패키지가 설치되지 않으므로 정상; 기존 optional 의존성과 같은 처리).
 
 Run: `npm run lint`
 Expected: 통과.
@@ -2164,7 +2154,7 @@ git add apps/shell/electron-builder.cjs tools/gen-third-party-notices.mjs
 git commit -m "$(cat <<'EOF'
 HWP: package the studio bundle and the native binaries as extraResources
 
-studio-dist ships under resources/modules/hwp-studio; the platform HwpForge
+dist/studio ships under resources/modules/hwp-studio; the platform HwpForge
 binary and the rhwp CLI ship under resources/native next to the sheets
 sidecar; the builder config fails fast when any source is missing. Third-party
 notices pick up the studio's own notice file and packages referenced by a
@@ -2244,10 +2234,10 @@ version equals the installed `@rhwp/core` (pinned exactly in
 `apps/hwp/package.json`), drops in that package's WASM, removes the PWA
 plugin, disables CDN web fonts (`RHWP_DISABLE_EXTERNAL_WEBFONTS=1`; the
 Hamchorom CDN is licensed for non-commercial use only), and builds into
-`apps/hwp/studio-dist/` (gitignored). electron-builder copies that directory
+`apps/hwp/dist/studio/` (gitignored). electron-builder copies that directory
 to `resources/modules/hwp-studio`, and the hwp main process serves it under
 `/rhwp/` on its loopback origin. The studio's own third-party notices are
-assembled into `studio-dist/THIRD-PARTY.md` and merged into the installer's
+assembled into `dist/studio/THIRD-PARTY.md` and merged into the installer's
 notices.
 
 To move to a new rhwp release: set `@rhwp/core` and `@rhwp/editor` to the
