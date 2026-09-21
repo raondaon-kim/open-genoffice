@@ -9,7 +9,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
-    "build": "electron-vite build",
+    "build:studio": "node ../../tools/build-hwp-studio.mjs",
+    "build:cli": "node ../../tools/fetch-rhwp-cli.mjs",
+    "build": "npm run build:studio && npm run build:cli && electron-vite build",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
@@ -17,8 +19,9 @@
     "@genoffice/agent-core": "*",
     "@genoffice/ai-provider": "*",
     "@genoffice/ui": "*",
-    "@rhwp/core": "^0.8.6",
-    "@rhwp/editor": "^0.8.6"
+    "@hwpforge/mcp": "^0.16.4",
+    "@rhwp/core": "0.8.6",
+    "@rhwp/editor": "0.8.6"
   },
   "devDependencies": {
     "@genoffice/electron-utils": "*",

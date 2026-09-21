@@ -518,8 +518,8 @@ export function startHwpStandalone(): void {
     preloadPath: join(__dirname, '../preload/index.js'),
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
     rendererFile: join(__dirname, '../renderer/index.html'),
-    // dev: apps/hwp/out/main → apps/hwp/studio-dist
-    studioDir: join(__dirname, '../../studio-dist'),
+    // dev: apps/hwp/out/main → apps/hwp/dist/studio
+    studioDir: join(__dirname, '../../dist/studio'),
   })
   void app.whenReady().then(() => {
     registerHwpIpc()

@@ -135,7 +135,7 @@ const SIDECAR_BIN = app.isPackaged
   : join(APPS_ROOT, 'sheets', 'native', 'xlsx-engine', 'target', 'release', SIDECAR_EXE)
 const HWP_STUDIO_DIR = app.isPackaged
   ? join(process.resourcesPath, 'modules', 'hwp-studio')
-  : join(APPS_ROOT, 'hwp', 'studio-dist')
+  : join(APPS_ROOT, 'hwp', 'dist', 'studio')
 const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
 const HWPFORGE_BIN = app.isPackaged
   ? join(process.resourcesPath, 'native', HWPFORGE_EXE)
