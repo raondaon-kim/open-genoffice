@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
+import type { AgentMessage, AgentToolDef } from '@genoffice/agent-core'
 import { httpBodyDetail } from './http-error'
 import { GENSPARK_LLM_BASE_URLS, OPENAI_COMPATIBLE_BASE_URLS } from './providers'
 import type { StreamCallbacks } from './protocols/shared'

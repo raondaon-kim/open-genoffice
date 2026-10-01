@@ -3,7 +3,6 @@ import type {
   ListAiModelsArgs,
   ListAiModelsResult,
   KeyedPublicAiProviderId,
-  PublicAiProviderId,
   PublicAiSettings,
   RefreshAiModelsArgs,
   VerifyAndSaveAiProviderArgs,
