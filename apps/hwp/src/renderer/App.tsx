@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor } from '@rhwp/editor'
 import type { RhwpEditor } from '@rhwp/editor'
 import { HwpAiPanel } from './ai/AiPanel'
-import type { HwpAiDeps } from './ai/tools'
+import type { HwpAiDeps } from './ai/context'
 import type { HwpApi } from '../shared/ipc'
 
 declare global {
@@ -47,6 +47,10 @@ export function App() {
   const [status, setStatus] = useState('')
   const [pages, setPages] = useState<number | null>(null)
   const [dirty, setDirty] = useState(false)
+  /** an AI edit reloaded the document: the studio's dirty flag resets on loadFile, ours must not */
+  const [aiDirty, setAiDirty] = useState(false)
+  const aiDirtyRef = useRef(false)
+  aiDirtyRef.current = aiDirty
   const [aiOpen, setAiOpen] = useState(true)
   const [docName, setDocName] = useState(UNTITLED_NAME)
   /** saved/opened path used to (re)bootstrap the AI conversation identity */
@@ -130,10 +134,11 @@ export function App() {
       void editorRef.current
         ?.getDocumentState()
         .then((state) => {
-          if (state.dirty !== last) {
-            last = state.dirty
-            setDirty(state.dirty)
-            window.hwpApi?.setDirty(state.dirty)
+          const effective = state.dirty || aiDirtyRef.current
+          if (effective !== last) {
+            last = effective
+            setDirty(effective)
+            window.hwpApi?.setDirty(effective)
           }
         })
         .catch(() => {})
@@ -175,6 +180,7 @@ export function App() {
       } catch {
         // older studio without notify-saved-v1; the dirty poll re-syncs anyway
       }
+      setAiDirty(false)
       setDirty(false)
       window.hwpApi?.setDirty(false)
       if (aiPath !== path) setAiPath(path) // (re)bind AI chat to the saved file
@@ -199,6 +205,10 @@ export function App() {
   const aiDeps: HwpAiDeps = {
     editor: () => (phase === 'ready' ? editorRef.current : null),
     fileName: () => basename(filePathRef.current ?? 'document.hwp'),
+    markAiDirty: () => {
+      setAiDirty(true)
+      window.hwpApi?.setDirty(true)
+    },
   }
 
   return (

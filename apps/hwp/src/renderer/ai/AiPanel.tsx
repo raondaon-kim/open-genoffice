@@ -9,7 +9,8 @@ import type { ModelPickerModel } from '@genoffice/ui'
 import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } from '../../shared/ipc'
 import { createHwpSkill } from './hwp-skill'
 import { createElectronTransport } from './transport'
-import type { HwpAiDeps } from './tools'
+import type { HwpAiContext, HwpAiDeps } from './context'
+import { SnapshotStack } from './snapshots'
 import { HWP_TEMPLATES } from '../templates'
 import type { HwpTemplate } from '../templates'
 
@@ -133,6 +134,18 @@ export function HwpAiPanel({
   const runToolsRef = useRef<ToolActivity[]>([])
   const depsRef = useRef(deps)
   depsRef.current = deps
+  const stackRef = useRef<SnapshotStack | null>(null)
+  if (!stackRef.current) stackRef.current = new SnapshotStack()
+  const ctxRef = useRef<HwpAiContext | null>(null)
+  if (!ctxRef.current) {
+    ctxRef.current = {
+      editor: () => depsRef.current.editor(),
+      fileName: () => depsRef.current.fileName(),
+      api: () => window.hwpApi,
+      stack: stackRef.current,
+      markAiDirty: () => depsRef.current.markAiDirty(),
+    }
+  }
   const modelsRef = useRef<AiModelSummary[]>([])
   modelsRef.current = models
 
@@ -144,10 +157,7 @@ export function HwpAiPanel({
   if (!loopRef.current) {
     loopRef.current = new AgentLoop({
       transport: transportRef.current,
-      skill: createHwpSkill({
-        editor: () => depsRef.current.editor(),
-        fileName: () => depsRef.current.fileName(),
-      }),
+      skill: createHwpSkill(ctxRef.current),
       events: {
         onText: (text) => {
           setPhase('replying')
