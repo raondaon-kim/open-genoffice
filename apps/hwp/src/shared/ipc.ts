@@ -1,6 +1,14 @@
 import type { Lang } from '@genoffice/i18n'
 import type { AiModelSummary, AiRoute, AiStreamChunk } from '@genoffice/ai-provider'
 import type { AgentMessage, AgentToolDef } from '@genoffice/agent-core'
+import type {
+  AiEditRequest,
+  AiEditResult,
+  AiQueryRequest,
+  AiQueryResult,
+  AiSnapshotRequest,
+  AiSnapshotResult,
+} from './ai-contract'
 
 export const HWP_EXTENSIONS = ['hwp', 'hwpx'] as const
 
@@ -14,6 +22,9 @@ export const HWP_CHANNELS = {
   dirtyChanged: 'hwp:dirty-changed',
   createDocument: 'hwp:create-document',
   getStudioUrl: 'hwp:get-studio-url',
+  aiSnapshot: 'hwp:ai-snapshot',
+  aiQuery: 'hwp:ai-query',
+  aiEdit: 'hwp:ai-edit',
   getLanguage: 'hwp:get-language',
   languageChanged: 'hwp:language-changed',
 } as const
@@ -111,6 +122,13 @@ export interface HwpApi {
   createDocument(markdown: string, fileName?: string): Promise<CreateDocumentResult>
   /** loopback URL of the bundled rhwp studio; fails when studio assets are not built/installed */
   getStudioUrl(): Promise<StudioUrlResult>
+  // ---- AI tools (Phase 2): snapshot → rhwp CLI in main ----
+  /** cache the current document bytes in main under their documentSha256 */
+  aiSnapshot(request: AiSnapshotRequest): Promise<AiSnapshotResult>
+  /** run an allow-listed read query on a cached snapshot */
+  aiQuery(request: AiQueryRequest): Promise<AiQueryResult>
+  /** apply an edit-op chain to a cached snapshot and return the edited bytes */
+  aiEdit(request: AiEditRequest): Promise<AiEditResult>
   /** mirror the editor's dirty flag into the main process (drives close guards) */
   setDirty(dirty: boolean): void
   /** main → renderer: write pending edits to disk (menu Save / close guard) */

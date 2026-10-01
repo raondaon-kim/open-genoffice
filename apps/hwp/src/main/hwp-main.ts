@@ -10,6 +10,19 @@ import type { SaveHwpRequest, SaveHwpResult, StudioUrlResult } from '../shared/i
 import { createHwpFromMarkdown } from './hwpforge-client'
 import { resolveNativeBinary } from './native-binary-path'
 import { createStaticServer } from './static-server'
+import type {
+  AiEditRequest,
+  AiEditResult,
+  AiQueryRequest,
+  AiQueryResult,
+  AiSnapshotRequest,
+  AiSnapshotResult,
+} from '../shared/ai-contract'
+import { runEditChain } from './ai-edit-chain'
+import { SnapshotStore } from './ai-snapshots'
+import type { NativeBinaryName } from './native-binary-path'
+import { runRhwp } from './rhwp-cli'
+import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import type { StaticRoot } from './static-server'
 
 const tDlg = createI18n({
@@ -208,7 +221,7 @@ interface RuntimePaths {
   hwpforgePath?: string
   /** built rhwp studio (index.html + wasm + fonts); served under STUDIO_PREFIX on the loopback origin */
   studioDir?: string
-  /** rhwp native CLI (Phase 2 AI tools); injected by the shell, unused in Phase 1 */
+  /** rhwp native CLI — the AI tools' engine for reading/editing snapshots */
   rhwpPath?: string
 }
 
@@ -286,6 +299,45 @@ export function flushHwpSave(contents: WebContents): Promise<boolean> {
   if (!dirtyByWc.has(contents.id)) return Promise.resolve(true)
   return requestRendererSave(contents)
 }
+
+/** exportHwpx bytes above this are refused — IPC copy + CLI parse would stall the tab */
+const MAX_SNAPSHOT_BYTES = 50 * 1024 * 1024
+
+let snapshotStore: SnapshotStore | null = null
+
+function snapshots(): SnapshotStore {
+  if (!snapshotStore) {
+    snapshotStore = new SnapshotStore({ rootDir: join(app.getPath('userData'), 'ai-snapshots') })
+    app.once('will-quit', () => {
+      void snapshotStore?.disposeAll()
+    })
+  }
+  return snapshotStore
+}
+
+/** shared lookup for the bundled helpers: shell-injected path → env → resources/native → dev tree */
+function nativeBinary(name: NativeBinaryName): string {
+  const rhwp = name === 'rhwp'
+  return resolveNativeBinary(name, {
+    runtimePath: rhwp ? runtime.rhwpPath : runtime.hwpforgePath,
+    envPath: rhwp ? process.env.RHWP_CLI_PATH : process.env.HWPFORGE_MCP_PATH,
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    // apps/shell or apps/hwp → repo root
+    repoRoot: join(app.getAppPath(), '..', '..'),
+    platform: process.platform,
+    arch: process.arch,
+  })
+}
+
+function rhwpBinary(): { ok: true; path: string } | { ok: false; error: string } {
+  const path = nativeBinary('rhwp')
+  return existsSync(path)
+    ? { ok: true, path }
+    : { ok: false, error: `rhwp binary not found: ${path}` }
+}
+
+const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err))
 
 let ipcRegistered = false
 
@@ -370,16 +422,7 @@ function registerHwpIpc(): void {
         join(app.getPath('userData'), 'ai-created'),
         baseName,
         {
-          binPath: resolveNativeBinary('hwpforge-mcp', {
-            runtimePath: runtime.hwpforgePath,
-            envPath: process.env.HWPFORGE_MCP_PATH,
-            isPackaged: app.isPackaged,
-            resourcesPath: process.resourcesPath,
-            // apps/shell or apps/hwp → repo root
-            repoRoot: join(app.getAppPath(), '..', '..'),
-            platform: process.platform,
-            arch: process.arch,
-          }),
+          binPath: nativeBinary('hwpforge-mcp'),
         },
       )
       if (result.ok && result.path) runtime.onCreateDocument?.(result.path)
@@ -403,6 +446,64 @@ function registerHwpIpc(): void {
   ipcMain.handle(HWP_CHANNELS.getLanguage, () => getUiLang())
 
   ipcMain.handle(HWP_CHANNELS.getStudioUrl, () => studioUrl())
+
+  ipcMain.handle(
+    HWP_CHANNELS.aiSnapshot,
+    async (e, request: AiSnapshotRequest): Promise<AiSnapshotResult> => {
+      if (!request || typeof request.sha !== 'string' || !(request.data instanceof ArrayBuffer)) {
+        return { ok: false, error: 'hwp: malformed snapshot request' }
+      }
+      if (request.data.byteLength > MAX_SNAPSHOT_BYTES) {
+        const mb = (request.data.byteLength / 1048576).toFixed(1)
+        return { ok: false, error: `hwp: document too large for the AI tools (${mb} MB > 50 MB)` }
+      }
+      const put = await snapshots().put(e.sender.id, request.sha, new Uint8Array(request.data))
+      return put.ok ? { ok: true } : { ok: false, error: put.error }
+    },
+  )
+
+  ipcMain.handle(
+    HWP_CHANNELS.aiQuery,
+    async (e, request: AiQueryRequest): Promise<AiQueryResult> => {
+      if (!request || typeof request.sha !== 'string' || !isAiQueryName(request.tool)) {
+        return { ok: false, error: 'hwp: malformed query request' }
+      }
+      const path = snapshots().path(e.sender.id, request.sha)
+      if (!path) return { ok: false, error: 'hwp: snapshot missing — send it again' }
+      const bin = rhwpBinary()
+      if (!bin.ok) return bin
+      const built = buildQueryArgs(request.tool, request.args ?? {}, path)
+      if (!built.ok) return { ok: false, error: built.error }
+      try {
+        return { ok: true, result: await runRhwp(bin.path, built.args) }
+      } catch (err) {
+        return { ok: false, error: errorText(err) }
+      }
+    },
+  )
+
+  ipcMain.handle(HWP_CHANNELS.aiEdit, async (e, request: AiEditRequest): Promise<AiEditResult> => {
+    const preflight = (error: string): AiEditResult => ({
+      ok: false,
+      failedOp: null,
+      error,
+      journal: [],
+    })
+    if (!request || typeof request.sha !== 'string') return preflight('hwp: malformed edit request')
+    const path = snapshots().path(e.sender.id, request.sha)
+    if (!path) return preflight('hwp: snapshot missing — send it again')
+    const bin = rhwpBinary()
+    if (!bin.ok) return preflight(bin.error)
+    const result = await runEditChain({
+      rhwpPath: bin.path,
+      snapshotPath: path,
+      workDir: snapshots().ownerDir(e.sender.id),
+      ops: request.ops,
+    })
+    // the renderer reloads these bytes; caching them now spares a resend on the next read
+    if (result.ok) await snapshots().put(e.sender.id, result.outputSha, new Uint8Array(result.data))
+    return result
+  })
 }
 
 function grantAndTrack(wc: WebContents, openPath?: string | null): void {
@@ -424,6 +525,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
+    void snapshotStore?.dispose(wcId)
   })
 }
 

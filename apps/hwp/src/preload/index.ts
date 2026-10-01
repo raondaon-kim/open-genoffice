@@ -21,6 +21,9 @@ const api: HwpApi = {
   createDocument: (markdown, fileName) =>
     ipcRenderer.invoke(HWP_CHANNELS.createDocument, markdown, fileName),
   getStudioUrl: () => ipcRenderer.invoke(HWP_CHANNELS.getStudioUrl),
+  aiSnapshot: (request) => ipcRenderer.invoke(HWP_CHANNELS.aiSnapshot, request),
+  aiQuery: (request) => ipcRenderer.invoke(HWP_CHANNELS.aiQuery, request),
+  aiEdit: (request) => ipcRenderer.invoke(HWP_CHANNELS.aiEdit, request),
   setDirty: (dirty) => ipcRenderer.send(HWP_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
     const listener = () => handler()
