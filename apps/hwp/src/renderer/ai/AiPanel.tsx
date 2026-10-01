@@ -11,6 +11,8 @@ import { createHwpSkill } from './hwp-skill'
 import { createElectronTransport } from './transport'
 import type { HwpAiContext, HwpAiDeps } from './context'
 import { SnapshotStack } from './snapshots'
+import { undoAiEdit } from './tools/edit'
+import { fetchExploreChips } from './tools/read'
 import { HWP_TEMPLATES } from '../templates'
 import type { HwpTemplate } from '../templates'
 
@@ -104,10 +106,13 @@ type Phase = 'thinking' | 'replying' | 'working'
 export function HwpAiPanel({
   deps,
   filePath,
+  documentReady,
   onCollapse,
 }: {
   deps: HwpAiDeps
   filePath: string | null
+  /** the studio has the document loaded (AI tools can snapshot it) */
+  documentReady: boolean
   onCollapse: () => void
 }): ReactElement {
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -124,6 +129,8 @@ export function HwpAiPanel({
   const [modelNotice, setModelNotice] = useState<string | null>(null)
   const [lang, setLang] = useState<'en' | 'ko'>('en')
   const [templateBusy, setTemplateBusy] = useState<string | null>(null)
+  const [undoDepth, setUndoDepth] = useState(0)
+  const [chips, setChips] = useState<string[]>([])
   const chatRef = useRef<HTMLDivElement>(null)
   const asideRef = useRef<HTMLElement>(null)
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
@@ -182,6 +189,7 @@ export function HwpAiPanel({
               },
             ],
           }))
+          setUndoDepth(stackRef.current?.depth ?? 0)
         },
         onTurnEnd: () => {
           setPhase('thinking')
@@ -356,6 +364,24 @@ export function HwpAiPanel({
     }
   }, [filePath])
 
+  // empty state: what the engine thinks this document is for (rhwp explore) —
+  // display only; clicking a chip drafts a prompt, nothing is sent
+  useEffect(() => {
+    if (!routeReady || !documentReady || chat.length > 0) {
+      setChips([])
+      return
+    }
+    let cancelled = false
+    const ctx = ctxRef.current
+    if (!ctx) return
+    void fetchExploreChips(ctx).then((list) => {
+      if (!cancelled) setChips(list)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [routeReady, documentReady, chat.length, filePath])
+
   // UI language: Korean gets Korean starter prompts (document/work language)
   useEffect(() => {
     let cancelled = false
@@ -443,6 +469,19 @@ export function HwpAiPanel({
         isError: true,
       })
       setBusy(false)
+    }
+  }
+
+  const undoLast = async (): Promise<void> => {
+    const ctx = ctxRef.current
+    if (!ctx || busy) return
+    try {
+      const result = await undoAiEdit(ctx)
+      setModelNotice(result.output)
+    } catch (err) {
+      setModelNotice(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUndoDepth(stackRef.current?.depth ?? 0)
     }
   }
 
@@ -536,6 +575,17 @@ export function HwpAiPanel({
           searchPlaceholder="Search models"
           emptyLabel="No compatible models"
         />
+        {undoDepth > 0 && (
+          <button
+            type="button"
+            className="hwp-ai__undo"
+            disabled={busy}
+            title={lang === 'ko' ? '마지막 AI 편집 되돌리기' : 'Undo the last AI edit'}
+            onClick={() => void undoLast()}
+          >
+            {lang === 'ko' ? `↶ AI 편집 되돌리기 (${undoDepth})` : `↶ Undo AI edit (${undoDepth})`}
+          </button>
+        )}
         <button
           type="button"
           className="hwp-ai__collapse"
@@ -569,6 +619,26 @@ export function HwpAiPanel({
                 ? '문서에 대해 물어보세요 — 요약, 누름틀 작성, 표 정리, 서식 변경을 도와드립니다.'
                 : 'Ask about this document — summarize it, fill its form fields, or format it.'}
             </p>
+            {chips.length > 0 && (
+              <div
+                className="hwp-ai__starter-list"
+                aria-label={lang === 'ko' ? '이 문서로 할 수 있는 일' : 'What this document offers'}
+              >
+                {chips.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    className="hwp-ai__starter hwp-ai__starter--chip"
+                    onClick={() => {
+                      setPrompt(chip)
+                      composerRef.current?.focus()
+                    }}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            )}
             {models.length > 0 && (
               <div className="hwp-ai__starter-list">
                 {STARTER_PROMPTS[lang].map((starter) => (

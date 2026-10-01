@@ -242,7 +242,12 @@ export function App() {
           />
         </div>
         {aiOpen && phase !== 'error' && (
-          <HwpAiPanel deps={aiDeps} filePath={aiPath} onCollapse={() => setAiOpen(false)} />
+          <HwpAiPanel
+            deps={aiDeps}
+            filePath={aiPath}
+            documentReady={phase === 'ready'}
+            onCollapse={() => setAiOpen(false)}
+          />
         )}
       </div>
     </div>

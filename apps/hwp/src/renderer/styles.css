@@ -12,7 +12,10 @@
   align-items: center;
   gap: 12px;
   padding: 4px 12px;
-  font: 12px/1.4 system-ui, -apple-system, sans-serif;
+  font:
+    12px/1.4 system-ui,
+    -apple-system,
+    sans-serif;
   color: #555;
   background: #ececef;
   border-bottom: 1px solid #d8d8de;
@@ -38,7 +41,9 @@
 }
 
 .hwp-statusbar__ai-toggle {
-  font: 600 11px/1 system-ui, sans-serif;
+  font:
+    600 11px/1 system-ui,
+    sans-serif;
   color: #3276cd;
   background: #fff;
   border: 1px solid #c5c5cc;
@@ -86,7 +91,10 @@
   justify-content: center;
   padding: 24px;
   text-align: center;
-  font: 14px/1.6 system-ui, -apple-system, sans-serif;
+  font:
+    14px/1.6 system-ui,
+    -apple-system,
+    sans-serif;
   color: #666;
 }
 
@@ -149,10 +157,38 @@
   background: #f0f0f4;
 }
 
+.hwp-ai__undo {
+  flex: none;
+  padding: 4px 10px;
+  border: 1px solid var(--hwp-border, #d5d8de);
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.4;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hwp-ai__undo:hover {
+  background: #f0f0f4;
+}
+
+.hwp-ai__undo:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.hwp-ai__starter--chip {
+  border-style: dashed;
+}
+
 .hwp-ai__notice {
   margin: 0;
   padding: 6px 12px;
-  font: 12px/1.5 system-ui, sans-serif;
+  font:
+    12px/1.5 system-ui,
+    sans-serif;
   color: #8a5b00;
   background: #fff7e0;
   border-bottom: 1px solid #f0e2b8;
@@ -173,12 +209,17 @@
   margin: auto;
   max-width: 280px;
   text-align: center;
-  font: 13px/1.6 system-ui, sans-serif;
+  font:
+    13px/1.6 system-ui,
+    sans-serif;
   color: #8a8a92;
 }
 
 .hwp-ai__msg {
-  font: 13px/1.6 system-ui, -apple-system, sans-serif;
+  font:
+    13px/1.6 system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .hwp-ai__msg--user {
@@ -202,7 +243,9 @@
 }
 
 .hwp-ai__phase {
-  font: 12px/1.4 system-ui, sans-serif;
+  font:
+    12px/1.4 system-ui,
+    sans-serif;
   color: #8a8a92;
   padding: 2px 0;
 }
@@ -211,7 +254,9 @@
   border: 1px solid #e4e4e9;
   border-radius: 6px;
   margin: 4px 0;
-  font: 12px/1.5 system-ui, sans-serif;
+  font:
+    12px/1.5 system-ui,
+    sans-serif;
   background: #fafafc;
 }
 
@@ -271,7 +316,9 @@
 
 .hwp-ai__retry {
   margin: 4px 0 0;
-  font: 12px/1.5 system-ui, sans-serif;
+  font:
+    12px/1.5 system-ui,
+    sans-serif;
   color: #8a5b00;
 }
 
@@ -319,7 +366,10 @@
   border-top: none;
   padding: 8px 12px 12px;
   background: #fff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 .ai-input-box {
