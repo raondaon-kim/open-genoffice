@@ -67,6 +67,31 @@ async function ensureHwpctrl(editor: EditorLike): Promise<void> {
     await editor.plugins.load('hwpctrl')
 }
 
+/**
+ * the file phase after a live phase that shares its undo entry (pushed by the
+ * caller). On failure: nothing ran live → drop that entry (it would otherwise
+ * undo the user's later typing); something ran live → keep it and say so.
+ */
+async function filePhase(
+  ctx: HwpAiContext,
+  ops: EditOp[],
+  appliedLive: string[],
+): Promise<Awaited<ReturnType<typeof applyFileEdit>>> {
+  try {
+    return await applyFileEdit(ctx, ops, { skipPush: true })
+  } catch (err) {
+    if (appliedLive.length === 0) {
+      ctx.stack.pop()
+      throw err
+    }
+    const message = err instanceof Error ? err.message : String(err)
+    throw new ToolError(
+      `${message.replace(/ — nothing was applied\./, '.')} Already applied live: ${appliedLive.join(', ')} (undo_ai_edit reverts them).`,
+      err instanceof ToolError ? err.summary : 'failed',
+    )
+  }
+}
+
 async function applyFormat(
   ctx: HwpAiContext,
   input: Record<string, unknown>,
@@ -100,7 +125,8 @@ async function applyFormat(
     for (const id of plan.live) {
       const result = await editor.commands.execute(id)
       if (!result.ok) {
-        ctx.markAiDirty()
+        if (applied.length > 0) ctx.markAiDirty()
+        else ctx.stack.pop()
         throw new ToolError(
           `The editor refused ${id}: ${result.reason}${result.message ? ` — ${result.message}` : ''}. Already applied live: ${applied.join(', ') || 'nothing'} (undo_ai_edit reverts them).`,
           'command refused',
@@ -115,7 +141,7 @@ async function applyFormat(
     const ops: EditOp[] = []
     if (plan.char) ops.push({ op: 'apply_char_format', section, paragraph, props: plan.char })
     if (plan.para) ops.push({ op: 'apply_para_format', section, paragraph, props: plan.para })
-    const { result, focused } = await applyFileEdit(ctx, ops, { skipPush: true })
+    const { result, focused } = await filePhase(ctx, ops, applied)
     fileSummary = summarizeEdit(ops, result, focused)
   }
   return {
@@ -168,7 +194,7 @@ async function fillFields(
     string
   >
   const ops: EditOp[] = [{ op: 'fill_fields', data: rest }]
-  const { result, focused } = await applyFileEdit(ctx, ops, { skipPush: true })
+  const { result, focused } = await filePhase(ctx, ops, live)
   return {
     output: [
       live.length ? `Filled live: ${live.join(', ')}.` : '',

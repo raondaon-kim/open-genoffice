@@ -111,6 +111,58 @@ describe('apply_format', () => {
     expect(ctx.stack.depth).toBe(1)
   })
 
+  it('leaves no undo entry when the file phase fails and nothing ran live', async () => {
+    const failEdit = (): AiEditResult => ({
+      ok: false,
+      failedOp: 0,
+      error: 'Tool argument error (do not retry): bad paragraph',
+      journal: [],
+    })
+    const ctx = ctxWith(fakeApi({}, failEdit), fakeEditor())
+    const result = await formatTools.execute(
+      ctx,
+      call('apply_format', { target, format: { bold: true } }),
+    )
+    expect(result).toMatchObject({ isError: true })
+    expect(ctx.stack.depth).toBe(0)
+    expect(ctx.dirty).toBe(0)
+  })
+
+  it('keeps the undo entry and says what already ran when the file phase fails after live steps', async () => {
+    const failEdit = (): AiEditResult => ({
+      ok: false,
+      failedOp: 0,
+      error: 'Tool argument error (do not retry): bad paragraph',
+      journal: [],
+    })
+    const ctx = ctxWith(fakeApi({}, failEdit), fakeEditor())
+    const result = await formatTools.execute(
+      ctx,
+      call('apply_format', { target, format: { sizeDelta: 1, bold: true } }),
+    )
+    expect(result).toMatchObject({ isError: true })
+    expect(result.output).toMatch(/Already applied live: format:font-size-increase/)
+    expect(result.output).toMatch(/undo_ai_edit/)
+    expect(ctx.stack.depth).toBe(1)
+  })
+
+  it('leaves no undo entry when the very first live command is refused', async () => {
+    const editor = fakeEditor()
+    editor.commands.execute = async () => ({
+      ok: false as const,
+      reason: 'disabled',
+      message: 'not on text',
+    })
+    const ctx = ctxWith(fakeApi({}, okEdit), editor)
+    const result = await formatTools.execute(
+      ctx,
+      call('apply_format', { target, format: { align: 'center' } }),
+    )
+    expect(result).toMatchObject({ isError: true, summary: 'command refused' })
+    expect(ctx.stack.depth).toBe(0)
+    expect(ctx.dirty).toBe(0)
+  })
+
   it('validates target and format', async () => {
     const ctx = ctxWith(fakeApi({}, okEdit))
     expect(
@@ -153,6 +205,34 @@ describe('fill_fields', () => {
     expect(api.edits[0].ops).toEqual([{ op: 'fill_fields', data: { '작성자[1]': '홍길동' } }])
     expect(result.output).toMatch(/회사명/)
     expect(result.output).toMatch(/notFound=\["없음"\]/)
+    expect(ctx.stack.depth).toBe(1)
+  })
+
+  it('leaves no undo entry when every field went to the CLI and the CLI failed', async () => {
+    const editor = fakeEditor()
+    editor.hwpctrl.call = async () => false
+    const ctx = ctxWith(
+      fakeApi({}, () => ({ ok: false, failedOp: 0, error: 'engine failed', journal: [] })),
+      editor,
+    )
+    const result = await formatTools.execute(ctx, call('fill_fields', { data: { a: 'b' } }))
+    expect(result).toMatchObject({ isError: true })
+    expect(ctx.stack.depth).toBe(0)
+  })
+
+  it('names the live-filled fields when the CLI fallback fails', async () => {
+    const editor = fakeEditor()
+    editor.hwpctrl.call = async (_m: string, args?: unknown[]) => args?.[0] !== '작성자'
+    const ctx = ctxWith(
+      fakeApi({}, () => ({ ok: false, failedOp: 0, error: 'engine failed', journal: [] })),
+      editor,
+    )
+    const result = await formatTools.execute(
+      ctx,
+      call('fill_fields', { data: { 회사명: '유비온', 작성자: '홍길동' } }),
+    )
+    expect(result).toMatchObject({ isError: true })
+    expect(result.output).toMatch(/Already applied live: 회사명/)
     expect(ctx.stack.depth).toBe(1)
   })
 
