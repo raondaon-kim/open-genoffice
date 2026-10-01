@@ -214,12 +214,12 @@ describe('read_table / list_fields / get_document_state', () => {
     })
     const result = await readTools.execute(ctxWith(api), call('list_fields'))
     const out = JSON.parse(result.output)
-    expect(out.fields[0]).toMatchObject({
-      name: '회사명',
-      guide: '여기에 입력',
-      section: 0,
-      paragraph: 7,
-    })
+    expect(out.fields[0]).toMatchObject({ section: 0, paragraph: 7 })
+    // a field's name and guide are authored in the document too: data, fenced
+    expect(unwrap(out.fields[0].name)).toBe('회사명')
+    expect(out.fields[0].name).toMatch(/^⟦문서 내용:[0-9a-f]{16}⟧회사명⟦\/문서 내용:[0-9a-f]{16}⟧$/)
+    expect(out.fields[0].guide).toMatch(/^⟦문서 내용:/)
+    expect(unwrap(out.fields[0].guide)).toBe('여기에 입력')
     expect(unwrap(out.fields[0].value)).toBe('유비온')
   })
 

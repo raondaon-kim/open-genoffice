@@ -235,8 +235,10 @@ async function listFields(ctx: HwpAiContext): Promise<ToolExecution> {
   const fields = arr(envelope.fields).map((f) => {
     const location = (f.location as Rec | undefined) ?? {}
     return {
-      name: f.name,
-      guide: f.guide,
+      // name and guide are authored in the document as well: data, fenced
+      // (fill_fields accepts a name copied back with its fence)
+      name: wrapText(str(f.name), nonce),
+      guide: wrapText(str(f.guide), nonce),
       value: wrapText(str(f.value), nonce),
       fieldType: f.fieldType,
       section: location.section,

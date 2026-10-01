@@ -236,6 +236,18 @@ describe('fill_fields', () => {
     expect(ctx.stack.depth).toBe(1)
   })
 
+  it('accepts field names still wrapped in the fence list_fields returned them in', async () => {
+    const editor = fakeEditor()
+    const ctx = ctxWith(fakeApi({}, okEdit), editor)
+    const fenced = '⟦문서 내용:abcdef0123456789⟧회사명⟦/문서 내용:abcdef0123456789⟧'
+    const result = await formatTools.execute(
+      ctx,
+      call('fill_fields', { data: { [fenced]: '유비온' } }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(editor.hwpctrl.call).toHaveBeenCalledWith('PutFieldText', ['회사명', '유비온'])
+  })
+
   it('loads the hwpctrl plugin when it is not active yet, and validates data', async () => {
     const editor = fakeEditor()
     editor.plugins.list = async () => []

@@ -2,6 +2,7 @@ import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { EditOp } from '../../../shared/ai-contract'
 import type { EditorLike, HwpAiContext, ToolModule } from '../context'
 import { intArg, record, requireEditor, staleCoordinates, ToolError, toExecution } from '../errors'
+import { stripFence } from '../provenance'
 import { planFormat } from '../router'
 import type { FormatSpec } from '../router'
 import { applyFileEdit, summarizeEdit } from './edit'
@@ -173,7 +174,7 @@ async function fillFields(
 ): Promise<ToolExecution> {
   const editor = requireEditor(ctx)
   const data = record(input.data, 'data')
-  const entries = Object.entries(data)
+  const entries = Object.entries(data).map(([name, value]) => [stripFence(name), value] as const)
   if (entries.length === 0) throw new ToolError('data must not be empty', 'invalid argument')
   if (entries.length > MAX_FIELDS)
     throw new ToolError(`at most ${MAX_FIELDS} fields per call`, 'invalid argument')
