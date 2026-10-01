@@ -42,6 +42,37 @@ describe('resolveCodexBinary', () => {
     ).rejects.toThrow(/Codex executable not found: .*nope/)
   })
 
+  it('keeps a custom path inside the Codex desktop app on that app (newest release), not the bundled binary', async () => {
+    const root = await scratch('codex-managed-')
+    const release = join(root, 'release-2')
+    await mkdir(release)
+    await writeFile(join(release, 'codex.exe'), '')
+    await writeFile(join(release, 'codex-code-mode-host.exe'), '')
+    const bundled = join(root, 'bundled.exe')
+    await writeFile(bundled, '')
+    setBundledCodexPath(bundled)
+    // a stale saved hash path and the bin folder itself both mean "the desktop app"
+    for (const configured of [join(root, 'release-1', 'codex.exe'), root]) {
+      await expect(
+        resolveCodexBinary(configured, { platform: 'win32', env: {}, managedInstallRoot: root }),
+      ).resolves.toEqual({ path: join(release, 'codex.exe'), source: 'managed' })
+    }
+  })
+
+  it('fails loudly when a desktop-app path is set but the app has no complete install', async () => {
+    const root = await scratch('codex-managed-empty-')
+    const bundled = join(root, 'bundled.exe')
+    await writeFile(bundled, '')
+    setBundledCodexPath(bundled)
+    await expect(
+      resolveCodexBinary(join(root, 'gone', 'codex.exe'), {
+        platform: 'win32',
+        env: {},
+        managedInstallRoot: root,
+      }),
+    ).rejects.toThrow(/Codex app install not found/)
+  })
+
   it('prefers the bundled app-server over desktop, VS Code and PATH installs', async () => {
     const dir = await scratch('codex-bundled-')
     const bundled = join(dir, 'codex-app-server.exe')

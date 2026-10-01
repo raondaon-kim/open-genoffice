@@ -364,6 +364,12 @@ export async function resolveCodexBinary(
         return { path: configuredExecutable, source: 'custom' }
       throw new Error(`Codex executable not found: ${configuredExecutable}`)
     }
+    // a path inside the desktop app's tree means "use the Codex app": follow its
+    // newest complete release (saved hash paths go stale on every update) and never
+    // fall back to the bundled binary behind the user's back
+    const desktop = await newestManagedCodex(managedRoot!, platform)
+    if (desktop) return { path: desktop, source: 'managed' }
+    throw new Error(`Codex app install not found under ${managedRoot}`)
   }
 
   const bundled = options.bundledPath ?? bundledCodexPath
