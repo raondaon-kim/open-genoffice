@@ -6544,14 +6544,15 @@ EOF
 
 ## 수용 로그
 
-Task 2와 Task 15에서 채운다.
+2026-10-01, Windows 10 x64, rhwp 0.8.6, Codex 0.159.3(동봉) · ChatGPT 계정, 모델 `gpt-5.6-luna`.
 
-| 항목                                                                         | 결과 | 비고                                                                                |
-| ---------------------------------------------------------------------------- | ---- | ----------------------------------------------------------------------------------- |
-| 계약 테스트(실바이너리) 14건                                                 |      |                                                                                     |
-| 유닛 테스트 — main(rhwp-cli·queries·edit-ops·snapshots·chain)                |      |                                                                                     |
-| 유닛 테스트 — renderer(provenance·stack·fence·read·edit·router·format·skill) |      |                                                                                     |
-| 드라이버(개발 셸): 칩·explain·edit IPC                                       |      |                                                                                     |
-| 드라이버(패키지 exe)                                                         |      |                                                                                     |
-| 게이트: typecheck · lint · format(vs main) · shell 테스트                    |      |                                                                                     |
-| 미검증                                                                       |      | macOS; 실제 모델로의 대화형 편집(API 키 없음) — 도구 층은 유닛·드라이버로 대체 검증 |
+| 항목                                                                               | 결과           | 비고                                                                                                                                                                          |
+| ---------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 계약 테스트(실바이너리) 14건                                                       | **통과** 14/14 | 스펙 §14의 실측 사실(오프셋 code point, insert-paragraph 앞 삽입, delete-text 클램프, 서식 props, 머리말·각주, 종료 코드) 그대로                                              |
+| 유닛 테스트 — main(rhwp-cli·queries·edit-ops·snapshots·chain)                      | **통과**       | 7 + 4 + 7 + 5 + 8                                                                                                                                                             |
+| 유닛 테스트 — renderer(provenance·stack·fence·read·edit·router·format·skill·panel) | **통과**       | HWP 전체 134/134(기존 31). 패널 UI 테스트 추가(칩·로딩 중 무조회·되돌리기 숨김)                                                                                               |
+| 드라이버(개발 셸): 칩·explain·edit IPC                                             | **통과**       | 칩 3개, explain 문단 7, replace_phrase replacedCount 1·diff 4·changedPages [0]                                                                                                |
+| 드라이버(개발 셸): **실제 Codex 턴을 패널로**                                      | **통과**       | "사업→프로젝트" 요청 → `get_document_overview` → `find`(1건) → `edit_text`(1 op) → 본문 반영(스크린샷), 상태 "unsaved changes", "AI 편집 되돌리기 (1)" → 클릭 시 되돌림       |
+| 드라이버(패키지 exe)                                                               | **통과**       | 같은 시나리오, 설치본 `OpenGenOfficeSetup-v0.4.0-x64.exe` 214.6 MB                                                                                                            |
+| 게이트: typecheck · lint · format(vs main) · shell/docs/ai-provider 테스트         | **통과**       | shell 159, docs 524, ai-provider 121                                                                                                                                          |
+| 미검증                                                                             | —              | macOS; 실문서(대형·병합 셀 표·누름틀 양식)로의 대화형 편집 — 픽스처 문서로만 확인; 라이브 서식(apply_format 정렬·크기 증감)의 실제 스튜디오 동작 — 유닛(가짜 편집기)로만 확인 |

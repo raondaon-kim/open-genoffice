@@ -16,7 +16,10 @@ The fork's material changes include:
   rhwp engine, embedded as a fifth shell tab; the rhwp studio UI is built from
   the pinned upstream release and bundled with the app (served from a loopback
   origin, no remote dependency), and the HwpForge document generator and rhwp
-  CLI binaries are packaged as application resources;
+  CLI binaries are packaged as application resources; the Hangul AI reads and
+  edits open documents through the bundled rhwp CLI (snapshot → verified edit
+  chain → reload, one-step undo) and fences document text as data before it
+  reaches the model;
 - encrypted device-local storage for user-supplied provider keys;
 - a global default model and sticky per-document provider/model selection;
 - model catalog discovery, compatibility filtering, and key verification;
