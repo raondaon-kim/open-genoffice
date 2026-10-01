@@ -305,6 +305,17 @@ if (existsSync(studioNotices)) {
   console.warn('apps/hwp/dist/studio/THIRD-PARTY.md not found — run npm run build:hwp-studio first')
 }
 
+// The bundled Codex app-server (tools/fetch-codex.mjs) ships its upstream LICENSE/NOTICE.
+const codexDir = join(ROOT, `apps/shell/native/codex/${process.platform}-${process.arch}`)
+if (existsSync(join(codexDir, 'LICENSE'))) {
+  out += hr('5. OpenAI Codex app-server (openai/codex, Apache-2.0)')
+  out += readFileSync(join(codexDir, 'LICENSE'), 'utf8').trim() + '\n'
+  if (existsSync(join(codexDir, 'NOTICE')))
+    out += '\n' + readFileSync(join(codexDir, 'NOTICE'), 'utf8').trim() + '\n'
+} else {
+  console.warn(`${codexDir}/LICENSE not found — run npm run fetch:codex first`)
+}
+
 const dest = join(ROOT, 'apps/shell/build/THIRD-PARTY-NOTICES.txt')
 mkdirSync(dirname(dest), { recursive: true })
 writeFileSync(dest, out)

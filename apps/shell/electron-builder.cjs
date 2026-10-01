@@ -132,6 +132,11 @@ const config = {
         from: '../hwp/native/rhwp/darwin-arm64/rhwp',
         to: 'native/rhwp',
       },
+      {
+        // tools/fetch-codex.mjs — the official Codex app-server (stdio JSON-RPC)
+        from: 'native/codex/darwin-arm64/codex-app-server',
+        to: 'native/codex-app-server',
+      },
     ],
   },
   win: {
@@ -156,6 +161,10 @@ const config = {
       {
         from: '../hwp/native/rhwp/win32-x64/rhwp.exe',
         to: 'native/rhwp.exe',
+      },
+      {
+        from: 'native/codex/win32-x64/codex-app-server.exe',
+        to: 'native/codex-app-server.exe',
       },
     ],
   },

@@ -333,6 +333,7 @@ describe('Open GenOffice builder configuration', () => {
           to: 'native/hwpforge-mcp.exe',
         },
         { from: '../hwp/native/rhwp/win32-x64/rhwp.exe', to: 'native/rhwp.exe' },
+        { from: 'native/codex/win32-x64/codex-app-server.exe', to: 'native/codex-app-server.exe' },
       ],
     })
     expect(config.dmg).toMatchObject({ sign: false })
@@ -352,6 +353,7 @@ describe('Open GenOffice builder configuration', () => {
           to: 'native/hwpforge-mcp',
         },
         { from: '../hwp/native/rhwp/darwin-arm64/rhwp', to: 'native/rhwp' },
+        { from: 'native/codex/darwin-arm64/codex-app-server', to: 'native/codex-app-server' },
       ]),
     })
     // loading the config must not depend on what is built on this machine — the

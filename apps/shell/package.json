@@ -8,7 +8,8 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev --watch",
-    "build": "electron-vite build",
+    "build:codex": "node ../../tools/fetch-codex.mjs",
+    "build": "npm run build:codex && electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "start": "electron-vite build && electron .",

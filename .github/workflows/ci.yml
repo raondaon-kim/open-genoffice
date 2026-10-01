@@ -62,6 +62,10 @@ jobs:
         # binary at the same pinned version and verifies it against SHA256SUMS.
         run: npm run fetch:rhwp-cli
 
+      - name: Fetch Codex app-server (bundled AI backend)
+        # Exercises tools/fetch-codex.mjs: pinned release asset + SHA-256 check.
+        run: npm run fetch:codex
+
       - name: Check dependency licenses
         run: npm run licenses
 
