@@ -66,6 +66,7 @@ export type {
   VerifiableAiProviderId,
   VerifyApiKeyOptions,
 } from './verification'
+export { CODEX_SIGN_IN_NOTICE, codexSignInNotice } from './codex-notice'
 export { chatForProvider } from './chat'
 export { sseLines, streamForProvider } from './stream'
 export type { StreamCallbacks } from './stream'

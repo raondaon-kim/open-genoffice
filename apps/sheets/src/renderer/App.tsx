@@ -99,6 +99,7 @@ import { createUniver } from './create-univer'
 
 import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
 import {
+  codexSignInNotice,
   openRouterRetrySuggestion,
   type AiModelSummary,
   type AiRoute,
@@ -616,7 +617,9 @@ export function App(): React.JSX.Element {
     selectedRoute ? (providerLabels.get(selectedRoute.providerId) ?? selectedRoute.providerId) : '',
     imageContextExists && selectedModel && !modelSupportsImage(selectedModel)
       ? 'This model cannot continue a conversation containing images.'
-      : 'This saved model is no longer available. Choose a replacement to continue.',
+      : // the default route is Codex: before sign-in, say where to sign in
+        (codexSignInNotice(selectedRoute, publicAiSettings?.providers ?? []) ??
+          'This saved model is no longer available. Choose a replacement to continue.'),
   )
 
   // File renamed externally (in the shell Home list) → sync the title-bar file

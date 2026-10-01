@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
-import { openRouterRetrySuggestion } from '@genoffice/ai-provider'
+import { codexSignInNotice, openRouterRetrySuggestion } from '@genoffice/ai-provider'
 import type { AiModelSummary, AiRoute } from '@genoffice/ai-provider'
 import { AiComposer, Markdown, ModelPicker } from '@genoffice/ui'
 import type { ModelPickerModel } from '@genoffice/ui'
@@ -304,12 +304,16 @@ export function HwpAiPanel({
           routeEquals(route, { providerId: model.providerId, modelId: model.id }),
         )
         setRouteValidated(routeUsable)
+        // the default route is Codex: before sign-in, say where to sign in
+        const codexNotice = codexSignInNotice(storedRoute, settings.providers)
         setModelNotice(
           compatible.length === 0
-            ? 'No AI model is available — add a provider key in Settings to use the assistant here.'
+            ? (codexNotice ??
+                'No AI model is available — add a provider key in Settings to use the assistant here.')
             : routeUsable
               ? null
-              : `The selected model (${route.modelId}) is unavailable. Choose a compatible one from the picker.`,
+              : (codexNotice ??
+                `The selected model (${route.modelId}) is unavailable. Choose a compatible one from the picker.`),
         )
         const messages: ProjectChatMessage[] = await window.hwpApi.loadProjectChat({
           projectId: identity.projectId,

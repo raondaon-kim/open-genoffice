@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import {
+  codexSignInNotice,
   openRouterRetrySuggestion,
   type AiModelSummary,
   type AiRoute,
@@ -299,7 +300,9 @@ export function AiPanel({
           )
         ) {
           setModelNotice(
-            routeReadError ??
+            // the default route is Codex: before sign-in, say where to sign in
+            codexSignInNotice(route, settings.providers) ??
+              routeReadError ??
               `The selected model (${route.modelId}) is unavailable. Choose a compatible replacement before sending.`,
           )
         }

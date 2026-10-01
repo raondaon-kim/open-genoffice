@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { AgentLoop, composeSkills, type AgentImage, type ToolDisplay } from '@genoffice/agent-core'
-import { openRouterRetrySuggestion } from '@genoffice/ai-provider'
+import { codexSignInNotice, openRouterRetrySuggestion } from '@genoffice/ai-provider'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type {
   AiConversationIdentity,
@@ -334,6 +334,8 @@ export function AiPanel({
   const activeModel = useMemo(() => modelForRoute(models, selectedRoute), [models, selectedRoute])
   const routeSendable =
     activeModel != null && compatibleModels([activeModel], requiresImageInput).length === 1
+  // the default route is Codex: before sign-in, say where to sign in
+  const codexNotice = routeSendable ? null : codexSignInNotice(selectedRoute, providers)
   const pickerModels = useMemo(() => {
     const available = compatibleModels(models, requiresImageInput).map((model) =>
       toPickerModel(model, providers),
@@ -1257,7 +1259,8 @@ export function AiPanel({
     }
     if (!routeSendable) {
       setModelNotice(
-        'This presentation’s saved model is unavailable. Choose a replacement to continue.',
+        codexNotice ??
+          'This presentation’s saved model is unavailable. Choose a replacement to continue.',
       )
       return
     }
@@ -1860,6 +1863,7 @@ export function AiPanel({
           {(modelNotice || (routeReady && selectedRoute && !routeSendable)) && (
             <div className="ai-model-notice">
               {modelNotice ??
+                codexNotice ??
                 'This presentation’s saved model is unavailable. Choose a replacement to continue.'}
             </div>
           )}

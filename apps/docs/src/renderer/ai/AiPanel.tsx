@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
-import { openRouterRetryRoute, openRouterRetrySuggestion } from '@genoffice/ai-provider'
+import {
+  codexSignInNotice,
+  openRouterRetryRoute,
+  openRouterRetrySuggestion,
+} from '@genoffice/ai-provider'
 import {
   AgentLoop,
   composeSkills,
@@ -668,6 +672,8 @@ export function AiPanel({
     .filter((model) => isDocsCompatibleModel(model, requiresImageModel))
     .map((model) => toPickerModel(model, providers))
   const selectedRouteUnavailable = routeReady && selectedRoute != null && selectedModel == null
+  // the default route is Codex: before sign-in, say where to sign in
+  const codexNotice = selectedRouteUnavailable ? codexSignInNotice(selectedRoute, providers) : null
   const unavailableSelectedModel: ModelPickerModel | null = selectedRouteUnavailable
     ? {
         providerId: selectedRoute.providerId,
@@ -677,7 +683,7 @@ export function AiPanel({
           selectedRoute.providerId,
         label: `${selectedRoute.modelId} (Unavailable)`,
         shortLabel: `${selectedRoute.modelId} (Unavailable)`,
-        description: 'This saved route is no longer available or compatible.',
+        description: codexNotice ?? 'This saved route is no longer available or compatible.',
         capabilityLabels: ['Choose another model before sending'],
       }
     : null
@@ -1249,8 +1255,12 @@ export function AiPanel({
         {modelNotice && <div className="ai-model-notice">{modelNotice}</div>}
         {selectedRouteUnavailable && (
           <div className="ai-model-notice">
-            {selectedRoute.modelId} is saved as this conversation&apos;s route, but it is no longer
-            available or compatible. Choose another model before sending.
+            {codexNotice ?? (
+              <>
+                {selectedRoute.modelId} is saved as this conversation&apos;s route, but it is no
+                longer available or compatible. Choose another model before sending.
+              </>
+            )}
           </div>
         )}
         <AiComposer
