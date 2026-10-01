@@ -290,4 +290,29 @@ describe('AiSettingsModal', () => {
     })
     expect(container.querySelector('[data-codex-card]')).toBeNull()
   })
+
+  it('starts the Codex path field with the saved custom path', async () => {
+    const api = {
+      ...createApi(),
+      codexStatus: vi.fn(async () => ({
+        state: 'connected' as const,
+        accountType: 'chatgpt',
+        email: 'a@b.com',
+        customPath: 'D:\\tools\\codex.exe',
+      })),
+      codexLogin: vi.fn(),
+      codexLoginCancel: vi.fn(),
+      codexLoginWithApiKey: vi.fn(),
+      codexLogout: vi.fn(),
+      onCodexStatusChanged: vi.fn(() => () => undefined),
+      setCodexCliPath: vi.fn(async () => settings),
+    }
+    await act(async () => {
+      root.render(React.createElement(AiSettingsModal, { api, onClose: vi.fn() }))
+    })
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Custom Codex executable path"]',
+    )
+    expect(input?.value).toBe('D:\\tools\\codex.exe')
+  })
 })

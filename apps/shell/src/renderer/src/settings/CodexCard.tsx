@@ -16,21 +16,15 @@ const ACTION_LABELS: Record<CodexCardAction, string> = {
 }
 
 /** Codex (ChatGPT sign-in) card at the top of AI settings; onChanged reloads providers and models. */
-export function CodexCard({
-  api,
-  customPath,
-  onChanged,
-}: {
-  api: CodexRendererApi
-  customPath: string
-  onChanged: () => void
-}) {
+export function CodexCard({ api, onChanged }: { api: CodexRendererApi; onChanged: () => void }) {
   const [status, setStatus] = useState<CodexStatusView | null>(null)
   const [pending, setPending] = useState<CodexLoginStartView | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [apiKeyOpen, setApiKeyOpen] = useState(false)
   const [apiKey, setApiKey] = useState('')
-  const [path, setPath] = useState(customPath)
+  const [path, setPath] = useState('')
+  /** true once the user types, so a status refresh does not overwrite their edit */
+  const [pathEdited, setPathEdited] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -49,6 +43,12 @@ export function CodexCard({
       off()
     }
   }, [api, onChanged])
+
+  // show the saved custom path (status.customPath) until the user edits the field
+  const savedPath = status?.customPath ?? ''
+  useEffect(() => {
+    if (!pathEdited) setPath(savedPath)
+  }, [savedPath, pathEdited])
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true)
@@ -155,7 +155,10 @@ export function CodexCard({
             spellCheck={false}
             placeholder="Leave empty to use the bundled Codex"
             aria-label="Custom Codex executable path"
-            onChange={(event) => setPath(event.target.value)}
+            onChange={(event) => {
+              setPath(event.target.value)
+              setPathEdited(true)
+            }}
           />
           <button
             type="button"
@@ -164,6 +167,7 @@ export function CodexCard({
             onClick={() =>
               void run(async () => {
                 await api.setCodexCliPath(path)
+                setPathEdited(false)
                 setStatus(await api.codexStatus())
                 onChanged()
               })

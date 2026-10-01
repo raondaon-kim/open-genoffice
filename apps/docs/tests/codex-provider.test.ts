@@ -138,3 +138,14 @@ describe('CodexProvider', () => {
     expect(provider.lastDefaultModel()).toBe('gpt-6.1-sol')
   })
 })
+
+describe('CodexProvider custom path in the status', () => {
+  it('reports the saved custom path so the settings card can show it', async () => {
+    const d = deps({ type: 'chatgpt', email: 'a@b.com' })
+    const provider = new CodexProvider(d.value)
+    provider.setCliPath('D:\\tools\\codex.exe')
+    await expect(provider.status()).resolves.toMatchObject({ customPath: 'D:\\tools\\codex.exe' })
+    provider.setCliPath(undefined)
+    expect((await provider.status()).customPath).toBeUndefined()
+  })
+})

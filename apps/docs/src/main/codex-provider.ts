@@ -47,6 +47,8 @@ export interface CodexStatusView {
   planType?: string
   message?: string
   binary?: { path: string; source: CodexBinarySource; version: string | null }
+  /** the user's saved custom executable path, when one is set */
+  customPath?: string
 }
 
 export class CodexProvider {
@@ -103,16 +105,19 @@ export class CodexProvider {
     } catch {
       binary = undefined
     }
-    if (account.state === 'error')
-      return { state: 'error', message: account.message, ...(binary ? { binary } : {}) }
-    if (account.state === 'signed-out')
-      return { state: 'signed-out', ...(binary ? { binary } : {}) }
+    // the custom path is a file path, not a credential: the card shows and edits it
+    const extra = {
+      ...(binary ? { binary } : {}),
+      ...(this.customPath ? { customPath: this.customPath } : {}),
+    }
+    if (account.state === 'error') return { state: 'error', message: account.message, ...extra }
+    if (account.state === 'signed-out') return { state: 'signed-out', ...extra }
     return {
       state: 'connected',
       accountType: account.accountType,
       ...(account.email ? { email: account.email } : {}),
       ...(account.planType ? { planType: account.planType } : {}),
-      ...(binary ? { binary } : {}),
+      ...extra,
     }
   }
 

@@ -659,7 +659,7 @@ export function AiSettingsModal({ api, onClose }: AiSettingsModalProps) {
                 api.codexLogout &&
                 api.onCodexStatusChanged &&
                 api.setCodexCliPath && (
-                  <CodexCard api={api as CodexRendererApi} customPath="" onChanged={reload} />
+                  <CodexCard api={api as CodexRendererApi} onChanged={reload} />
                 )}
 
               <section className="ai-providers-section" aria-labelledby="ai-providers-title">
