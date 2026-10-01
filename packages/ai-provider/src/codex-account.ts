@@ -1,4 +1,4 @@
-import type { CodexRpc } from './codex-app-server'
+import { CODEX_CLIENT_CLOSED, type CodexRpc } from './codex-app-server'
 
 /**
  * Codex account RPCs (app-server `account/*`). Codex owns the credentials in
@@ -84,6 +84,10 @@ export function waitForCodexLogin(
       timeoutMs,
     )
     unsubscribe = rpc.onNotification((message) => {
+      if (message.method === CODEX_CLIENT_CLOSED) {
+        finish({ success: false, error: text(record(message.params)?.message) ?? 'Codex stopped' })
+        return
+      }
       if (message.method !== 'account/login/completed') return
       const params = record(message.params)
       const id = text(params?.loginId)

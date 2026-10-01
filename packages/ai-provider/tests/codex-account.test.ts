@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CodexRpc, RpcMessage } from '../src/codex-app-server'
+import { CODEX_CLIENT_CLOSED, type CodexRpc, type RpcMessage } from '../src/codex-app-server'
 import {
   CodexAccountMonitor,
   cancelCodexLogin,
@@ -192,5 +192,15 @@ describe('CodexAccountMonitor', () => {
       message: 'Codex executable not found: C:\\x\\codex.exe',
     })
     expect(monitor.isConnected()).toBe(false)
+  })
+})
+
+describe('sign-in while the app-server dies', () => {
+  it('ends the wait with the exit error instead of the ten-minute timeout', async () => {
+    const rpc = fakeRpc({})
+    const outcome = waitForCodexLogin(rpc, 'L1', 600_000)
+    rpc.push({ method: CODEX_CLIENT_CLOSED, params: { message: 'Codex app-server exited (1)' } })
+    await expect(outcome).resolves.toEqual({ success: false, error: 'Codex app-server exited (1)' })
+    expect(rpc.listenerCount()).toBe(0)
   })
 })

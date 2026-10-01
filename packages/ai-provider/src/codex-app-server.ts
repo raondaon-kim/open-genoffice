@@ -75,6 +75,13 @@ const CODEX_BASE_INSTRUCTIONS =
  *  stdout is the last unbounded reader here. */
 export const MAX_RPC_LINE_BYTES = 4 * 1024 * 1024
 
+/**
+ * Synthetic notification delivered to every listener when the app-server process
+ * dies or is stopped: waits on notifications (a running turn, a sign-in) end with
+ * the process error instead of hanging until a watchdog or timeout fires.
+ */
+export const CODEX_CLIENT_CLOSED = 'genoffice/client-closed'
+
 interface CodexChildOutput {
   on(event: 'data', listener: (chunk: Buffer) => void): unknown
   on(event: 'end' | 'close', listener: () => void): unknown
@@ -633,6 +640,14 @@ class CodexAppServerClient {
     this.pending.clear()
     for (const session of this.sessions.values()) this.disposeSession(session, false)
     this.sessions.clear()
+    const closed: RpcMessage = { method: CODEX_CLIENT_CLOSED, params: { message: error.message } }
+    for (const listener of [...this.notificationListeners]) {
+      try {
+        listener(closed)
+      } catch {
+        // a listener failing during shutdown must not keep the others from hearing it
+      }
+    }
     this.notificationListeners.clear()
     this.onClose()
   }
@@ -982,6 +997,11 @@ export async function waitForTurn(
     }
     const unsubscribe = client.onNotification((message) => {
       const params = objectValue(message.params)
+      if (message.method === CODEX_CLIENT_CLOSED) {
+        const detail = typeof params?.message === 'string' ? params.message : ''
+        finish(new Error(detail || 'Codex app-server stopped'))
+        return
+      }
       if (params?.threadId !== threadId) return
       cb.onActivity?.()
       const eventTurnId = typeof params.turnId === 'string' ? params.turnId : ''

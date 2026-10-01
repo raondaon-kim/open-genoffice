@@ -3,10 +3,14 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  CODEX_CLIENT_CLOSED,
   chatCodexAppServer,
   codexAppServerLaunchArgs,
   resolveCodexBinary,
   setBundledCodexPath,
+  waitForTurn,
+  type CodexTurnTransport,
+  type RpcMessage,
 } from '../src/codex-app-server'
 
 const dirs: string[] = []
@@ -158,4 +162,44 @@ describe('process failure', () => {
       /Codex app-server exited/,
     )
   }, 20_000)
+})
+
+describe('process death mid-turn', () => {
+  it('rejects a running turn with the exit error instead of waiting for the idle watchdog', async () => {
+    let listener: ((message: RpcMessage) => void) | undefined
+    const transport: CodexTurnTransport = {
+      request: async (method) => {
+        if (method === 'turn/start') {
+          queueMicrotask(() => {
+            listener?.({ method: 'turn/started', params: { threadId: 'th1', turn: { id: 't1' } } })
+            listener?.({
+              method: CODEX_CLIENT_CLOSED,
+              params: { message: 'Codex app-server exited (1): killed' },
+            })
+          })
+          return { turn: { id: 't1' } }
+        }
+        return {}
+      },
+      onNotification: (next) => {
+        listener = next
+        return () => {
+          listener = undefined
+        }
+      },
+    }
+    await expect(
+      waitForTurn(
+        transport,
+        'th1',
+        () => transport.request('turn/start', {}),
+        new AbortController().signal,
+        {
+          signal: new AbortController().signal,
+          onDelta: () => undefined,
+          onToolCall: () => undefined,
+        },
+      ),
+    ).rejects.toThrow('Codex app-server exited (1): killed')
+  })
 })
