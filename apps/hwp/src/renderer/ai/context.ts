@@ -7,6 +7,7 @@ import type { SnapshotStack } from './snapshots'
 export type EditorLike = Pick<
   RhwpEditor,
   | 'getDocumentState'
+  | 'exportHwp'
   | 'exportHwpx'
   | 'loadFile'
   | 'focusTarget'

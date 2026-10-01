@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { editTools, snapshotFileName } from '../src/renderer/ai/tools/edit'
 import type { AiEditRequest, AiEditResult } from '../src/shared/ai-contract'
-import { call, ctxWith, fakeApi, fakeEditor, SHA, SHA_B } from './helpers/ai-fakes'
+import { call, ctxWith, fakeApi, fakeEditor, HWP5_BYTES, SHA, SHA_B } from './helpers/ai-fakes'
 
 const NEW = new TextEncoder().encode('NEW-HWPX')
 const okEdit = (request: AiEditRequest): AiEditResult => ({
@@ -233,8 +233,34 @@ describe('undo_ai_edit', () => {
   })
 })
 
-it('snapshotFileName keeps the base name and forces .hwpx (the bytes are HWPX)', () => {
-  expect(snapshotFileName('보고서.hwp')).toBe('보고서.hwpx')
-  expect(snapshotFileName('a.hwpx')).toBe('a.hwpx')
-  expect(snapshotFileName('untitled')).toBe('untitled.hwpx')
+it("snapshotFileName keeps the base name and names the bytes' real format", () => {
+  const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04])
+  const cfb = new Uint8Array(HWP5_BYTES)
+  expect(snapshotFileName('보고서.hwp', zip)).toBe('보고서.hwpx')
+  expect(snapshotFileName('a.hwpx', zip)).toBe('a.hwpx')
+  expect(snapshotFileName('untitled', zip)).toBe('untitled.hwpx')
+  expect(snapshotFileName('보고서.hwp', cfb)).toBe('보고서.hwp')
+  expect(snapshotFileName('a.hwpx', cfb)).toBe('a.hwp')
+})
+
+describe('an .hwp (HWP5) document', () => {
+  it('uploads exportHwp() bytes, reloads the edited HWP5 bytes as .hwp, and undo keeps .hwp', async () => {
+    const edited = new Uint8Array([...HWP5_BYTES, 7])
+    const api = fakeApi({}, (request) => ({ ...okEdit(request), data: edited.buffer.slice(0) }))
+    const editor = fakeEditor({ format: 'hwp' })
+    const ctx = ctxWith(api, editor)
+    const result = await editTools.execute(
+      ctx,
+      call('edit_text', { ops: [{ op: 'replace_phrase', find: '사업', replace: '프로젝트' }] }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(editor.exportHwpx).not.toHaveBeenCalled()
+    expect(editor.loadFile).toHaveBeenLastCalledWith(new Uint8Array(edited), 'doc.hwp', {
+      skipUnsavedGuard: true,
+    })
+    await editTools.execute(ctx, call('undo_ai_edit'))
+    expect(editor.loadFile).toHaveBeenLastCalledWith(new Uint8Array(HWP5_BYTES), 'doc.hwp', {
+      skipUnsavedGuard: true,
+    })
+  })
 })

@@ -16,6 +16,19 @@ const B = 'b'.repeat(64)
 const bytes = (sha: string) => new TextEncoder().encode(sha.slice(0, 4))
 
 describe('SnapshotStack', () => {
+  it("exports in the document's own format — documentSha256 of an .hwp hashes exportHwp()", async () => {
+    const stack = new SnapshotStack()
+    const hwp5 = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0])
+    const editor = {
+      getDocumentState: vi.fn(async () => ({ documentSha256: A, format: 'hwp' as const })),
+      exportHwp: vi.fn(async () => hwp5),
+      exportHwpx: vi.fn(async () => new Uint8Array([0x50, 0x4b])),
+    }
+    const snapshot = await stack.capture(editor)
+    expect(Array.from(snapshot.bytes)).toEqual(Array.from(hwp5))
+    expect(editor.exportHwpx).not.toHaveBeenCalled()
+  })
+
   it('captures once per documentSha256 and reuses the cached bytes', async () => {
     const stack = new SnapshotStack()
     const editor = editorWith([A, A, B], bytes)

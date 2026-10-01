@@ -13,7 +13,8 @@ export interface Snapshot {
 }
 
 export interface SnapshotEditor {
-  getDocumentState(): Promise<{ documentSha256: string }>
+  getDocumentState(): Promise<{ documentSha256: string; format?: 'hwp' | 'hwpx' }>
+  exportHwp?(): Promise<Uint8Array>
   exportHwpx(): Promise<Uint8Array>
 }
 
@@ -52,9 +53,12 @@ export class SnapshotStack {
   }
 
   private async doCapture(editor: SnapshotEditor): Promise<Snapshot> {
-    const { documentSha256: sha } = await editor.getDocumentState()
+    const { documentSha256: sha, format } = await editor.getDocumentState()
     if (this.latest?.sha === sha) return this.latest
-    const bytes = await editor.exportHwpx()
+    // the studio hashes the document in its source format (an .hwp hashes exportHwp());
+    // main checks the digest, so the bytes must be that same export
+    const bytes =
+      format === 'hwp' && editor.exportHwp ? await editor.exportHwp() : await editor.exportHwpx()
     if (bytes.byteLength > MAX_SNAPSHOT_BYTES) {
       const mb = (bytes.byteLength / 1048576).toFixed(1)
       throw new Error(`The document is too large for the AI tools (${mb} MB > 50 MB).`)

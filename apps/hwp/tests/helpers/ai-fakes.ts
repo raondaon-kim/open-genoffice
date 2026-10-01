@@ -12,20 +12,24 @@ import type {
 
 export const SHA = 'a'.repeat(64)
 export const SHA_B = 'b'.repeat(64)
+/** an HWP5 (CFB) header — what exportHwp() / rhwp edits of an .hwp produce */
+export const HWP5_BYTES = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 9]
 
 export interface FakeEditor extends EditorLike {
   /** documentSha256 values returned by successive getDocumentState calls (last one repeats) */
   shas: string[]
 }
 
-export function fakeEditor(overrides: { shas?: string[]; pageCount?: number } = {}): FakeEditor {
+export function fakeEditor(
+  overrides: { shas?: string[]; pageCount?: number; format?: 'hwp' | 'hwpx' } = {},
+): FakeEditor {
   const shas = overrides.shas ?? [SHA]
   let i = 0
   const editor = {
     shas,
     getDocumentState: vi.fn(async () => ({
       schemaVersion: 1 as const,
-      format: 'hwpx' as const,
+      format: overrides.format ?? ('hwpx' as const),
       documentEpoch: 1,
       changeSeq: 1,
       dirty: false,
@@ -33,6 +37,7 @@ export function fakeEditor(overrides: { shas?: string[]; pageCount?: number } = 
       documentSha256: shas[Math.min(i++, shas.length - 1)],
     })),
     exportHwpx: vi.fn(async () => new Uint8Array([1, 2, 3])),
+    exportHwp: vi.fn(async () => new Uint8Array(HWP5_BYTES)),
     loadFile: vi.fn(async () => ({ pageCount: 3 })),
     focusTarget: vi.fn(async () => ({ focused: true, page: 1 })),
     commands: {

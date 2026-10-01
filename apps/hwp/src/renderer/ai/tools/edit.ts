@@ -35,9 +35,14 @@ const MAX_OPS = 20
 type Ok = Extract<AiEditResult, { ok: true }>
 type Rec = Record<string, unknown>
 
-/** the reloaded bytes are HWPX whatever the file on disk is called */
-export function snapshotFileName(name: string): string {
-  return `${name.replace(/\.(hwp|hwpx)$/i, '')}.hwpx`
+/**
+ * the name to reload bytes under: the studio picks its source format from the
+ * extension, so it must match the bytes — rhwp edits keep the input's format
+ * (an .hwp stays HWP5); a CFB header (D0 CF 11 E0) is HWP5, anything else HWPX
+ */
+export function snapshotFileName(name: string, bytes: Uint8Array): string {
+  const hwp5 = bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
+  return `${name.replace(/\.(hwp|hwpx)$/i, '')}.${hwp5 ? 'hwp' : 'hwpx'}`
 }
 
 const OP_DOC = `Coordinates are 0-based engine coordinates from find / get_document_overview / read_table. Text arguments are single paragraphs (no newlines).`
@@ -187,13 +192,16 @@ export async function applyFileEdit(
   }
   if (!opts.skipPush) ctx.stack.push(snapshot)
   const bytes = new Uint8Array(result.data)
-  const fileName = snapshotFileName(ctx.fileName())
   try {
-    await editor.loadFile(bytes, fileName, { skipUnsavedGuard: true })
+    await editor.loadFile(bytes, snapshotFileName(ctx.fileName(), bytes), {
+      skipUnsavedGuard: true,
+    })
   } catch (err) {
     if (!opts.skipPush) ctx.stack.pop()
     try {
-      await editor.loadFile(snapshot.bytes, fileName, { skipUnsavedGuard: true })
+      await editor.loadFile(snapshot.bytes, snapshotFileName(ctx.fileName(), snapshot.bytes), {
+        skipUnsavedGuard: true,
+      })
     } catch {
       /* the studio keeps whatever it has; the error below tells the user */
     }
@@ -228,7 +236,7 @@ export async function undoAiEdit(ctx: HwpAiContext): Promise<ToolExecution> {
       summary: 'nothing to undo',
     }
   try {
-    await editor.loadFile(snapshot.bytes, snapshotFileName(ctx.fileName()), {
+    await editor.loadFile(snapshot.bytes, snapshotFileName(ctx.fileName(), snapshot.bytes), {
       skipUnsavedGuard: true,
     })
   } catch (err) {
