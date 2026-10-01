@@ -13,6 +13,7 @@ import type {
 } from '../shared/home-api'
 import { HOME_CHANNELS, PROJECT_CHANNELS } from '../shared/home-api'
 import { AI_CHANNELS } from '../../../docs/src/shared/ipc'
+import { CODEX_CHANNELS } from '../shared/codex-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 
@@ -144,6 +145,18 @@ const homeApi: HomeApi = {
     ipcRenderer.invoke(AI_CHANNELS.removeProviderKey, providerId),
   listAiModels: (args) => ipcRenderer.invoke(AI_CHANNELS.listModels, args),
   refreshAiModels: (args) => ipcRenderer.invoke(AI_CHANNELS.refreshModels, args),
+  codexStatus: () => ipcRenderer.invoke(CODEX_CHANNELS.status),
+  codexLogin: (method) => ipcRenderer.invoke(CODEX_CHANNELS.login, method),
+  codexLoginCancel: (loginId) => ipcRenderer.invoke(CODEX_CHANNELS.loginCancel, loginId),
+  codexLoginWithApiKey: (apiKey) => ipcRenderer.invoke(CODEX_CHANNELS.loginApiKey, apiKey),
+  codexLogout: () => ipcRenderer.invoke(CODEX_CHANNELS.logout),
+  onCodexStatusChanged: (handler) => {
+    const listener = (_event: IpcRendererEvent, status: Parameters<typeof handler>[0]) =>
+      handler(status)
+    ipcRenderer.on(CODEX_CHANNELS.statusChanged, listener)
+    return () => ipcRenderer.removeListener(CODEX_CHANNELS.statusChanged, listener)
+  },
+  setCodexCliPath: (path) => ipcRenderer.invoke(AI_CHANNELS.setCodexCliPath, path),
 }
 
 contextBridge.exposeInMainWorld('aiOffice', homeApi)

@@ -8,6 +8,7 @@ import type {
   VerifyAndSaveAiProviderArgs,
   VerifyAndSaveAiProviderResult,
 } from '../../../docs/src/shared/ipc'
+import type { CodexRendererApi } from './codex-api'
 
 /** UI language; kept self-contained here (mirrors Lang in @genoffice/i18n) */
 export type UiLanguage =
@@ -63,7 +64,7 @@ export interface RecentPage {
   totalAll: number
 }
 
-export interface HomeApi {
+export interface HomeApi extends CodexRendererApi {
   /** unified recents across document types, newest first (paged) */
   recents(query?: RecentQuery): Promise<RecentPage>
   /** starred files (independent of the recent list), newest first (paged) */

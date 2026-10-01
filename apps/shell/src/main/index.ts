@@ -89,6 +89,11 @@ import { TABS_CHANNELS } from '../shared/tabs-api'
 import { normalizeRecentQuery, pageRecentPaths, statExistingPaths } from './recent-files'
 import { TabManager } from './tab-manager'
 import { initAutoUpdater } from './updater'
+import {
+  configureCodexBundledBinary,
+  getCodexProvider,
+} from '../../../docs/src/main/codex-provider'
+import { registerCodexIpc } from './codex-ipc'
 
 /**
  * Open GenOffice unified shell: ONE Electron app, ONE BrowserWindow, hosting the
@@ -152,6 +157,11 @@ const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
 const RHWP_BIN = app.isPackaged
   ? join(process.resourcesPath, 'native', RHWP_EXE)
   : join(APPS_ROOT, 'hwp', 'native', 'rhwp', `${process.platform}-${process.arch}`, RHWP_EXE)
+const CODEX_EXE = process.platform === 'win32' ? 'codex-app-server.exe' : 'codex-app-server'
+const CODEX_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', CODEX_EXE)
+  : join(APPS_ROOT, 'shell', 'native', 'codex', `${process.platform}-${process.arch}`, CODEX_EXE)
+configureCodexBundledBinary(CODEX_BIN)
 
 configureDocsRuntime({
   preloadPath: join(DOCS_OUT, 'preload', 'index.js'),
@@ -1426,6 +1436,27 @@ function registerHomeIpc(): void {
 
   ipcMain.handle(HOME_CHANNELS.setOnboardingSeen, () => {
     writeAppSetting(APP_SETTINGS_PATH(), 'onboardingSeen', true)
+  })
+  registerCodexIpc({
+    ipcMain,
+    provider: getCodexProvider(),
+    openExternal: (url) => shell.openExternal(url),
+    confirm: async ({ message, detail, confirmLabel }) => {
+      const parent = BrowserWindow.getFocusedWindow()
+      const options = {
+        type: 'warning' as const,
+        message,
+        detail,
+        buttons: [confirmLabel, 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+      }
+      const { response } = parent
+        ? await dialog.showMessageBox(parent, options)
+        : await dialog.showMessageBox(options)
+      return response === 0
+    },
   })
 }
 

@@ -145,6 +145,7 @@ export const AI_CHANNELS = {
   setGlobalDefault: 'ai:settings:set-default',
   verifyAndSaveProvider: 'ai:provider:verify-and-save',
   removeProviderKey: 'ai:provider:remove-key',
+  setCodexCliPath: 'ai:codex:set-cli-path',
   listModels: 'ai:models:list',
   refreshModels: 'ai:models:refresh',
   getConversationRoute: 'ai:conversation:get-route',

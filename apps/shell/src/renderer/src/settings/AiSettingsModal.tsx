@@ -1,5 +1,5 @@
 import { ModelPicker, type ModelPickerModel } from '@genoffice/ui'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AiModelSummary,
   AiRoute,
@@ -11,6 +11,8 @@ import type {
 import type { AiSettingsRendererApi, KeyedAiProviderId } from './ai-settings-api'
 import { shouldShowGensparkLogin } from './provider-card'
 import { modelListNeedsRefresh } from './ai-settings-refresh'
+import { CodexCard } from './CodexCard'
+import type { CodexRendererApi } from '../../../shared/codex-api'
 
 interface AiSettingsModalProps {
   api: AiSettingsRendererApi | null
@@ -400,6 +402,9 @@ export function AiSettingsModal({ api, onClose }: AiSettingsModalProps) {
   const [refreshing, setRefreshing] = useState(false)
   const [savingDefault, setSavingDefault] = useState(false)
   const [gensparkSignInRequested, setGensparkSignInRequested] = useState(false)
+  /** bumped after a Codex sign-in/out so providers and models reload */
+  const [reloadKey, setReloadKey] = useState(0)
+  const reload = useCallback(() => setReloadKey((key) => key + 1), [])
   const [error, setError] = useState<string | null>(null)
   const lastModelsRefreshAtRef = useRef(0)
   const modelsRefreshPromiseRef = useRef<Promise<void> | null>(null)
@@ -435,7 +440,7 @@ export function AiSettingsModal({ api, onClose }: AiSettingsModalProps) {
     return () => {
       active = false
     }
-  }, [api])
+  }, [api, reloadKey])
 
   const providers = useMemo(() => {
     if (!settings) return []
@@ -452,8 +457,8 @@ export function AiSettingsModal({ api, onClose }: AiSettingsModalProps) {
   }, [settings])
 
   const pickerModels = useMemo(() => {
-    return toModelPickerModels(modelResult?.models ?? [], providers)
-  }, [modelResult, providers])
+    return toModelPickerModels(modelResult?.models ?? [], settings?.providers ?? providers)
+  }, [modelResult, providers, settings])
 
   const gensparkSignedIn = providers.some(
     (provider) => provider.id === 'genspark' && provider.status === 'connected',
@@ -646,6 +651,16 @@ export function AiSettingsModal({ api, onClose }: AiSettingsModalProps) {
                   />
                 </div>
               </section>
+
+              {api?.codexStatus &&
+                api.codexLogin &&
+                api.codexLoginCancel &&
+                api.codexLoginWithApiKey &&
+                api.codexLogout &&
+                api.onCodexStatusChanged &&
+                api.setCodexCliPath && (
+                  <CodexCard api={api as CodexRendererApi} customPath="" onChanged={reload} />
+                )}
 
               <section className="ai-providers-section" aria-labelledby="ai-providers-title">
                 <div className="ai-providers-section__head">

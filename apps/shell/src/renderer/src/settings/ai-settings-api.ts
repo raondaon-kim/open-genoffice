@@ -8,6 +8,7 @@ import type {
   VerifyAndSaveAiProviderArgs,
   VerifyAndSaveAiProviderResult,
 } from '../../../../../docs/src/shared/ipc'
+import type { CodexRendererApi } from '../../../shared/codex-api'
 
 export type KeyedAiProviderId = KeyedPublicAiProviderId
 
@@ -16,7 +17,7 @@ export type KeyedAiProviderId = KeyedPublicAiProviderId
  * may expose these methods on its existing API; editor windows expose them on
  * `window.desktop`. No credential-reading method is part of this interface.
  */
-export interface AiSettingsRendererApi {
+export interface AiSettingsRendererApi extends Partial<CodexRendererApi> {
   /** Start the existing Genspark browser login flow. */
   accountLogin?: () => Promise<boolean>
   getAiPublicSettings(): Promise<PublicAiSettings>

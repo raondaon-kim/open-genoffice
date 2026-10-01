@@ -5,11 +5,17 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const pickerModels = vi.hoisted(() => ({
+  last: [] as Array<{ providerId: string; modelId: string }>,
+}))
+
 vi.mock('@genoffice/ui', () => ({
   ModelPicker: ({
+    models,
     onOpen,
     onSelectionChange,
   }: {
+    models?: Array<{ providerId: string; modelId: string }>
     onOpen?: () => void
     onSelectionChange: (model: {
       providerId: string
@@ -17,8 +23,9 @@ vi.mock('@genoffice/ui', () => ({
       providerLabel: string
       label: string
     }) => void
-  }) =>
-    React.createElement(
+  }) => {
+    pickerModels.last = models ?? []
+    return React.createElement(
       React.Fragment,
       null,
       React.createElement(
@@ -41,7 +48,8 @@ vi.mock('@genoffice/ui', () => ({
         },
         'pick Genspark',
       ),
-    ),
+    )
+  },
 }))
 
 import { AiSettingsModal, toModelPickerModels } from '../src/renderer/src/settings/AiSettingsModal'
@@ -211,5 +219,75 @@ describe('AiSettingsModal', () => {
     vi.setSystemTime(1_000_000 + 5 * 60 * 1000)
     await act(async () => picker?.click())
     expect(api.refreshAiModels).toHaveBeenCalledOnce()
+  })
+
+  it('offers signed-in Codex models in the global default picker', async () => {
+    const codexSettings = {
+      ...settings,
+      providers: [
+        ...settings.providers,
+        {
+          id: 'codex' as const,
+          label: 'Codex (ChatGPT)',
+          status: 'connected' as const,
+          hasApiKey: false,
+        },
+      ],
+    }
+    const codexModels = {
+      ...modelResult,
+      models: [
+        ...modelResult.models,
+        {
+          ...modelResult.models[0]!,
+          id: 'gpt-5.6-luna',
+          canonicalId: 'gpt-5.6-luna',
+          providerId: 'codex' as const,
+          name: 'gpt-5.6-luna',
+        },
+      ],
+    }
+    const api = {
+      ...createApi(),
+      getAiPublicSettings: vi.fn(async () => codexSettings),
+      listAiModels: vi.fn(async () => codexModels),
+    }
+    await act(async () => {
+      root.render(React.createElement(AiSettingsModal, { api, onClose: vi.fn() }))
+    })
+    expect(
+      pickerModels.last.some((m) => m.providerId === 'codex' && m.modelId === 'gpt-5.6-luna'),
+    ).toBe(true)
+  })
+
+  it('shows the Codex card when the settings API can sign in to Codex', async () => {
+    const api = {
+      ...createApi(),
+      codexStatus: vi.fn(async () => ({
+        state: 'connected' as const,
+        accountType: 'chatgpt',
+        email: 'a@b.com',
+        planType: 'prolite',
+      })),
+      codexLogin: vi.fn(),
+      codexLoginCancel: vi.fn(),
+      codexLoginWithApiKey: vi.fn(),
+      codexLogout: vi.fn(),
+      onCodexStatusChanged: vi.fn(() => () => undefined),
+      setCodexCliPath: vi.fn(async () => settings),
+    }
+    await act(async () => {
+      root.render(React.createElement(AiSettingsModal, { api, onClose: vi.fn() }))
+    })
+    const card = container.querySelector('[data-codex-card]')
+    expect(card?.textContent).toContain('Connected as a@b.com')
+    expect(card?.querySelector('[data-codex-action="logout"]')).not.toBeNull()
+  })
+
+  it('omits the Codex card for editor windows whose settings API has no Codex methods', async () => {
+    await act(async () => {
+      root.render(React.createElement(AiSettingsModal, { api: createApi(), onClose: vi.fn() }))
+    })
+    expect(container.querySelector('[data-codex-card]')).toBeNull()
   })
 })

@@ -638,6 +638,13 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       throw new Error(safeError(error), { cause: error })
     }
   })
+  ipcMain.handle(AI_CHANNELS.setCodexCliPath, (_event, value) => {
+    try {
+      return settings.setCodexCliPath(value)
+    } catch (error) {
+      throw new Error(safeError(error), { cause: error })
+    }
+  })
   ipcMain.handle(AI_CHANNELS.listModels, async (_event, value) => {
     try {
       if (value !== undefined && !isRecord(value)) throw new Error('Model-list request is invalid')

@@ -425,3 +425,22 @@ describe('Codex dispatch', () => {
     ])
   })
 })
+
+describe('Codex custom path channel', () => {
+  it('forwards the path to the settings service and returns the public settings', async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const setCodexCliPath = vi.fn(() => ({ schemaVersion: 1 }))
+    registerAiRoutingIpc({
+      ipcMain: {
+        handle: (channel, listener) =>
+          handlers.set(channel, listener as (...args: unknown[]) => unknown),
+      },
+      settings: { setCodexCliPath } as never,
+      getProjectStore: () => ({}) as never,
+      getGensparkApiKey: () => '',
+    })
+    const result = await handlers.get(AI_CHANNELS.setCodexCliPath)!({}, 'D:\\tools\\codex.exe')
+    expect(setCodexCliPath).toHaveBeenCalledWith('D:\\tools\\codex.exe')
+    expect(result).toEqual({ schemaVersion: 1 })
+  })
+})
