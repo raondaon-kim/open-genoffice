@@ -36,8 +36,8 @@
     "icons": "node tools/gen-open-genoffice-icons.mjs",
     "notices": "node tools/gen-third-party-notices.mjs",
     "licenses": "node tools/check-licenses.mjs",
-    "dist:mac": "npm run notices && npm run build:all && npm run dist:mac -w @genoffice/shell",
-    "dist:win": "npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell"
+    "dist:mac": "npm run fetch:codex && npm run notices && npm run build:all && npm run dist:mac -w @genoffice/shell",
+    "dist:win": "npm run fetch:codex && npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell"
   },
   "dependencies": {
     "ws": "^8.21.1"
