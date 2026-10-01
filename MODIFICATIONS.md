@@ -6,6 +6,9 @@ with upstream commit `4da673d4dfa994bd0b4a9bc43430e4a058a17c61`.
 
 The fork's material changes include:
 
+- Codex (ChatGPT sign-in) as the default AI for new installs: the official
+  Codex app-server ships with the app, the upstream app-server bridge is ported,
+  and AI settings sign in, sign out and show the account and plan;
 - first-class OpenRouter, Anthropic, and OpenAI routes alongside Genspark;
 - direct bring-your-own-key routes for DeepSeek, GLM (Z.ai), Kimi (Moonshot),
   and MiniMax through their OpenAI-compatible endpoints;

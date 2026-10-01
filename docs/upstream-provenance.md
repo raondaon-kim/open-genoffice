@@ -69,3 +69,16 @@ from `resources/native/`. electron-builder only warns about a missing
 (`apps/shell/build/verify-extra-resources.js`) fails the build when any source
 for the platform being packaged — module `out` trees, the studio, a native
 binary — is missing or an empty directory.
+
+## Codex app-server bridge (from upstream)
+
+`packages/ai-provider/src/codex-app-server.ts`, `watchdog.ts`, the stream-callback
+subset of `protocols/shared.ts` and the tests `codex-app-server.test.ts` /
+`codex-stdout-lines.test.ts` are ported from `genspark-ai/genoffice`
+`676bf4d5` (Apache-2.0). Fork changes: binary resolution prefers a custom path
+(which must exist), then the bundled app-server, the desktop install, the VS
+Code extension's CLI and PATH; the standalone `codex-app-server` is launched
+without the CLI subcommand; the client exposes `withCodexRpc` for the account
+RPCs in `codex-account.ts`. The app ships the official Codex app-server
+(`openai/codex` `rust-v0.159.3`, Apache-2.0) as `resources/native/codex-app-server[.exe]`,
+fetched and SHA-256-verified by `tools/fetch-codex.mjs`.

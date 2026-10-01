@@ -23,6 +23,10 @@ Other versions are on the [Releases](https://github.com/sergedoub/open-genoffice
 ## What this fork changes
 
 - Keeps Genspark as a built-in provider and migration default.
+- Uses your ChatGPT plan through Codex by default: the official Codex
+  app-server ships with the app, and Settings › AI signs in with ChatGPT (browser
+  or device code) or an OpenAI API key, shows the account and plan, and signs
+  out. API-key providers keep working alongside it.
 - Adds OpenRouter, Anthropic, OpenAI, DeepSeek, GLM (Z.ai), Kimi (Moonshot),
   and MiniMax with user-supplied API keys.
 - Adds a Hangul (`.hwp`/`.hwpx`) module as a fifth shell tab: open existing

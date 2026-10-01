@@ -1,7 +1,7 @@
 # Codex CLI 기본 AI + 업스트림 프로바이더 11종 설계 (Phase 3)
 
 - 날짜: 2026-10-01
-- 상태: 설계 승인(대화), 스펙 검토 대기
+- 상태: M1 구현 완료 (2026-10-01) — 계획 docs/superpowers/plans/2026-10-01-codex-default-provider.md
 - 선행: Phase 1(`2026-09-21-hwp-local-self-hosting-design.md`) — 네이티브 바이너리 패키징 계약(`resources/native/`,
   `beforePack` 존재 검사, 릴리스 자산 + SHA256 검증 fetch 스크립트)을 그대로 쓴다.
 - 범위: `packages/ai-provider`(Codex 브리지 포팅, 프로바이더 메타·엔드포인트), `apps/docs/src/main`(설정·카탈로그·라우팅 —
