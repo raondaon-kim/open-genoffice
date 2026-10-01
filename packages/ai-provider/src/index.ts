@@ -16,6 +16,7 @@ export type {
   AiSettings,
   AiStreamChunk,
   AiStreamRequest,
+  CodexModelCatalog,
   GenSparkAccountStatus,
   LegacyAiSettings,
 } from './types'

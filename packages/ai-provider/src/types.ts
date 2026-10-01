@@ -78,6 +78,8 @@ export interface AiProviderConfig {
   model: string
   /** only used by the custom (OpenAI-compatible) provider */
   baseUrl?: string | undefined
+  /** Codex only: custom codex/codex-app-server executable; empty uses the bundled binary */
+  cliPath?: string | undefined
 }
 
 export interface AiProviderMeta extends AiProviderDefinition {
@@ -127,4 +129,10 @@ export interface AiStreamChunk {
   /** complete parsed tool call (emitted once its arguments finish streaming) */
   toolCall?: AgentToolCall
   error?: string
+}
+
+/** live model list of the signed-in Codex account (app-server model/list) */
+export interface CodexModelCatalog {
+  models: string[]
+  defaultModel: string
 }

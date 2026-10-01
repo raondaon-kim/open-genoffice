@@ -291,12 +291,7 @@ export async function verifyOpenAiApiKey(
   apiKey: string,
   options: VerifyApiKeyOptions = {},
 ): Promise<AiProviderVerificationResult> {
-  return verifyOpenAiCompatibleModelsKey(
-    'openai',
-    apiKey,
-    options,
-    'https://api.openai.com/v1',
-  )
+  return verifyOpenAiCompatibleModelsKey('openai', apiKey, options, 'https://api.openai.com/v1')
 }
 
 export function verifyDeepSeekApiKey(

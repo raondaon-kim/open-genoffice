@@ -1,7 +1,10 @@
 import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 import { httpBodyDetail } from './http-error'
 import { GENSPARK_LLM_BASE_URLS, OPENAI_COMPATIBLE_BASE_URLS } from './providers'
+import type { StreamCallbacks } from './protocols/shared'
 import type { AiProviderConfig, AiProviderId } from './types'
+
+export type { StreamCallbacks } from './protocols/shared'
 
 // ---- streaming (SSE line splitting shared by all providers) ----
 
@@ -21,12 +24,6 @@ export async function* sseLines(
     for (const line of lines) yield line
   }
   if (buffer) yield buffer
-}
-
-export interface StreamCallbacks {
-  onDelta: (text: string) => void
-  onToolCall: (call: AgentToolCall) => void
-  signal: AbortSignal
 }
 
 /**

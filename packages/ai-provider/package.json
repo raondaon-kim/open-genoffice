@@ -6,7 +6,9 @@
   "type": "module",
   "description": "Multi-provider LLM streaming, model catalog, verification, and one-shot chat client shared by GenOffice apps",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./codex-app-server": "./src/codex-app-server.ts",
+    "./codex-account": "./src/codex-account.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
