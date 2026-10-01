@@ -1,7 +1,7 @@
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { EditOp } from '../../../shared/ai-contract'
 import type { EditorLike, HwpAiContext, ToolModule } from '../context'
-import { intArg, record, requireEditor, ToolError, toExecution } from '../errors'
+import { intArg, record, requireEditor, staleCoordinates, ToolError, toExecution } from '../errors'
 import { planFormat } from '../router'
 import type { FormatSpec } from '../router'
 import { applyFileEdit, summarizeEdit } from './edit'
@@ -78,7 +78,8 @@ async function filePhase(
   appliedLive: string[],
 ): Promise<Awaited<ReturnType<typeof applyFileEdit>>> {
   try {
-    return await applyFileEdit(ctx, ops, { skipPush: true })
+    // apply_format checked its coordinates before the live phase moved the document
+    return await applyFileEdit(ctx, ops, { skipPush: true, skipReadCheck: true })
   } catch (err) {
     if (appliedLive.length === 0) {
       ctx.stack.pop()
@@ -90,6 +91,12 @@ async function filePhase(
       err instanceof ToolError ? err.summary : 'failed',
     )
   }
+}
+
+/** a live AI change: unsaved for the user, and known to the model (its coordinates stay valid) */
+async function noteAiChange(ctx: HwpAiContext, editor: EditorLike): Promise<void> {
+  ctx.markAiDirty()
+  ctx.stack.noteRead((await editor.getDocumentState()).documentSha256)
 }
 
 async function applyFormat(
@@ -105,6 +112,7 @@ async function applyFormat(
 
   // one undo unit for both phases: the pre-format bytes
   const snapshot = await ctx.stack.capture(editor)
+  if (ctx.stack.coordinatesStale(snapshot.sha)) throw staleCoordinates()
   ctx.stack.push(snapshot)
   const applied: string[] = []
   if (plan.live.length > 0) {
@@ -125,7 +133,7 @@ async function applyFormat(
     for (const id of plan.live) {
       const result = await editor.commands.execute(id)
       if (!result.ok) {
-        if (applied.length > 0) ctx.markAiDirty()
+        if (applied.length > 0) await noteAiChange(ctx, editor)
         else ctx.stack.pop()
         throw new ToolError(
           `The editor refused ${id}: ${result.reason}${result.message ? ` — ${result.message}` : ''}. Already applied live: ${applied.join(', ') || 'nothing'} (undo_ai_edit reverts them).`,
@@ -134,7 +142,7 @@ async function applyFormat(
       }
       applied.push(id)
     }
-    ctx.markAiDirty()
+    await noteAiChange(ctx, editor)
   }
   let fileSummary = ''
   if (plan.char || plan.para) {
@@ -181,7 +189,7 @@ async function fillFields(
     if (ok === false) refused.push(name)
     else live.push(name)
   }
-  if (live.length > 0) ctx.markAiDirty()
+  if (live.length > 0) await noteAiChange(ctx, editor)
   if (refused.length === 0) {
     return {
       output: `Filled ${live.length} field(s): ${live.join(', ')}. The change is unsaved — the user saves with ⌘S; undo_ai_edit reverts it.`,

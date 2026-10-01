@@ -31,6 +31,7 @@ export class SnapshotStack {
   private capturing: Promise<Snapshot> | null = null
   private readonly sent = new Set<string>()
   private readonly sending = new Map<string, Promise<AiSnapshotResult>>()
+  private readSha: string | null = null
 
   constructor(private readonly limit = UNDO_LIMIT) {}
 
@@ -96,6 +97,23 @@ export class SnapshotStack {
   /** drop the capture cache (main rejected the bytes) */
   invalidate(): void {
     this.latest = null
+  }
+
+  /**
+   * the document state the model's coordinates come from: the last state it
+   * read, or the result of its own last edit. null until the first read.
+   */
+  get lastReadSha(): string | null {
+    return this.readSha
+  }
+
+  noteRead(sha: string): void {
+    this.readSha = sha
+  }
+
+  /** coordinates taken at lastReadSha are stale once the user moved the document */
+  coordinatesStale(currentSha: string): boolean {
+    return this.readSha !== null && this.readSha !== currentSha
   }
 
   isSent(sha: string): boolean {

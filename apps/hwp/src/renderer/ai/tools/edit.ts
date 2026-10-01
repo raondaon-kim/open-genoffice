@@ -1,7 +1,16 @@
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { AiEditResult, EditOp } from '../../../shared/ai-contract'
 import type { HwpAiContext, ToolModule } from '../context'
-import { intArg, optStrArg, record, requireEditor, strArg, ToolError, toExecution } from '../errors'
+import {
+  intArg,
+  optStrArg,
+  record,
+  requireEditor,
+  staleCoordinates,
+  strArg,
+  ToolError,
+  toExecution,
+} from '../errors'
 import { withFence } from '../fence'
 import { ensureSnapshot } from '../snapshots'
 
@@ -164,16 +173,20 @@ export function summarizeEdit(ops: EditOp[], result: Ok, focused: boolean): stri
 
 /**
  * snapshot → main edit chain → SHA fence → reload. `skipPush` when the caller
- * already pushed the pre-edit snapshot (live phase of apply_format).
+ * already pushed the pre-edit snapshot (live phase of apply_format);
+ * `skipReadCheck` when the caller already checked its coordinates.
  */
 export async function applyFileEdit(
   ctx: HwpAiContext,
   ops: EditOp[],
-  opts: { skipPush?: boolean } = {},
+  opts: { skipPush?: boolean; skipReadCheck?: boolean } = {},
 ): Promise<{ result: Ok; focused: boolean }> {
   const editor = requireEditor(ctx)
   const api = ctx.api()
-  const fenced = await withFence(editor, async () => {
+  // replace_phrase / fill_fields address text by search or name; the rest by coordinates
+  const coordinates = !opts.skipReadCheck && ops.some((op) => 'paragraph' in op || 'table' in op)
+  const fenced = await withFence(editor, async (sha) => {
+    if (coordinates && ctx.stack.coordinatesStale(sha)) throw staleCoordinates()
     const snapshot = await ensureSnapshot(editor, ctx.stack, api)
     return { snapshot, result: await api.aiEdit({ sha: snapshot.sha, ops }) }
   })
@@ -212,6 +225,7 @@ export async function applyFileEdit(
   }
   ctx.stack.noteLoaded({ sha: result.outputSha, bytes })
   ctx.stack.markSent(result.outputSha)
+  ctx.stack.noteRead(result.outputSha) // the model knows what its own edit moved
   ctx.markAiDirty()
   let focused = false
   const target = firstParagraph(ops)
@@ -247,6 +261,7 @@ export async function undoAiEdit(ctx: HwpAiContext): Promise<ToolExecution> {
     )
   }
   ctx.stack.noteLoaded(snapshot)
+  ctx.stack.noteRead(snapshot.sha)
   ctx.markAiDirty()
   return {
     output: `Reverted the last AI edit (${ctx.stack.depth} more can be undone). The document is unsaved — ⌘S saves it.`,

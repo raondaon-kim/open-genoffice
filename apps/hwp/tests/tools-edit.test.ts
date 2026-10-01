@@ -162,7 +162,8 @@ describe('edit_table / insert_element', () => {
   })
 
   it('maps element kinds onto edit ops and validates their arguments', async () => {
-    const api = fakeApi({}, okEdit)
+    // the studio reports the edit's outputSha after reload; this fake editor always says SHA
+    const api = fakeApi({}, (request) => ({ ...okEdit(request), outputSha: SHA }))
     const ctx = ctxWith(api)
     await editTools.execute(
       ctx,

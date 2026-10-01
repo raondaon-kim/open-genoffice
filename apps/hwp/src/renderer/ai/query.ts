@@ -37,7 +37,10 @@ export async function runQuery(
   for (let attempt = 0; ; attempt++) {
     const snapshot = await ensureSnapshot(editor, ctx.stack, api)
     const response = await api.aiQuery({ sha: snapshot.sha, tool, args })
-    if (response.ok) return interpret(tool, response.result)
+    if (response.ok) {
+      ctx.stack.noteRead(snapshot.sha)
+      return interpret(tool, response.result)
+    }
     // main's per-view cache is small; if it dropped our snapshot, send it again once
     if (attempt === 0 && /snapshot missing/.test(response.error)) {
       ctx.stack.forgetSent(snapshot.sha)

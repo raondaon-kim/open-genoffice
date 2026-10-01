@@ -12,6 +12,14 @@ export class ToolError extends Error {
   }
 }
 
+/** a coordinate edit after the user changed the document since the model last read it */
+export function staleCoordinates(): ToolError {
+  return new ToolError(
+    'The document was edited since you last read it, so these coordinates may point at moved text — nothing was applied. Read it again (find / get_document_overview) and retry with fresh coordinates.',
+    'document changed',
+  )
+}
+
 export function toExecution(err: unknown): ToolExecution {
   if (err instanceof ToolError) return { output: err.message, isError: true, summary: err.summary }
   return {
