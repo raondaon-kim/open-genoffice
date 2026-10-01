@@ -96,7 +96,9 @@ async function filePhase(
 /** a live AI change: unsaved for the user, and known to the model (its coordinates stay valid) */
 async function noteAiChange(ctx: HwpAiContext, editor: EditorLike): Promise<void> {
   ctx.markAiDirty()
-  ctx.stack.noteRead((await editor.getDocumentState()).documentSha256)
+  const sha = (await editor.getDocumentState()).documentSha256
+  ctx.stack.noteRead(sha)
+  ctx.stack.sealTop(sha)
 }
 
 async function applyFormat(

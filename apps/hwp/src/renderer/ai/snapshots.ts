@@ -10,6 +10,8 @@ import type { AiSnapshotRequest, AiSnapshotResult } from '../../shared/ai-contra
 export interface Snapshot {
   sha: string
   bytes: Uint8Array
+  /** undo entries: the document state right after the AI edit this entry reverts */
+  after?: string
 }
 
 export interface SnapshotEditor {
@@ -81,8 +83,19 @@ export class SnapshotStack {
   }
 
   push(snapshot: Snapshot): void {
-    this.stack.push(snapshot)
+    // a copy: the capture cache may hand out the same object again
+    this.stack.push({ sha: snapshot.sha, bytes: snapshot.bytes })
     while (this.stack.length > this.limit) this.stack.shift()
+  }
+
+  peek(): Snapshot | null {
+    return this.stack[this.stack.length - 1] ?? null
+  }
+
+  /** record the state the AI edit on top of the stack produced */
+  sealTop(after: string): void {
+    const top = this.peek()
+    if (top) top.after = after
   }
 
   pop(): Snapshot | null {

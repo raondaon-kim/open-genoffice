@@ -226,6 +226,7 @@ export async function applyFileEdit(
   ctx.stack.noteLoaded({ sha: result.outputSha, bytes })
   ctx.stack.markSent(result.outputSha)
   ctx.stack.noteRead(result.outputSha) // the model knows what its own edit moved
+  ctx.stack.sealTop(result.outputSha)
   ctx.markAiDirty()
   let focused = false
   const target = firstParagraph(ops)
@@ -243,12 +244,20 @@ export async function applyFileEdit(
 
 export async function undoAiEdit(ctx: HwpAiContext): Promise<ToolExecution> {
   const editor = requireEditor(ctx)
-  const snapshot = ctx.stack.pop()
-  if (!snapshot)
+  const top = ctx.stack.peek()
+  if (!top)
     return {
       output: 'Nothing to undo — no AI edit has been applied in this tab.',
       summary: 'nothing to undo',
     }
+  // reloading the pre-edit bytes would also discard what the user typed since
+  if (top.after && (await editor.getDocumentState()).documentSha256 !== top.after) {
+    throw new ToolError(
+      'The document was edited after the last AI edit, so undoing it would also discard those changes — nothing was reverted. Use ⌘Z in the document to step back instead.',
+      'undo blocked',
+    )
+  }
+  const snapshot = ctx.stack.pop()!
   try {
     await editor.loadFile(snapshot.bytes, snapshotFileName(ctx.fileName(), snapshot.bytes), {
       skipUnsavedGuard: true,

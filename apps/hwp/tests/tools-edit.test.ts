@@ -215,7 +215,8 @@ describe('edit_table / insert_element', () => {
 describe('undo_ai_edit', () => {
   it('reloads the previous snapshot and reports the remaining depth', async () => {
     const api = fakeApi({}, okEdit)
-    const editor = fakeEditor()
+    // edit: before/capture/after = SHA; after the reload the studio reports SHA_B
+    const editor = fakeEditor({ shas: [SHA, SHA, SHA, SHA_B] })
     const ctx = ctxWith(api, editor)
     await editTools.execute(
       ctx,
@@ -231,6 +232,23 @@ describe('undo_ai_edit', () => {
     const nothing = await editTools.execute(ctx, call('undo_ai_edit'))
     expect(nothing).toMatchObject({ summary: 'nothing to undo' })
     expect(nothing.isError).toBeUndefined()
+  })
+
+  it('refuses to undo over edits the user made after the AI edit, and keeps the entry', async () => {
+    const api = fakeApi({}, okEdit)
+    // edit: before/capture/after = SHA → reload (SHA_B) → the user types → SHA_C
+    const SHA_C = 'c'.repeat(64)
+    const editor = fakeEditor({ shas: [SHA, SHA, SHA, SHA_C] })
+    const ctx = ctxWith(api, editor)
+    await editTools.execute(
+      ctx,
+      call('edit_text', { ops: [{ op: 'delete_paragraph', section: 0, paragraph: 1 }] }),
+    )
+    const undo = await editTools.execute(ctx, call('undo_ai_edit'))
+    expect(undo).toMatchObject({ isError: true, summary: 'undo blocked' })
+    expect(undo.output).toMatch(/⌘Z/)
+    expect(editor.loadFile).toHaveBeenCalledTimes(1)
+    expect(ctx.stack.depth).toBe(1)
   })
 })
 
@@ -248,7 +266,7 @@ describe('an .hwp (HWP5) document', () => {
   it('uploads exportHwp() bytes, reloads the edited HWP5 bytes as .hwp, and undo keeps .hwp', async () => {
     const edited = new Uint8Array([...HWP5_BYTES, 7])
     const api = fakeApi({}, (request) => ({ ...okEdit(request), data: edited.buffer.slice(0) }))
-    const editor = fakeEditor({ format: 'hwp' })
+    const editor = fakeEditor({ format: 'hwp', shas: [SHA, SHA, SHA, SHA_B] })
     const ctx = ctxWith(api, editor)
     const result = await editTools.execute(
       ctx,
