@@ -6,6 +6,8 @@ import {
   type AiRoute,
   type AiStreamChunk,
 } from '@genoffice/ai-provider'
+import { chatCodexAppServer, streamCodexAppServer } from '@genoffice/ai-provider/codex-app-server'
+import type { AgentToolCall } from '@genoffice/agent-core'
 import type {
   AppendChatArgs,
   ProjectStore,
@@ -18,6 +20,7 @@ import {
   type AiConversationIdentity,
   type AiStreamRequest,
   isPublicAiProviderId,
+  type KeyedPublicAiProviderId,
   type PublicAiProviderId,
 } from '../shared/ipc'
 import { redactProviderError } from './ai-secret-store'
@@ -608,10 +611,12 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       if (!isRecord(value)) throw new Error('Provider verification request is required')
       assertOnlyKeys(value, ['providerId', 'apiKey'], 'Provider verification request')
       return await settings.verifyAndSave({
-        providerId: boundedString(value.providerId, 'providerId', 64, false) as Exclude<
-          PublicAiProviderId,
-          'genspark'
-        >,
+        providerId: boundedString(
+          value.providerId,
+          'providerId',
+          64,
+          false,
+        ) as KeyedPublicAiProviderId,
         apiKey: boundedString(value.apiKey, 'apiKey', 16_384, false),
       })
     } catch (error) {
@@ -721,20 +726,38 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       )
       route = await resolveSendRoute(options, request.conversation, requireImageInput)
       config = settings.getProviderConfig(route, options.getGensparkApiKey)
-      await streamForProvider(
-        route.providerId,
-        config,
-        request.system,
-        request.messages,
-        request.tools ?? [],
-        request.maxTokens ?? 8192,
-        {
-          signal: controller.signal,
-          onDelta: (text) => send({ requestId: request.requestId, type: 'delta', text }),
-          onToolCall: (toolCall) =>
-            send({ requestId: request.requestId, type: 'tool-call', toolCall }),
-        },
-      )
+      const callbacks = {
+        signal: controller.signal,
+        onDelta: (text: string) => send({ requestId: request.requestId, type: 'delta', text }),
+        onToolCall: (toolCall: AgentToolCall) =>
+          send({ requestId: request.requestId, type: 'tool-call', toolCall }),
+      }
+      if (route.providerId === 'codex') {
+        await streamCodexAppServer(
+          config,
+          request.system,
+          request.messages,
+          request.tools ?? [],
+          request.maxTokens ?? 8192,
+          {
+            ...callbacks,
+            // one native Codex thread per conversation, so follow-up turns send only the new events
+            ...(request.conversation
+              ? { sessionId: `${request.conversation.projectId}:${request.conversation.chatId}` }
+              : {}),
+          },
+        )
+      } else {
+        await streamForProvider(
+          route.providerId,
+          config,
+          request.system,
+          request.messages,
+          request.tools ?? [],
+          request.maxTokens ?? 8192,
+          callbacks,
+        )
+      }
       send({ requestId: request.requestId, type: 'done' })
     } catch (error) {
       if (controller.signal.aborted) {
@@ -762,7 +785,15 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       const request = parseAiChatRequest(value)
       route = await resolveSendRoute(options, request.conversation)
       config = settings.getProviderConfig(route, options.getGensparkApiKey)
-      const response = await chatForProvider(route.providerId, config, request.system, request.user)
+      const response =
+        route.providerId === 'codex'
+          ? await chatCodexAppServer(
+              config,
+              request.system,
+              request.user,
+              AbortSignal.timeout(180_000),
+            )
+          : await chatForProvider(route.providerId, config, request.system, request.user)
       if (!response.ok && response.error) {
         const error = safeError(response.error, config)
         void refreshAfterModelError(settings, route, error).catch(() => undefined)

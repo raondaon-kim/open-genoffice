@@ -1007,6 +1007,19 @@ describe('chat AI route metadata', () => {
     expect(reopened.route).toEqual({ providerId: 'anthropic', modelId: 'claude-sonnet-4' })
   })
 
+  it('stores and reopens a Codex conversation route', () => {
+    store.getOrCreateChatAiMetadata('default', 'chat-codex', {
+      providerId: 'openai',
+      modelId: 'gpt-5',
+    })
+    store.setChatAiRoute('default', 'chat-codex', { providerId: 'codex', modelId: 'gpt-5.6-luna' })
+    const reopened = new ProjectStore(tmpDir).getOrCreateChatAiMetadata('default', 'chat-codex', {
+      providerId: 'openai',
+      modelId: 'gpt-5',
+    })
+    expect(reopened.route).toEqual({ providerId: 'codex', modelId: 'gpt-5.6-luna' })
+  })
+
   it('follows an unsaved chat through rebind even when no transcript exists yet', () => {
     const source = store.getOrCreateChatAiMetadata('default', 'unsaved-route', {
       providerId: 'openrouter',

@@ -118,6 +118,8 @@ export async function chatForProvider(
         return chatGemini(config, system, user, GENSPARK_LLM_BASE_URLS.gemini)
       }
       return chatOpenAiCompatible(GENSPARK_LLM_BASE_URLS.openai, config, system, user)
+    case 'codex':
+      return { ok: false, error: 'Codex runs through the main-process app-server bridge' }
     case 'anthropic':
       return chatAnthropic(config, system, user)
     case 'gemini':

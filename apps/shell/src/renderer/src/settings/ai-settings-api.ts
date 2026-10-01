@@ -2,14 +2,14 @@ import type {
   AiRoute,
   ListAiModelsArgs,
   ListAiModelsResult,
-  PublicAiProviderId,
+  KeyedPublicAiProviderId,
   PublicAiSettings,
   RefreshAiModelsArgs,
   VerifyAndSaveAiProviderArgs,
   VerifyAndSaveAiProviderResult,
 } from '../../../../../docs/src/shared/ipc'
 
-export type KeyedAiProviderId = Exclude<PublicAiProviderId, 'genspark'>
+export type KeyedAiProviderId = KeyedPublicAiProviderId
 
 /**
  * Minimal renderer contract for the Home settings surface. The shell preload

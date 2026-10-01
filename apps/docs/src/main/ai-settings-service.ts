@@ -16,6 +16,7 @@ import type {
   ListAiModelsArgs,
   ListAiModelsResult,
   PublicAiProvider,
+  KeyedPublicAiProviderId,
   PublicAiProviderId,
   PublicAiSettings,
   RefreshAiModelsArgs,
@@ -65,7 +66,7 @@ const VERIFIABLE_PROVIDER_IDS = [
   'glm',
   'kimi',
   'minimax',
-] as const satisfies readonly Exclude<PublicAiProviderId, 'genspark'>[]
+] as const satisfies readonly KeyedPublicAiProviderId[]
 const DEFAULT_ROUTE: AiRoute = {
   providerId: 'genspark',
   modelId:
@@ -157,7 +158,7 @@ export class AiSettingsService {
     if (route.providerId === 'genspark' && !this.options.isGensparkConfigured()) {
       throw new Error('Sign in to Genspark before selecting a Genspark model')
     } else if (route.providerId !== 'genspark') {
-      const providerId = route.providerId as Exclude<PublicAiProviderId, 'genspark'>
+      const providerId = route.providerId as KeyedPublicAiProviderId
       const provider = this.load().providers[providerId]
       const credentialStatus = this.options.secretStore.status(providerId)
       if (credentialStatus === 'unreadable') {
@@ -232,11 +233,11 @@ export class AiSettingsService {
   removeProviderKey(providerId: unknown): PublicAiSettings {
     if (
       typeof providerId !== 'string' ||
-      !VERIFIABLE_PROVIDER_IDS.includes(providerId as Exclude<PublicAiProviderId, 'genspark'>)
+      !VERIFIABLE_PROVIDER_IDS.includes(providerId as KeyedPublicAiProviderId)
     ) {
       throw new Error('Provider key cannot be removed')
     }
-    const id = providerId as Exclude<PublicAiProviderId, 'genspark'>
+    const id = providerId as KeyedPublicAiProviderId
     const state = this.load()
     if (state.globalDefault.providerId === id) {
       throw new Error(

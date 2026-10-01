@@ -49,6 +49,7 @@ import type {
 const TOOL_FIELD_MAX_CHARS = 16_000
 const AI_PROVIDER_IDS = new Set<AiProviderId>([
   'genspark',
+  'codex',
   'openrouter',
   'anthropic',
   'gemini',

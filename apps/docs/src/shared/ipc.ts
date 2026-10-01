@@ -45,6 +45,7 @@ export { AI_PROVIDERS } from '@genoffice/ai-provider'
 /** Provider ids surfaced in settings and model pickers; single source of truth for main-process validation. */
 export const PUBLIC_AI_PROVIDER_IDS = [
   'genspark',
+  'codex',
   'openrouter',
   'anthropic',
   'openai',
@@ -56,10 +57,11 @@ export const PUBLIC_AI_PROVIDER_IDS = [
 
 export type PublicAiProviderId = Extract<AiProviderId, (typeof PUBLIC_AI_PROVIDER_IDS)[number]>
 
+/** providers authenticated by a user API key (Genspark and Codex sign in instead) */
+export type KeyedPublicAiProviderId = Exclude<PublicAiProviderId, 'genspark' | 'codex'>
+
 export function isPublicAiProviderId(value: unknown): value is PublicAiProviderId {
-  return (
-    typeof value === 'string' && (PUBLIC_AI_PROVIDER_IDS as readonly string[]).includes(value)
-  )
+  return typeof value === 'string' && (PUBLIC_AI_PROVIDER_IDS as readonly string[]).includes(value)
 }
 
 export interface AiConversationIdentity {
@@ -93,6 +95,7 @@ export interface PublicAiProvider {
   hasApiKey: boolean
   verifiedAt?: string
   accountLabel?: string
+  planType?: string
 }
 
 export interface PublicAiSettings {
@@ -103,7 +106,7 @@ export interface PublicAiSettings {
 }
 
 export interface VerifyAndSaveAiProviderArgs {
-  providerId: Exclude<PublicAiProviderId, 'genspark'>
+  providerId: KeyedPublicAiProviderId
   apiKey: string
 }
 
@@ -283,9 +286,7 @@ export interface DesktopApi {
   getAiPublicSettings(): Promise<PublicAiSettings>
   setAiGlobalDefault(route: AiRoute): Promise<PublicAiSettings>
   verifyAndSaveAiProvider(args: VerifyAndSaveAiProviderArgs): Promise<VerifyAndSaveAiProviderResult>
-  removeAiProviderKey(
-    providerId: Exclude<PublicAiProviderId, 'genspark'>,
-  ): Promise<PublicAiSettings>
+  removeAiProviderKey(providerId: KeyedPublicAiProviderId): Promise<PublicAiSettings>
   listAiModels(args?: ListAiModelsArgs): Promise<ListAiModelsResult>
   refreshAiModels(args?: RefreshAiModelsArgs): Promise<ListAiModelsResult>
   getAiConversationRoute(identity: AiConversationIdentity): Promise<AiRoute>

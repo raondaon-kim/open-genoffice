@@ -479,6 +479,10 @@ export async function streamForProvider(
         maxTokens,
         cb,
       )
+    case 'codex':
+      // Codex needs a child process; ai-routing-ipc dispatches it to the
+      // main-only @genoffice/ai-provider/codex-app-server bridge.
+      throw new Error('Codex runs through the main-process app-server bridge')
     case 'anthropic':
       return streamAnthropic(config, system, messages, tools, maxTokens, cb)
     case 'gemini':

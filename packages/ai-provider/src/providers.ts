@@ -33,6 +33,17 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     keyPlaceholder: 'Not required - sign in to Genspark',
   },
   {
+    id: 'codex',
+    label: 'Codex (ChatGPT)',
+    protocol: 'codex-app-server',
+    auth: 'codex-login',
+    modelSource: 'remote',
+    // filled at runtime from the signed-in account's app-server model/list
+    models: [],
+    defaultModel: 'gpt-5.6-luna',
+    keyPlaceholder: '',
+  },
+  {
     id: 'openrouter',
     label: 'OpenRouter',
     protocol: 'openai-compatible',

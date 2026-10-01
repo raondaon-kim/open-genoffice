@@ -2,6 +2,7 @@ import type { AgentMessage, AgentToolCall, AgentToolDef } from '@genoffice/agent
 
 export type AiProviderId =
   | 'genspark'
+  | 'codex'
   | 'openrouter'
   | 'anthropic'
   | 'gemini'
@@ -12,9 +13,11 @@ export type AiProviderId =
   | 'openai'
   | 'custom'
 
-export type AiProviderProtocol = 'genspark' | 'anthropic' | 'gemini' | 'openai-compatible'
+export type AiProviderProtocol =
+  'genspark' | 'anthropic' | 'gemini' | 'openai-compatible' | 'codex-app-server'
 
-export type AiProviderAuth = 'genspark-login' | 'bearer-key' | 'anthropic-key' | 'gemini-key'
+export type AiProviderAuth =
+  'genspark-login' | 'codex-login' | 'bearer-key' | 'anthropic-key' | 'gemini-key'
 
 export type AiModelSource = 'static' | 'remote' | 'manual'
 

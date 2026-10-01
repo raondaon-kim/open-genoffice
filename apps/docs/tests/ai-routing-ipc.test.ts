@@ -11,6 +11,12 @@ import {
   registerAiRoutingIpc,
 } from '../src/main/ai-routing-ipc'
 
+const codexBridge = vi.hoisted(() => ({
+  streamCodexAppServer: vi.fn(),
+  chatCodexAppServer: vi.fn(),
+}))
+vi.mock('@genoffice/ai-provider/codex-app-server', () => codexBridge)
+
 describe('credential-safe AI request validation', () => {
   it('accepts content plus conversation identity', () => {
     expect(
@@ -342,5 +348,80 @@ describe('project IPC trusted-boundary validation', () => {
         attachments: [{ name: 'secret', path: '../../etc/passwd' }],
       }),
     ).toThrow('Attachment path is invalid')
+  })
+})
+
+describe('Codex dispatch', () => {
+  function registerWithCodexRoute(send = vi.fn()) {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    registerAiRoutingIpc({
+      ipcMain: {
+        handle: (channel, listener) =>
+          handlers.set(channel, listener as (...args: unknown[]) => unknown),
+      },
+      settings: {
+        getGlobalDefault: () => ({ providerId: 'codex', modelId: 'gpt-5.6-luna' }),
+        assertRouteAvailable: vi.fn(async () => undefined),
+        getProviderConfig: () => ({ apiKey: '', model: 'gpt-5.6-luna' }),
+      } as never,
+      getProjectStore: () =>
+        ({
+          getOrCreateChatAiMetadata: () => ({
+            schemaVersion: 1,
+            route: { providerId: 'codex', modelId: 'gpt-5.6-luna' },
+            createdAt: '2026-10-01T00:00:00.000Z',
+            updatedAt: '2026-10-01T00:00:00.000Z',
+          }),
+        }) as never,
+      getGensparkApiKey: () => '',
+    })
+    return { handlers, send }
+  }
+
+  it('streams a codex route through the app-server bridge with the conversation as its session', async () => {
+    codexBridge.streamCodexAppServer.mockImplementation(async (...args: unknown[]) => {
+      const cb = args[5] as { onDelta(text: string): void }
+      cb.onDelta('안녕하세요')
+    })
+    const { handlers, send } = registerWithCodexRoute()
+    await handlers.get(AI_CHANNELS.stream)!(
+      { sender: { id: 5, isDestroyed: () => false, send } },
+      {
+        requestId: 'codex-1',
+        conversation: { projectId: 'default', chatId: '0123456789abcdef' },
+        system: 'system',
+        messages: [{ role: 'user', text: 'hi' }],
+      },
+    )
+    expect(codexBridge.streamCodexAppServer).toHaveBeenCalledTimes(1)
+    const [config, system, , , maxTokens, cb] = codexBridge.streamCodexAppServer.mock.calls[0]!
+    expect(config).toEqual({ apiKey: '', model: 'gpt-5.6-luna' })
+    expect(system).toBe('system')
+    expect(maxTokens).toBe(8192)
+    expect(cb).toMatchObject({ sessionId: 'default:0123456789abcdef' })
+    expect(send).toHaveBeenCalledWith(AI_CHANNELS.streamChunk, {
+      requestId: 'codex-1',
+      type: 'delta',
+      text: '안녕하세요',
+    })
+    expect(send).toHaveBeenLastCalledWith(AI_CHANNELS.streamChunk, {
+      requestId: 'codex-1',
+      type: 'done',
+    })
+  })
+
+  it('answers one-shot chat for a codex route through the bridge', async () => {
+    codexBridge.chatCodexAppServer.mockResolvedValue({ ok: true, content: '요약' })
+    const { handlers } = registerWithCodexRoute()
+    const response = await handlers.get(AI_CHANNELS.chat)!(
+      { sender: { id: 5 } },
+      { system: 's', user: 'u' },
+    )
+    expect(response).toEqual({ ok: true, content: '요약' })
+    expect(codexBridge.chatCodexAppServer.mock.calls[0]!.slice(0, 3)).toEqual([
+      { apiKey: '', model: 'gpt-5.6-luna' },
+      's',
+      'u',
+    ])
   })
 })

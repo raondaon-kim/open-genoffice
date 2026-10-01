@@ -2,6 +2,7 @@ import type {
   AiRoute,
   ListAiModelsArgs,
   ListAiModelsResult,
+  KeyedPublicAiProviderId,
   PublicAiProviderId,
   PublicAiSettings,
   RefreshAiModelsArgs,
@@ -116,9 +117,7 @@ export interface HomeApi {
   getAiPublicSettings(): Promise<PublicAiSettings>
   setAiGlobalDefault(route: AiRoute): Promise<PublicAiSettings>
   verifyAndSaveAiProvider(args: VerifyAndSaveAiProviderArgs): Promise<VerifyAndSaveAiProviderResult>
-  removeAiProviderKey(
-    providerId: Exclude<PublicAiProviderId, 'genspark'>,
-  ): Promise<PublicAiSettings>
+  removeAiProviderKey(providerId: KeyedPublicAiProviderId): Promise<PublicAiSettings>
   listAiModels(args?: ListAiModelsArgs): Promise<ListAiModelsResult>
   refreshAiModels(args?: RefreshAiModelsArgs): Promise<ListAiModelsResult>
 }

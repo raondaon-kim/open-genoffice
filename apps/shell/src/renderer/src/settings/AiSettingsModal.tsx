@@ -30,6 +30,7 @@ const PROVIDER_ORDER: readonly PublicAiProviderId[] = [
 
 const PROVIDER_HELP: Record<PublicAiProviderId, string> = {
   genspark: 'Use your signed-in Genspark account and credits.',
+  codex: 'Use your ChatGPT plan through Codex.',
   openrouter: 'Access compatible models from many providers with one key.',
   anthropic: 'Get your Anthropic key',
   openai: 'Get your OpenAI key',
@@ -183,7 +184,9 @@ function ProviderCard({
   onSettingsChange: (settings: PublicAiSettings) => void
   onModelsChange: (models: ListAiModelsResult) => void
 }) {
-  const keyedProvider = provider.id === 'genspark' ? null : provider.id
+  // Genspark and Codex sign in instead of storing a key
+  const keyedProvider: KeyedAiProviderId | null =
+    provider.id === 'genspark' || provider.id === 'codex' ? null : provider.id
   const [editing, setEditing] = useState(!provider.hasApiKey)
   const [key, setKey] = useState('')
   const [busy, setBusy] = useState<'verify' | 'remove' | null>(null)

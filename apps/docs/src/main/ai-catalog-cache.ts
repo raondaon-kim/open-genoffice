@@ -10,7 +10,12 @@ import {
   type AiModelSummary,
   type AiProviderId,
 } from '@genoffice/ai-provider'
-import type { AiModelCatalogState, ListAiModelsResult, PublicAiProviderId } from '../shared/ipc'
+import type {
+  AiModelCatalogState,
+  KeyedPublicAiProviderId,
+  ListAiModelsResult,
+  PublicAiProviderId,
+} from '../shared/ipc'
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
@@ -26,7 +31,7 @@ interface CachedCatalogFile {
 
 export interface AiCatalogCacheOptions {
   cacheDir: string
-  getApiKey(providerId: Exclude<PublicAiProviderId, 'genspark'>): string | null
+  getApiKey(providerId: KeyedPublicAiProviderId): string | null
   fetch?: FetchLike
   now?: () => Date
 }
@@ -303,6 +308,10 @@ export class AiCatalogCache {
   private async fetchRemote(
     providerId: Exclude<PublicAiProviderId, 'genspark'>,
   ): Promise<CachedCatalogFile> {
+    if (providerId === 'codex') {
+      // filled from the Codex bridge in Task 5 (AiCatalogCacheOptions.codexModels)
+      throw new Error('Codex is not available in this build')
+    }
     const apiKey = this.options.getApiKey(providerId)
     if (!apiKey)
       throw new Error(`${providerDefinition(providerId)?.label ?? providerId} is not configured`)
@@ -328,9 +337,7 @@ export class AiCatalogCache {
       throw new Error(`${providerDefinition(providerId)?.label ?? providerId} has no models URL`)
     }
     const response = await this.fetchImpl(
-      isAnthropic
-        ? `${baseUrl}/v1/models?limit=1000`
-        : `${baseUrl.replace(/\/$/, '')}/models`,
+      isAnthropic ? `${baseUrl}/v1/models?limit=1000` : `${baseUrl.replace(/\/$/, '')}/models`,
       {
         method: 'GET',
         headers: isAnthropic
