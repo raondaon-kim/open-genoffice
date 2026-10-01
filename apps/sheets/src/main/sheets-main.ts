@@ -46,6 +46,7 @@ import {
   imageSearch,
 } from '@genoffice/ai-search'
 import { AiCatalogCache } from '../../../docs/src/main/ai-catalog-cache'
+import { getCodexProvider } from '../../../docs/src/main/codex-provider'
 import {
   parseProjectAppendArgs,
   parseProjectLoadArgs,
@@ -1989,15 +1990,18 @@ let sheetsAiSettingsService: AiSettingsService | null = null
 function getSheetsAiSettingsService(): AiSettingsService {
   if (sheetsAiSettingsService) return sheetsAiSettingsService
   const secrets = new AiSecretStore(AI_SECRETS_PATH(), createSafeStorageCipher(safeStorage))
+  const codex = getCodexProvider()
   const catalogs = new AiCatalogCache({
     cacheDir: AI_CATALOG_CACHE_PATH(),
     getApiKey: (providerId) => secrets.get(providerId),
+    codexModels: () => codex.listModels(),
   })
   sheetsAiSettingsService = new AiSettingsService({
     settingsPath: AI_SETTINGS_PATH(),
     secretStore: secrets,
     catalogs,
     isGensparkConfigured: hasGskAuth,
+    codex,
   })
   return sheetsAiSettingsService
 }

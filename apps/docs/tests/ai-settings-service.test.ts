@@ -119,7 +119,7 @@ describe('AiSettingsService migration and public boundary', () => {
   it('returns keyless legacy compatibility settings', () => {
     const { service } = fixture()
     const settings = service.getLegacyPublicSettings()
-    expect(settings.provider).toBe('genspark')
+    expect(settings.provider).toBe('codex') // fresh installs default to Codex (spec 2026-10-01 §5.3)
     expect(Object.values(settings.providers).every((provider) => provider.apiKey === '')).toBe(true)
   })
 

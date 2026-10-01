@@ -8,6 +8,7 @@ import { installNavigationGuard, safeExternalUrl } from '@genoffice/electron-uti
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
 import { AiCatalogCache } from '../../../docs/src/main/ai-catalog-cache'
+import { getCodexProvider } from '../../../docs/src/main/codex-provider'
 import {
   parseProjectAppendArgs,
   parseProjectLoadArgs,
@@ -347,15 +348,18 @@ function getStandaloneAiSettingsService(): AiSettingsService {
     join(userData, 'ai-secrets.json'),
     createSafeStorageCipher(safeStorage),
   )
+  const codex = getCodexProvider()
   const catalogs = new AiCatalogCache({
     cacheDir: join(userData, 'ai-model-catalogs'),
     getApiKey: (providerId) => secrets.get(providerId),
+    codexModels: () => codex.listModels(),
   })
   standaloneAiSettingsService = new AiSettingsService({
     settingsPath: join(userData, 'ai-settings.json'),
     secretStore: secrets,
     catalogs,
     isGensparkConfigured: hasGskAuth,
+    codex,
   })
   return standaloneAiSettingsService
 }

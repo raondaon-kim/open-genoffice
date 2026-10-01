@@ -56,6 +56,8 @@ import type {
 import { ATTACHMENT_IMAGE_EXTS } from '../shared/ipc'
 import { findDocxPath } from '../shared/open-file'
 import { AiCatalogCache } from './ai-catalog-cache'
+import { getCodexProvider } from './codex-provider'
+import { shutdownCodexAppServers } from '@genoffice/ai-provider/codex-app-server'
 import {
   parseProjectAppendArgs,
   parseProjectLoadArgs,
@@ -2276,15 +2278,18 @@ let aiSettingsService: AiSettingsService | null = null
 function getAiSettingsService(): AiSettingsService {
   if (aiSettingsService) return aiSettingsService
   const secrets = new AiSecretStore(SECRETS_PATH(), createSafeStorageCipher(safeStorage))
+  const codex = getCodexProvider()
   const catalogs = new AiCatalogCache({
     cacheDir: CATALOG_CACHE_PATH(),
     getApiKey: (providerId) => secrets.get(providerId),
+    codexModels: () => codex.listModels(),
   })
   aiSettingsService = new AiSettingsService({
     settingsPath: SETTINGS_PATH(),
     secretStore: secrets,
     catalogs,
     isGensparkConfigured: hasGskAuth,
+    codex,
   })
   return aiSettingsService
 }
@@ -2304,6 +2309,9 @@ export function registerAiIpc(): void {
     getProjectStore,
     getGensparkApiKey: gskApiKey,
   })
+
+  // stop every Codex app-server child on quit (also covers sheets/slides/pdf — one shared pool)
+  app.once('before-quit', shutdownCodexAppServers)
 
   // Genspark account (gsk login state): auth source for AI features; the frontend uses it to prompt login when logged out
   ipcMain.handle(

@@ -9,6 +9,7 @@ import {
   type AiModelCompatibilityRequirements,
   type AiModelSummary,
   type AiProviderId,
+  type CodexModelCatalog,
 } from '@genoffice/ai-provider'
 import type {
   AiModelCatalogState,
@@ -32,6 +33,8 @@ interface CachedCatalogFile {
 export interface AiCatalogCacheOptions {
   cacheDir: string
   getApiKey(providerId: KeyedPublicAiProviderId): string | null
+  /** signed-in Codex account's model list; absent when Codex is not wired in (tests, standalone tools) */
+  codexModels?: () => Promise<CodexModelCatalog>
   fetch?: FetchLike
   now?: () => Date
 }
@@ -309,8 +312,15 @@ export class AiCatalogCache {
     providerId: Exclude<PublicAiProviderId, 'genspark'>,
   ): Promise<CachedCatalogFile> {
     if (providerId === 'codex') {
-      // filled from the Codex bridge in Task 5 (AiCatalogCacheOptions.codexModels)
-      throw new Error('Codex is not available in this build')
+      if (!this.options.codexModels) throw new Error('Codex is not available in this build')
+      const live = await this.options.codexModels()
+      return this.toCached(
+        'codex',
+        live.models.map((id) => normalizeStaticModel('codex', id)),
+        this.now().toISOString(),
+        // the account's lineup changes with plans and releases; keep it short-lived
+        'max-age=300',
+      )
     }
     const apiKey = this.options.getApiKey(providerId)
     if (!apiKey)

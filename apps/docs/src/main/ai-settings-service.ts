@@ -26,6 +26,7 @@ import type {
 import { PUBLIC_AI_PROVIDER_IDS } from '../shared/ipc'
 import { AiCatalogCache } from './ai-catalog-cache'
 import { AiSecretStore, redactProviderError, type SecretCipher } from './ai-secret-store'
+import type { CodexProvider } from './codex-provider'
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
@@ -40,6 +41,8 @@ interface PersistedProviderState {
   accountLabel?: string
   usable?: boolean
   baseUrl?: string
+  /** codex only: custom executable path */
+  cliPath?: string
 }
 
 interface PersistedAiSettings {
@@ -53,6 +56,8 @@ export interface AiSettingsServiceOptions {
   secretStore: AiSecretStore
   catalogs: AiCatalogCache
   isGensparkConfigured(): boolean
+  /** process-wide Codex state (codex-provider.ts); absent in tests that do not exercise Codex */
+  codex?: CodexProvider
   fetch?: FetchLike
 }
 
@@ -67,11 +72,8 @@ const VERIFIABLE_PROVIDER_IDS = [
   'kimi',
   'minimax',
 ] as const satisfies readonly KeyedPublicAiProviderId[]
-const DEFAULT_ROUTE: AiRoute = {
-  providerId: 'genspark',
-  modelId:
-    AI_PROVIDERS.find((provider) => provider.id === 'genspark')?.defaultModel ?? 'claude-opus-4-7',
-}
+/** New installs default to the signed-in ChatGPT account through Codex (spec §5.3). */
+const DEFAULT_ROUTE: AiRoute = { providerId: 'codex', modelId: 'gpt-5.6-luna' }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -102,6 +104,7 @@ function normalizePersistedSettings(value: unknown): PersistedAiSettings | null 
       provider.accountLabel = raw.accountLabel
     if (typeof raw.usable === 'boolean') provider.usable = raw.usable
     if (typeof raw.baseUrl === 'string' && raw.baseUrl) provider.baseUrl = raw.baseUrl
+    if (typeof raw.cliPath === 'string' && raw.cliPath) provider.cliPath = raw.cliPath
     providers[id] = provider
   }
   return { schemaVersion: 2, globalDefault, providers }
@@ -157,6 +160,8 @@ export class AiSettingsService {
     }
     if (route.providerId === 'genspark' && !this.options.isGensparkConfigured()) {
       throw new Error('Sign in to Genspark before selecting a Genspark model')
+    } else if (route.providerId === 'codex') {
+      if (!this.codexConfigured()) throw new Error('Sign in to Codex in Settings › AI first')
     } else if (route.providerId !== 'genspark') {
       const providerId = route.providerId as KeyedPublicAiProviderId
       const provider = this.load().providers[providerId]
@@ -252,6 +257,7 @@ export class AiSettingsService {
   }
 
   async listModels(args: ListAiModelsArgs = {}): Promise<ListAiModelsResult> {
+    await this.options.codex?.ensureStatus()
     const providerIds = this.configuredProviderIds()
     const result = this.redactCatalogResult(
       await this.options.catalogs.list(
@@ -261,10 +267,12 @@ export class AiSettingsService {
       ),
     )
     if (!args.requireImageInput) this.updateProviderUsability(result)
+    this.adoptCodexDefault(result)
     return result
   }
 
   async refreshModels(args: RefreshAiModelsArgs = {}): Promise<ListAiModelsResult> {
+    await this.options.codex?.ensureStatus()
     const configured = new Set(this.configuredProviderIds())
     const requested = args.providerIds?.length ? args.providerIds : [...configured]
     const providerIds = requested.filter((providerId) => configured.has(providerId))
@@ -274,6 +282,7 @@ export class AiSettingsService {
       }),
     )
     if (!args.requireImageInput) this.updateProviderUsability(result)
+    this.adoptCodexDefault(result)
     return result
   }
 
@@ -288,6 +297,10 @@ export class AiSettingsService {
       const apiKey = gensparkApiKey()
       if (!apiKey) throw new Error('Not signed in to Genspark')
       return { apiKey, model: route.modelId }
+    }
+    if (route.providerId === 'codex') {
+      const cliPath = this.options.codex?.cliPath()
+      return { apiKey: '', model: route.modelId, ...(cliPath ? { cliPath } : {}) }
     }
     if (this.options.secretStore.status(route.providerId) === 'unreadable') {
       throw new Error(`Re-enter your ${provider.label} API key in AI settings`)
@@ -308,7 +321,13 @@ export class AiSettingsService {
     if (route.providerId === 'genspark' && !this.options.isGensparkConfigured()) {
       throw new Error('Not signed in to Genspark')
     }
-    if (route.providerId !== 'genspark') {
+    if (route.providerId === 'codex') {
+      const status = await this.options.codex?.ensureStatus()
+      if (status?.state === 'error') throw new Error(`Codex is unavailable: ${status.message}`)
+      if (status?.state !== 'connected')
+        throw new Error('Sign in to Codex in Settings › AI to use this model')
+    }
+    if (route.providerId !== 'genspark' && route.providerId !== 'codex') {
       const credentialStatus = this.options.secretStore.status(route.providerId)
       if (credentialStatus === 'unreadable') {
         throw new Error(
@@ -336,10 +355,48 @@ export class AiSettingsService {
     }
   }
 
+  setCodexCliPath(value: unknown): PublicAiSettings {
+    if (value !== undefined && value !== null && typeof value !== 'string') {
+      throw new Error('Codex path must be a string')
+    }
+    const path = typeof value === 'string' ? value.trim() : ''
+    if (path.length > 4096) throw new Error('Codex path is too long')
+    const state = this.load()
+    if (path) state.providers.codex = { ...state.providers.codex, cliPath: path }
+    else delete state.providers.codex
+    this.write(state)
+    this.options.codex?.setCliPath(path || undefined)
+    this.options.catalogs.clear('codex')
+    return this.getPublicSettings()
+  }
+
+  private codexConfigured(): boolean {
+    return this.options.codex?.isConnected() === true
+  }
+
+  /** the shared provider learns the persisted custom path the first time settings load */
+  private syncCodexPath(state: PersistedAiSettings): void {
+    this.options.codex?.setCliPath(state.providers.codex?.cliPath)
+  }
+
+  /** an unavailable built-in default model is replaced by the account default (spec §5.3) */
+  private adoptCodexDefault(result: ListAiModelsResult): void {
+    const state = this.load()
+    if (state.globalDefault.providerId !== 'codex') return
+    const codexModels = result.models.filter((model) => model.providerId === 'codex')
+    if (codexModels.length === 0) return
+    if (codexModels.some((model) => model.id === state.globalDefault.modelId)) return
+    const fallback = this.options.codex?.lastDefaultModel()
+    if (!fallback || !codexModels.some((model) => model.id === fallback)) return
+    state.globalDefault = { providerId: 'codex', modelId: fallback }
+    this.write(state)
+  }
+
   private configuredProviderIds(): PublicAiProviderId[] {
     const state = this.load()
     return PUBLIC_PROVIDER_IDS.filter((providerId) => {
       if (providerId === 'genspark') return this.options.isGensparkConfigured()
+      if (providerId === 'codex') return this.codexConfigured()
       return (
         this.options.secretStore.status(providerId) === 'ready' &&
         Boolean(state.providers[providerId]?.verifiedAt)
@@ -360,6 +417,25 @@ export class AiSettingsService {
         status: this.options.isGensparkConfigured() ? 'connected' : 'unavailable',
         hasApiKey: false,
       }
+    }
+    if (providerId === 'codex') {
+      const snapshot = this.options.codex?.monitor.snapshot()
+      const provider: PublicAiProvider = {
+        id: providerId,
+        label: definition.label,
+        status:
+          snapshot?.state === 'connected'
+            ? 'connected'
+            : snapshot?.state === 'error'
+              ? 'unavailable'
+              : 'not-configured',
+        hasApiKey: false,
+      }
+      if (snapshot?.state === 'connected') {
+        if (snapshot.email) provider.accountLabel = snapshot.email
+        if (snapshot.planType) provider.planType = snapshot.planType
+      }
+      return provider
     }
     const credentialStatus = this.options.secretStore.status(providerId)
     const hasApiKey = credentialStatus === 'ready'
@@ -389,6 +465,7 @@ export class AiSettingsService {
     this.removeStaleLegacyBackup()
     if (!existsSync(this.options.settingsPath)) {
       this.state = { schemaVersion: 2, globalDefault: { ...DEFAULT_ROUTE }, providers: {} }
+      this.syncCodexPath(this.state)
       return this.state
     }
     const rawText = readFileSync(this.options.settingsPath, 'utf8')
@@ -401,6 +478,7 @@ export class AiSettingsService {
     const current = normalizePersistedSettings(raw)
     if (current) {
       this.state = current
+      this.syncCodexPath(current)
       return current
     }
     return this.migrateLegacy(raw)
@@ -432,6 +510,7 @@ export class AiSettingsService {
     const validated = normalizePersistedSettings(JSON.parse(JSON.stringify(migrated)))
     if (!validated) throw new Error('Migrated AI settings could not be validated')
     this.write(validated)
+    this.syncCodexPath(validated)
     return validated
   }
 
@@ -449,7 +528,8 @@ export class AiSettingsService {
     return {
       models: result.models,
       catalogs: result.catalogs.map((catalog) => {
-        if (!catalog.error || catalog.providerId === 'genspark') return catalog
+        if (!catalog.error || catalog.providerId === 'genspark' || catalog.providerId === 'codex')
+          return catalog
         let secret: string | null = null
         try {
           secret = this.options.secretStore.get(catalog.providerId)
@@ -468,7 +548,8 @@ export class AiSettingsService {
     const state = this.load()
     let changed = false
     for (const catalog of result.catalogs) {
-      if (catalog.providerId === 'genspark' || catalog.error) continue
+      if (catalog.providerId === 'genspark' || catalog.providerId === 'codex' || catalog.error)
+        continue
       const provider = state.providers[catalog.providerId]
       if (!provider?.verifiedAt) continue
       const usable = result.models.some((model) => model.providerId === catalog.providerId)
