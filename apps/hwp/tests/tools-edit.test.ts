@@ -57,6 +57,25 @@ describe('edit_text (file path)', () => {
     expect(result.output).toMatch(/undo_ai_edit/)
   })
 
+  it('resends the snapshot once when main evicted it, then applies the edit', async () => {
+    let calls = 0
+    const api = fakeApi({}, (request) =>
+      calls++ === 0
+        ? { ok: false, failedOp: null, error: 'hwp: snapshot missing — send it again', journal: [] }
+        : okEdit(request),
+    )
+    const ctx = ctxWith(api, fakeEditor())
+    ctx.stack.markSent(SHA) // main had it once; its small cache dropped it since
+    const result = await editTools.execute(
+      ctx,
+      call('edit_text', { ops: [{ op: 'replace_phrase', find: '사업', replace: '프로젝트' }] }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(api.snapshots).toEqual([SHA])
+    expect(api.edits).toHaveLength(2)
+    expect(ctx.stack.depth).toBe(1)
+  })
+
   it('refuses to apply when the document changed underneath (fence) and leaves no undo entry', async () => {
     const api = fakeApi({}, okEdit)
     const editor = fakeEditor({ shas: [SHA, SHA, SHA_B] })

@@ -187,8 +187,16 @@ export async function applyFileEdit(
   const coordinates = !opts.skipReadCheck && ops.some((op) => 'paragraph' in op || 'table' in op)
   const fenced = await withFence(editor, async (sha) => {
     if (coordinates && ctx.stack.coordinatesStale(sha)) throw staleCoordinates()
-    const snapshot = await ensureSnapshot(editor, ctx.stack, api)
-    return { snapshot, result: await api.aiEdit({ sha: snapshot.sha, ops }) }
+    for (let attempt = 0; ; attempt++) {
+      const snapshot = await ensureSnapshot(editor, ctx.stack, api)
+      const result = await api.aiEdit({ sha: snapshot.sha, ops })
+      // main's per-view cache is small; if it dropped our snapshot, send it again once
+      if (attempt === 0 && !result.ok && /snapshot missing/.test(result.error)) {
+        ctx.stack.forgetSent(snapshot.sha)
+        continue
+      }
+      return { snapshot, result }
+    }
   })
   if (!fenced.ok) {
     throw new ToolError(
