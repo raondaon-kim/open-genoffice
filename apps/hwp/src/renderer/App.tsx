@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor } from '@rhwp/editor'
 import type { RhwpEditor } from '@rhwp/editor'
 import { HwpAiPanel } from './ai/AiPanel'
+import { SnapshotStack } from './ai/snapshots'
 import type { HwpAiDeps } from './ai/context'
 import type { HwpApi } from '../shared/ipc'
 
@@ -50,6 +51,9 @@ export function App() {
   /** an AI edit reloaded the document: the studio's dirty flag resets on loadFile, ours must not */
   const [aiDirty, setAiDirty] = useState(false)
   const aiDirtyRef = useRef(false)
+  // AI undo history outlives the panel: collapsing it must not drop the user's undo
+  const aiStackRef = useRef<SnapshotStack | null>(null)
+  if (!aiStackRef.current) aiStackRef.current = new SnapshotStack()
   aiDirtyRef.current = aiDirty
   const [aiOpen, setAiOpen] = useState(true)
   const [docName, setDocName] = useState(UNTITLED_NAME)
@@ -209,6 +213,7 @@ export function App() {
       setAiDirty(true)
       window.hwpApi?.setDirty(true)
     },
+    stack: aiStackRef.current,
   }
 
   return (

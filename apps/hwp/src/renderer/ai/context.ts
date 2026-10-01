@@ -25,6 +25,8 @@ export interface HwpAiDeps {
   fileName(): string
   /** an AI edit reloaded the document — the studio's own dirty flag is reset by loadFile */
   markAiDirty(): void
+  /** AI undo history + snapshot cache; owned by the app so a panel collapse keeps it */
+  stack: SnapshotStack
 }
 
 /** what every tool sees */

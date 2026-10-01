@@ -10,6 +10,7 @@ vi.mock('@genoffice/ui', () => ({
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'
+import { SnapshotStack } from '../src/renderer/ai/snapshots'
 
 const route = { providerId: 'openai', modelId: 'gpt-4.1' }
 const model = {
@@ -80,7 +81,7 @@ describe('HWP AI panel — engine-suggested chips', () => {
     container.remove()
   })
 
-  async function render(documentReady: boolean) {
+  async function render(documentReady: boolean, stack = new SnapshotStack()) {
     await act(async () => {
       root.render(
         React.createElement(HwpAiPanel, {
@@ -88,6 +89,7 @@ describe('HWP AI panel — engine-suggested chips', () => {
             editor: () => editor(),
             fileName: () => 'doc.hwpx',
             markAiDirty: () => undefined,
+            stack,
           },
           filePath: 'C:/docs/doc.hwpx',
           documentReady,
@@ -132,6 +134,15 @@ describe('HWP AI panel — engine-suggested chips', () => {
     await render(false)
     expect(container.querySelectorAll('.hwp-ai__starter--chip')).toHaveLength(0)
     expect(api.aiQuery).not.toHaveBeenCalled()
+  })
+
+  it('keeps the AI undo history across a collapse (the stack lives in the app)', async () => {
+    installApi({ ok: false, error: 'explore failed' })
+    const stack = new SnapshotStack()
+    stack.push({ sha: 'a'.repeat(64), bytes: new Uint8Array([1]) })
+    // a remount after collapse/expand gets the app's stack back
+    await render(true, stack)
+    expect(container.querySelector('.hwp-ai__undo')?.textContent).toMatch(/(1)/)
   })
 
   it('hides the undo button until an AI edit exists', async () => {

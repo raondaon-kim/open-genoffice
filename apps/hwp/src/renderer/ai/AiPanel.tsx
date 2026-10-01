@@ -10,7 +10,7 @@ import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } fro
 import { createHwpSkill } from './hwp-skill'
 import { createElectronTransport } from './transport'
 import type { HwpAiContext, HwpAiDeps } from './context'
-import { SnapshotStack } from './snapshots'
+import type { SnapshotStack } from './snapshots'
 import { undoAiEdit } from './tools/edit'
 import { fetchExploreChips } from './tools/read'
 import { HWP_TEMPLATES } from '../templates'
@@ -129,7 +129,7 @@ export function HwpAiPanel({
   const [modelNotice, setModelNotice] = useState<string | null>(null)
   const [lang, setLang] = useState<'en' | 'ko'>('en')
   const [templateBusy, setTemplateBusy] = useState<string | null>(null)
-  const [undoDepth, setUndoDepth] = useState(0)
+  const [undoDepth, setUndoDepth] = useState(() => deps.stack.depth)
   const [chips, setChips] = useState<string[]>([])
   const chatRef = useRef<HTMLDivElement>(null)
   const asideRef = useRef<HTMLElement>(null)
@@ -141,8 +141,7 @@ export function HwpAiPanel({
   const runToolsRef = useRef<ToolActivity[]>([])
   const depsRef = useRef(deps)
   depsRef.current = deps
-  const stackRef = useRef<SnapshotStack | null>(null)
-  if (!stackRef.current) stackRef.current = new SnapshotStack()
+  const stackRef = useRef<SnapshotStack>(deps.stack)
   const ctxRef = useRef<HwpAiContext | null>(null)
   if (!ctxRef.current) {
     ctxRef.current = {

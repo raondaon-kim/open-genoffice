@@ -11,6 +11,7 @@ vi.mock('@genoffice/ui', () => ({
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'
+import { SnapshotStack } from '../src/renderer/ai/snapshots'
 
 const codexRoute = { providerId: 'codex', modelId: 'gpt-5.6-luna' }
 
@@ -56,7 +57,12 @@ describe('HWP AI panel on the default Codex route', () => {
     await act(async () => {
       root.render(
         React.createElement(HwpAiPanel, {
-          deps: { editor: () => null, fileName: () => 'doc.hwp', markAiDirty: () => undefined },
+          deps: {
+            editor: () => null,
+            fileName: () => 'doc.hwp',
+            markAiDirty: () => undefined,
+            stack: new SnapshotStack(),
+          },
           filePath: null,
           documentReady: false,
           onCollapse: () => undefined,
