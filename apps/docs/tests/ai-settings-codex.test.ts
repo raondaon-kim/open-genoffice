@@ -128,3 +128,13 @@ describe('AiSettingsService + Codex', () => {
     expect(() => service.removeProviderKey('codex')).toThrow(/cannot be removed/)
   })
 })
+
+describe('Codex status before the first public read', () => {
+  it('reports a signed-in Codex as connected on the very first settings read', async () => {
+    const { service } = fixture(signedIn)
+    await service.ensureCodexStatus()
+    expect(service.getPublicSettings().providers.find((p) => p.id === 'codex')?.status).toBe(
+      'connected',
+    )
+  })
+})

@@ -598,7 +598,12 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
   const { ipcMain, settings } = options
 
   ipcMain.handle(AI_CHANNELS.getLegacySettings, () => settings.getLegacyPublicSettings())
-  ipcMain.handle(AI_CHANNELS.getPublicSettings, () => settings.getPublicSettings())
+  ipcMain.handle(AI_CHANNELS.getPublicSettings, async () => {
+    // the Codex status is cached; read it once before the first answer so a
+    // signed-in account is not reported as not configured
+    await settings.ensureCodexStatus()
+    return settings.getPublicSettings()
+  })
   ipcMain.handle(AI_CHANNELS.setGlobalDefault, async (_event, value) => {
     try {
       return await settings.setGlobalDefault(parseRoute(value))

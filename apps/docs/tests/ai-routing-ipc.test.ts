@@ -444,3 +444,31 @@ describe('Codex custom path channel', () => {
     expect(result).toEqual({ schemaVersion: 1 })
   })
 })
+
+describe('public settings channel', () => {
+  it('checks the Codex account before answering, so a signed-in Codex is not shown as missing', async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const order: string[] = []
+    registerAiRoutingIpc({
+      ipcMain: {
+        handle: (channel, listener) =>
+          handlers.set(channel, listener as (...args: unknown[]) => unknown),
+      },
+      settings: {
+        ensureCodexStatus: vi.fn(async () => {
+          order.push('ensureCodexStatus')
+        }),
+        getPublicSettings: vi.fn(() => {
+          order.push('getPublicSettings')
+          return { schemaVersion: 1 }
+        }),
+      } as never,
+      getProjectStore: () => ({}) as never,
+      getGensparkApiKey: () => '',
+    })
+    await expect(handlers.get(AI_CHANNELS.getPublicSettings)!({})).resolves.toEqual({
+      schemaVersion: 1,
+    })
+    expect(order).toEqual(['ensureCodexStatus', 'getPublicSettings'])
+  })
+})

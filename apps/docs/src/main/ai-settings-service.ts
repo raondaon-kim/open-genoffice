@@ -355,6 +355,11 @@ export class AiSettingsService {
     }
   }
 
+  /** refresh the cached Codex account status when it is missing or stale */
+  async ensureCodexStatus(): Promise<void> {
+    await this.options.codex?.ensureStatus()
+  }
+
   setCodexCliPath(value: unknown): PublicAiSettings {
     if (value !== undefined && value !== null && typeof value !== 'string') {
       throw new Error('Codex path must be a string')
