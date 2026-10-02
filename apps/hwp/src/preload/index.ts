@@ -49,6 +49,7 @@ const api: HwpApi = {
   resolveProjectChat: (args) => ipcRenderer.invoke(PROJECT_CHANNELS.resolveChat, args),
   appendProjectChat: (args) => ipcRenderer.invoke(PROJECT_CHANNELS.appendChat, args),
   loadProjectChat: (args) => ipcRenderer.invoke(PROJECT_CHANNELS.loadChat, args),
+  rebindProjectChat: (args) => ipcRenderer.invoke(PROJECT_CHANNELS.rebindChat, args),
 }
 
 contextBridge.exposeInMainWorld('hwpApi', api)

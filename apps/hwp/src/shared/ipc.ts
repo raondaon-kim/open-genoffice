@@ -45,6 +45,7 @@ export const PROJECT_CHANNELS = {
   resolveChat: 'project:resolveChat',
   appendChat: 'project:appendChat',
   loadChat: 'project:loadChat',
+  rebindChat: 'project:rebindChat',
 } as const
 
 export interface SaveHwpRequest {
@@ -177,4 +178,10 @@ export interface HwpApi {
     chatId: string
     limit?: number
   }): Promise<ProjectChatMessage[]>
+  /** move an unsaved-* conversation to the file it was first saved as */
+  rebindProjectChat(args: {
+    projectId: string
+    tempChatId: string
+    newFilePath: string
+  }): Promise<AiConversationIdentity>
 }

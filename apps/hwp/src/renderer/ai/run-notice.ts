@@ -27,3 +27,14 @@ export function runEndText(end: RunEnd, lang: 'ko' | 'en'): string {
     ? '모델이 답 없이 끝냈습니다. 다시 요청하거나 다른 모델을 골라 보세요.'
     : 'The model ended without an answer. Ask again or pick another model.'
 }
+
+/**
+ * what goes into the saved transcript for a finished run: the model's text, or —
+ * when the model wrote nothing but tools ran — the end-of-run note, so the run's
+ * tool record survives a reload. Stopped runs and empty runs are not saved.
+ */
+export function persistedRunText(end: RunEnd, shown: string, toolCount: number): string | null {
+  if (end.cancelled) return null
+  if (end.text) return shown
+  return toolCount > 0 ? shown : null
+}

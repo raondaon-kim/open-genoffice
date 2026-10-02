@@ -8,7 +8,8 @@ import { AiComposer, Markdown, ModelPicker, ThinkingBox, thinkingLabels } from '
 import type { ModelPickerModel } from '@genoffice/ui'
 import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } from '../../shared/ipc'
 import { createHwpSkill, HWP_MAX_TURNS } from './hwp-skill'
-import { runEndText } from './run-notice'
+import { persistedRunText, runEndText } from './run-notice'
+import { shouldRebindChat } from './chat-identity'
 import { createElectronTransport } from './transport'
 import type { HwpAiContext, HwpAiDeps } from './context'
 import type { SnapshotStack } from './snapshots'
@@ -215,9 +216,14 @@ export function HwpAiPanel({
           )
           patchLast({ streaming: false, text: final })
           setBusy(false)
-          // notices are display-only: only a run where the model wrote something is saved
-          if (text && !cancelled) {
-            persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current, {
+          // a run is saved when the model wrote something or tools ran (keeps the tool record)
+          const saved = persistedRunText(
+            { text, cancelled, turnLimit, mutations: mutationsRef.current },
+            final,
+            runToolsRef.current.length,
+          )
+          if (saved) {
+            persistMessage('assistant', saved, runToolsRef.current, activeRunRouteRef.current, {
               reasoning,
               thinking,
             })
@@ -289,6 +295,29 @@ export function HwpAiPanel({
   // Route + transcript bootstrap per file
   useEffect(() => {
     let cancelled = false
+    const unsaved = conversationRef.current
+    if (filePath && unsaved && shouldRebindChat(unsaved, filePath)) {
+      // first save of an untitled tab: the conversation (and the loop's memory) stays
+      void (async () => {
+        try {
+          const identity = await window.hwpApi.rebindProjectChat({
+            projectId: unsaved.projectId,
+            tempChatId: unsaved.chatId,
+            newFilePath: filePath,
+          })
+          if (cancelled) return
+          conversationRef.current = identity
+          if (routeRef.current) {
+            await window.hwpApi.setAiConversationRoute(identity, routeRef.current).catch(() => {})
+          }
+        } catch {
+          // keep talking under the unsaved id; history still shows in this tab
+        }
+      })()
+      return () => {
+        cancelled = true
+      }
+    }
     setRouteReady(false)
     setChat([])
     loopRef.current?.reset()

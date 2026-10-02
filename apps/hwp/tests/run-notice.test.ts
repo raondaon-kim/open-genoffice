@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { HWP_MAX_TURNS } from '../src/renderer/ai/hwp-skill'
-import { runEndText } from '../src/renderer/ai/run-notice'
+import { persistedRunText, runEndText } from '../src/renderer/ai/run-notice'
 import type { RunEnd } from '../src/renderer/ai/run-notice'
 
 const end = (over: Partial<RunEnd> = {}): RunEnd => ({
@@ -42,5 +42,20 @@ describe('run end text', () => {
     expect(runEndText(end({ cancelled: true }), 'en')).toBe('Stopped.')
     expect(runEndText(end({ cancelled: true }), 'ko')).toBe('중지했습니다.')
     expect(runEndText(end({ cancelled: true, text: '부분' }), 'ko')).toBe('부분')
+  })
+})
+
+describe('persistedRunText', () => {
+  it('saves what the model wrote', () => {
+    expect(persistedRunText(end({ text: '완료' }), '완료', 0)).toBe('완료')
+  })
+
+  it('saves a run that used tools even without model text, with the notice', () => {
+    expect(persistedRunText(end({ turnLimit: true, mutations: 2 }), 'NOTE', 5)).toBe('NOTE')
+  })
+
+  it('does not save a stopped run or an empty run without tools', () => {
+    expect(persistedRunText(end({ cancelled: true, text: '부분' }), '부분', 3)).toBeNull()
+    expect(persistedRunText(end(), 'NOTE', 0)).toBeNull()
   })
 })
