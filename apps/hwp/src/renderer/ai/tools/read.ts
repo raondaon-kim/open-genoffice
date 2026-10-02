@@ -8,7 +8,8 @@ export const READ_PAGES_MAX = 10
 export const READ_CHARS_CAP = 24_000
 export const TABLE_CELLS_CAP = 400
 export const FIND_DEFAULT_LIMIT = 20
-export const FORM_MAP_PARAGRAPHS_CAP = 300
+export const FORM_MAP_PARAGRAPHS_CAP = 150
+export const FORM_MAP_CHARS_CAP = READ_CHARS_CAP
 
 type Rec = Record<string, unknown>
 const arr = (value: unknown): Rec[] => (Array.isArray(value) ? (value as Rec[]) : [])
@@ -73,7 +74,7 @@ const tools: AgentToolDef[] = [
   {
     name: 'form_map',
     description:
-      'Map a form in ONE call: every form field (누름틀: name, guide, value, empty?), every table with each cell (row, col, text, empty?) and every body paragraph (section, paragraph, a short preview, full length, empty?, hasTable). Use it first when filling a form or a document with blanks, instead of calling find/read_table per cell. Paragraph previews are cut by the engine — use find or read_pages for the full text. Long documents return up to 300 paragraphs; continue with paragraphsFrom.',
+      'Map a form in ONE call: every form field (누름틀: name, guide, value, empty?), every table with each cell (row, col, text, empty?) and every body paragraph (section, paragraph, a short preview, full length, empty?, hasTable). Use it first when filling a form or a document with blanks, instead of calling find/read_table per cell. Paragraph previews are cut by the engine — use find or read_pages for the full text. The result stays within 24,000 characters: long documents return up to 150 paragraphs per call (continue with paragraphsFrom — later parts return only paragraphs), and large tables are cut at 400 cells in total (each table gives cellCount and truncated; read the rest with read_table).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -268,6 +269,7 @@ async function listFields(ctx: HwpAiContext): Promise<ToolExecution> {
 
 async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
   const from = intArg(input, 'paragraphsFrom', { min: 0, fallback: 0 })
+  const continuing = from > 0
   const unavailable: string[] = []
   const part = async (name: 'fields' | 'export_tables' | 'paragraphs', label: string) => {
     try {
@@ -277,39 +279,52 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
       return null
     }
   }
-  // one after another: each runQuery may send the snapshot first
-  const fieldsEnv = await part('fields', 'fields')
-  const tablesEnv = await part('export_tables', 'tables')
+  // one after another: each runQuery may send the snapshot first; a continuation
+  // (paragraphsFrom > 0) only needs the paragraphs again
+  const fieldsEnv = continuing ? null : await part('fields', 'fields')
+  const tablesEnv = continuing ? null : await part('export_tables', 'tables')
   const paragraphsEnv = await part('paragraphs', 'paragraphs')
+  const allParagraphs = arr(paragraphsEnv?.paragraphs)
+  // every body has at least one paragraph: an empty list means dump was not understood
+  if (paragraphsEnv && allParagraphs.length === 0) unavailable.push('paragraphs')
+
   const nonce = newNonce()
   const blank = (text: string) => text.trim().length === 0
-  const fields = arr(fieldsEnv?.fields).map((f) => ({
-    name: wrapText(str(f.name), nonce),
-    guide: wrapText(str(f.guide), nonce),
-    value: wrapText(str(f.value), nonce),
-    empty: blank(str(f.value)),
-  }))
+  const fields = arr(fieldsEnv?.fields).map((f) => {
+    const location = (f.location as Rec | undefined) ?? {}
+    return {
+      name: wrapText(str(f.name), nonce),
+      guide: wrapText(str(f.guide), nonce),
+      value: wrapText(str(f.value), nonce),
+      empty: blank(str(f.value)),
+      fieldType: f.fieldType,
+      section: location.section,
+      paragraph: location.paragraph,
+    }
+  })
+  const cellOf = (c: Rec) => ({
+    row: c.row,
+    col: c.col,
+    rowSpan: c.rowSpan,
+    colSpan: c.colSpan,
+    text: wrapText(str(c.text), nonce),
+    empty: blank(str(c.text)),
+  })
   let cellBudget = TABLE_CELLS_CAP
-  let tablesTruncated = false
   const tables = arr(tablesEnv?.tables).map((t) => {
-    const cells = arr(t.cells)
-    const kept = cells.slice(0, Math.max(0, cellBudget))
+    const source = arr(t.cells)
+    const kept = source.slice(0, Math.max(0, cellBudget))
     cellBudget -= kept.length
-    if (kept.length < cells.length) tablesTruncated = true
     return {
       index: t.index,
       rows: t.rows,
       cols: t.cols,
-      cells: kept.map((c) => ({
-        row: c.row,
-        col: c.col,
-        text: wrapText(str(c.text), nonce),
-        empty: blank(str(c.text)),
-      })),
+      cellCount: source.length,
+      truncated: kept.length < source.length,
+      cells: kept.map(cellOf),
     }
   })
-  const allParagraphs = arr(paragraphsEnv?.paragraphs)
-  const paragraphs = allParagraphs.slice(from, from + FORM_MAP_PARAGRAPHS_CAP).map((p) => ({
+  const page = allParagraphs.slice(from, from + FORM_MAP_PARAGRAPHS_CAP).map((p) => ({
     section: p.section,
     paragraph: p.paragraph,
     preview: wrapText(str(p.preview), nonce),
@@ -317,24 +332,52 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
     empty: p.empty === true,
     hasTable: p.hasTable === true,
   }))
+
   const emptyCells = tables.reduce((n, t) => n + t.cells.filter((c) => c.empty).length, 0)
-  const summary = [
-    `${fields.length} form field(s) (${fields.filter((f) => f.empty).length} empty)`,
-    `${tables.length} table(s) (${emptyCells} empty cell(s))`,
-    `${allParagraphs.length} body paragraph(s) (${allParagraphs.filter((p) => p.empty === true).length} empty)`,
-  ].join(', ')
-  const next = from + FORM_MAP_PARAGRAPHS_CAP
-  return {
-    output: JSON.stringify({
+  const summary = continuing
+    ? `${allParagraphs.length} body paragraph(s); this part starts at ${from}`
+    : [
+        `${fields.length} form field(s) (${fields.filter((f) => f.empty).length} empty)`,
+        `${tables.length} table(s) (${emptyCells} empty cell(s) among those listed)`,
+        `${allParagraphs.length} body paragraph(s) (${allParagraphs.filter((p) => p.empty === true).length} empty)`,
+      ].join(', ')
+  const render = () => {
+    const next = from + page.length
+    const cutTables = tables.filter((t) => t.truncated).map((t) => t.index)
+    const hints = [
+      next < allParagraphs.length
+        ? `call form_map {paragraphsFrom: ${next}} for more paragraphs`
+        : '',
+      cutTables.length ? `read_table {index} for the rest of table(s) ${cutTables.join(', ')}` : '',
+    ].filter(Boolean)
+    return JSON.stringify({
       summary,
-      fields,
-      tables,
-      tablesTruncated,
-      paragraphs,
+      ...(continuing ? {} : { fields, tables }),
+      paragraphs: page,
       ...(next < allParagraphs.length ? { nextParagraphsFrom: next } : {}),
+      ...(hints.length ? { truncated: true, hint: hints.join('; ') } : {}),
       ...(unavailable.length ? { unavailable } : {}),
-    }),
-    summary: `form map: ${fields.length} field(s), ${tables.length} table(s), ${allParagraphs.length} paragraph(s)`,
+    })
+  }
+  // stay within the character budget: drop paragraphs from the end first, then
+  // cells from the last listed tables (both are announced in `hint`)
+  let output = render()
+  while (output.length > FORM_MAP_CHARS_CAP) {
+    if (page.length > 0) {
+      page.splice(-Math.max(1, Math.ceil(page.length / 8)))
+    } else {
+      const table = [...tables].reverse().find((t) => t.cells.length > 0)
+      if (!table) break
+      table.cells.splice(-Math.max(1, Math.ceil(table.cells.length / 4)))
+      table.truncated = true
+    }
+    output = render()
+  }
+  return {
+    output,
+    summary: continuing
+      ? `form map: paragraphs from ${from}`
+      : `form map: ${fields.length} field(s), ${tables.length} table(s), ${allParagraphs.length} paragraph(s)`,
   }
 }
 
