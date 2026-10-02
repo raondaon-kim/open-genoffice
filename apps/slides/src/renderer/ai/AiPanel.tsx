@@ -1,5 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { AgentLoop, composeSkills, type AgentImage, type ToolDisplay } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  composeSkills,
+  toRestorableMessages,
+  type AgentImage,
+  type ToolDisplay,
+} from '@genoffice/agent-core'
 import { codexSignInNotice, openRouterRetrySuggestion } from '@genoffice/ai-provider'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type {
@@ -32,7 +38,13 @@ import {
 import { renderSlidesToPngBase64 } from '../export-render'
 import { isQcEnabled, mergeQcPages, qcSlidePage, QC_MAX_PAGES } from './slide-qc'
 import { useI18n, t as tGlobal, aiLangDirective, type TFunc } from '../i18n/locale'
-import { Markdown, ModelPicker, type ModelPickerModel } from '@genoffice/ui'
+import {
+  Markdown,
+  ModelPicker,
+  ThinkingBox,
+  thinkingLabels,
+  type ModelPickerModel,
+} from '@genoffice/ui'
 import { AiMark } from '../components/icons'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
@@ -129,6 +141,8 @@ interface ChatEntry {
   error?: string
   /** A failed model turn may be retried through OpenRouter's router. */
   retrySuggestion?: string
+  /** what the thinking box shows for this turn */
+  thinking?: string
   streaming?: boolean
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
@@ -256,7 +270,7 @@ export function AiPanel({
   onDeckProgress,
   currentFilePath,
 }: AiPanelProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [chat, setChat] = useState<ChatEntry[]>([])
@@ -442,6 +456,7 @@ export function AiPanel({
           msgs.map((message) => ({
             role: message.role,
             text: message.text,
+            ...(message.thinking ? { thinking: message.thinking } : {}),
             tools: message.tools?.map((tool) => ({
               name: tool.name,
               summary: tool.summary,
@@ -451,9 +466,7 @@ export function AiPanel({
           })),
         )
         // Reopening keeps one model conversation; only the document-scoped route may change.
-        loopRef.current?.restore(
-          msgs.map((message) => ({ role: message.role, text: message.text })),
-        )
+        loopRef.current?.restore(toRestorableMessages(msgs))
       })
       .catch(() => {
         setRouteReady(true)
@@ -493,6 +506,7 @@ export function AiPanel({
       output?: string
     }>,
     attachments?: AttachmentMeta[],
+    thought?: { reasoning?: string | undefined; thinking?: string | undefined },
   ) => {
     const ids = chatRefIds.current
     const api = (window as Window & { projectApi?: typeof window.projectApi }).projectApi
@@ -521,6 +535,8 @@ export function AiPanel({
               },
             }
           : {}),
+        ...(role === 'assistant' && thought?.reasoning ? { reasoning: thought.reasoning } : {}),
+        ...(role === 'assistant' && thought?.thinking ? { thinking: thought.thinking } : {}),
       })
       .catch(() => {
         /* Silent */
@@ -1023,6 +1039,7 @@ export function AiPanel({
       // Page-by-page deck generation needs more tool rounds
       maxTurns: 24,
       events: {
+        onThinking: (thinking) => patchLastAssistant({ thinking }),
         onText: (text) => patchLastAssistant({ text }),
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -1066,7 +1083,7 @@ export function AiPanel({
           patchLastAssistant({ streaming: false })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
-        onDone: ({ text, cancelled, turnLimit }) => {
+        onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
           const finalText = turnLimit
             ? [text, tGlobal('aiTurnLimit')].filter(Boolean).join('\n\n')
             : text || (cancelled ? tGlobal('aiStoppedNote') : '')
@@ -1085,7 +1102,10 @@ export function AiPanel({
           // Persist the assistant message (deckProgress not stored; tools store the whole run's full activity) —
           // side effects outside the updater (StrictMode double-invokes updaters, duplicating history writes)
           if (finalText && !cancelled) {
-            persistMessage('assistant', finalText, runToolsRef.current)
+            persistMessage('assistant', finalText, runToolsRef.current, undefined, {
+              reasoning,
+              thinking,
+            })
           }
         },
         onError: (error) => {
@@ -1638,6 +1658,9 @@ export function AiPanel({
           <>
             {historicChat.map((entry, i) => (
               <div key={`h${i}`} className={`ai-msg ai-msg-${entry.role} ai-msg-historic`}>
+                {entry.role === 'assistant' && entry.thinking && (
+                  <ThinkingBox text={entry.thinking} live={false} labels={thinkingLabels(lang)} />
+                )}
                 {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && <Markdown text={entry.text} />}
               </div>
@@ -1703,6 +1726,13 @@ export function AiPanel({
               key={i}
               className={`ai-msg ai-msg-${entry.role}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
+              {entry.role === 'assistant' && entry.thinking && (
+                <ThinkingBox
+                  text={entry.thinking}
+                  live={Boolean(entry.streaming && !entry.text)}
+                  labels={thinkingLabels(lang)}
+                />
+              )}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator
