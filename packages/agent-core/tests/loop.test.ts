@@ -977,6 +977,46 @@ describe('composeSkills', () => {
 })
 
 describe('AgentLoop thinking', () => {
+  it('the compaction summary request does not carry the reasoning of the turns it folds', async () => {
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onThinking?.('r'.repeat(600), 'reasoning')
+        cb.onDelta('first reply')
+        cb.onDone()
+      },
+      (cb) => {
+        cb.onDelta('second-turn reply')
+        cb.onDone()
+      },
+      // the 3rd run triggers compaction: this stream call is the summary request
+      (cb) => {
+        cb.onDelta('Goal: tested')
+        cb.onDone()
+      },
+      (cb) => {
+        cb.onDelta('continuing')
+        cb.onDone()
+      },
+    ])
+    const loop = new AgentLoop({
+      transport,
+      skill: makeSkill(),
+      compaction: { maxBytes: 500, keepRecentBytes: 100 },
+    })
+    loop.run('old instruction')
+    await flush()
+    loop.run('second question')
+    await flush()
+    loop.run('follow-up')
+    await flush()
+    expect(transport.requests).toHaveLength(4)
+    const summaryRequest = transport.requests[2]!
+    expect(summaryRequest.messages.some((m) => m.role === 'assistant')).toBe(true)
+    expect(summaryRequest.messages.some((m) => m.role === 'assistant' && 'reasoning' in m)).toBe(
+      false,
+    )
+  })
+
   it("keeps each turn's raw reasoning on its assistant message and reports the run's thinking", async () => {
     const transport = scriptedTransport([
       (cb) => {

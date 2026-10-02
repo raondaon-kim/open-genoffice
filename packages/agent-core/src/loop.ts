@@ -443,6 +443,11 @@ export class AgentLoop<TSnapshot = unknown> {
         }
       }
       if (m.role === 'user' && m.images?.length) return { role: 'user' as const, text: m.text }
+      // the folded turns' reasoning would only inflate the request that exists to shrink the history
+      if (m.role === 'assistant' && m.reasoning) {
+        const { reasoning: _dropped, ...rest } = m
+        return rest
+      }
       return m
     })
     return new Promise((resolve) => {
