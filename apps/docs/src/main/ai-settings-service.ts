@@ -6,6 +6,7 @@ import {
   migrateLegacyRoute,
   resolveAiSettings,
   verifyProviderApiKey,
+  type AiModelSummary,
   type AiProviderConfig,
   type AiProviderId,
   type AiProviderVerificationResult,
@@ -339,10 +340,15 @@ export class AiSettingsService {
         throw new Error(`No API key configured for ${this.providerLabel(route.providerId)}`)
       }
     }
-    const result = await this.options.catalogs.list([route.providerId as PublicAiProviderId])
-    const model = result.models.find(
-      (candidate) => candidate.providerId === route.providerId && candidate.id === route.modelId,
-    )
+    const providerIds = [route.providerId as PublicAiProviderId]
+    const find = (models: AiModelSummary[]) =>
+      models.find(
+        (candidate) => candidate.providerId === route.providerId && candidate.id === route.modelId,
+      )
+    let model = find((await this.options.catalogs.list(providerIds)).models)
+    // a catalog cached before the provider changed its lineup (e.g. a migrated deepseek-flash route
+    // against a pre-V4 cache) is refreshed once before the model is called unavailable
+    if (!model) model = find((await this.options.catalogs.list(providerIds, {}, true)).models)
     if (!model) {
       throw new Error(`${route.modelId} is unavailable; refresh models and choose a replacement`)
     }

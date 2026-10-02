@@ -315,3 +315,54 @@ describe('retired DeepSeek model names', () => {
     })
   })
 })
+
+describe('route availability against a stale model catalog', () => {
+  const model = (id: string) => ({
+    id,
+    canonicalId: id,
+    providerId: 'deepseek' as const,
+    name: id,
+    expiresAt: null,
+    available: true,
+    capabilities: {
+      inputModalities: ['text'],
+      outputModalities: ['text'],
+      supportsTools: true,
+      contextWindow: null,
+      maxOutputTokens: null,
+    },
+  })
+  const build = (list: ReturnType<typeof vi.fn>) =>
+    new AiSettingsService({
+      settingsPath: join(mkdtempSync(join(tmpdir(), 'genoffice-ai-stale-')), 'ai-settings.json'),
+      secretStore: { status: () => 'ready' } as never,
+      catalogs: { list } as never,
+      isGensparkConfigured: () => false,
+    })
+
+  it('refreshes the catalog once before calling a model unavailable', async () => {
+    // a catalog cached before V4 still lists only the retired names until it is refreshed
+    const list = vi.fn(async (_ids: unknown, _requirements: unknown, force?: boolean) => ({
+      models: [model(force ? 'deepseek-flash' : 'deepseek-chat')],
+      catalogs: [],
+    }))
+    const service = build(list)
+    await expect(
+      service.assertRouteAvailable({ providerId: 'deepseek', modelId: 'deepseek-flash' }),
+    ).resolves.toBeUndefined()
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(list.mock.calls[1]![2]).toBe(true)
+  })
+
+  it('still reports a model that is missing after the refresh, and does not refresh a found one', async () => {
+    const missing = vi.fn(async () => ({ models: [model('deepseek-flash')], catalogs: [] }))
+    await expect(
+      build(missing).assertRouteAvailable({ providerId: 'deepseek', modelId: 'nope' }),
+    ).rejects.toThrow('nope is unavailable')
+    expect(missing).toHaveBeenCalledTimes(2)
+
+    const found = vi.fn(async () => ({ models: [model('deepseek-flash')], catalogs: [] }))
+    await build(found).assertRouteAvailable({ providerId: 'deepseek', modelId: 'deepseek-flash' })
+    expect(found).toHaveBeenCalledTimes(1)
+  })
+})
