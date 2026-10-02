@@ -7,7 +7,8 @@ import type { AiModelSummary, AiRoute } from '@genoffice/ai-provider'
 import { AiComposer, Markdown, ModelPicker, ThinkingBox, thinkingLabels } from '@genoffice/ui'
 import type { ModelPickerModel } from '@genoffice/ui'
 import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } from '../../shared/ipc'
-import { createHwpSkill } from './hwp-skill'
+import { createHwpSkill, HWP_MAX_TURNS } from './hwp-skill'
+import { runEndText } from './run-notice'
 import { createElectronTransport } from './transport'
 import type { HwpAiContext, HwpAiDeps } from './context'
 import type { SnapshotStack } from './snapshots'
@@ -130,6 +131,10 @@ export function HwpAiPanel({
   const [routeValidated, setRouteValidated] = useState(false)
   const [modelNotice, setModelNotice] = useState<string | null>(null)
   const [lang, setLang] = useState<'en' | 'ko'>('en')
+  // the loop is built once; its callbacks read the current language through a ref
+  const langRef = useRef(lang)
+  langRef.current = lang
+  const mutationsRef = useRef(0)
   const [templateBusy, setTemplateBusy] = useState<string | null>(null)
   const [undoDepth, setUndoDepth] = useState(() => deps.stack.depth)
   const [chips, setChips] = useState<string[]>([])
@@ -166,6 +171,7 @@ export function HwpAiPanel({
     loopRef.current = new AgentLoop({
       transport: transportRef.current,
       skill: createHwpSkill(ctxRef.current),
+      maxTurns: HWP_MAX_TURNS,
       events: {
         onThinking: (thinking) => {
           setPhase('thinking')
@@ -177,6 +183,7 @@ export function HwpAiPanel({
         },
         onToolExecuted: ({ call, execution }) => {
           setPhase('working')
+          if (execution.mutated) mutationsRef.current++
           runToolsRef.current.push({
             name: call.name,
             summary: execution.summary,
@@ -202,15 +209,14 @@ export function HwpAiPanel({
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
         onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
-          const final = turnLimit
-            ? [text, 'Turn limit reached.'].filter(Boolean).join('\n\n')
-            : text || (cancelled ? 'Stopped.' : '')
-          patchLast((last) => ({
-            streaming: false,
-            text: final || (last.tools?.length ? last.text : 'No reply.'),
-          }))
+          const final = runEndText(
+            { text, cancelled, turnLimit, mutations: mutationsRef.current },
+            langRef.current,
+          )
+          patchLast({ streaming: false, text: final })
           setBusy(false)
-          if (final && !cancelled) {
+          // notices are display-only: only a run where the model wrote something is saved
+          if (text && !cancelled) {
             persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current, {
               reasoning,
               thinking,
@@ -468,6 +474,7 @@ export function HwpAiPanel({
     setBusy(true)
     setPhase('thinking')
     runToolsRef.current = []
+    mutationsRef.current = 0
     activeRunRouteRef.current = route
     persistMessage('user', instruction)
     try {

@@ -12,6 +12,9 @@ const MODULES: ToolModule[] = [readTools, editTools, formatTools, queryTools, cr
 
 export const AGENT_TOOLS: AgentToolDef[] = MODULES.flatMap((module) => module.tools)
 
+/** form filling takes several read/edit rounds; form_map keeps the real count low */
+export const HWP_MAX_TURNS = 20
+
 export const SYSTEM_PROMPT = `You are GenOffice's Hangul document assistant. You read, edit, format and create .hwp/.hwpx documents with the tools below. ${FENCE_RULE}
 
 # Coordinates — never guess them
