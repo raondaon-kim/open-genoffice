@@ -42,6 +42,12 @@ Other versions are on the [Releases](https://github.com/sergedoub/open-genoffice
   footnotes/headers and paragraph formatting as verified file edits with a
   one-step undo; quoted document text is fenced as data before it reaches the
   model.
+- "HWP from a form" on Home opens a copy of any `.hwp`/`.hwpx` form you have as
+  a new, untitled document (the form file itself is never written to; Save As
+  proposes `<form>_작성`), and the assistant fills it: `form_map` reads every
+  form field, table cell and paragraph in one call, `delete_table` removes
+  guidance tables, and forms whose layout the engine cannot round-trip exactly
+  are checked by their field/table/paragraph summary instead.
 - The Hangul AI can _create_ rich documents (reports, syllabi, announcements)
   — text **and real tables** in one file — by generating `.hwpx` through the
   HwpForge engine (MIT/Apache-2.0), and ships a built-in K-12 school-form

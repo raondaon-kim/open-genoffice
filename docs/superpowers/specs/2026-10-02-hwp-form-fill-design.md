@@ -1,7 +1,7 @@
 # 양식으로 새 문서 (한글 양식 채우기) 설계
 
 - 날짜: 2026-10-02
-- 상태: 설계 승인, 구현 전
+- 상태: 구현 완료 (2026-10-02) — 계획 docs/superpowers/plans/2026-10-02-hwp-form-fill.md
 - 브랜치: `feat/hwp-form-fill` (기반: `feat/ai-thinking-stream` — 그 아래 `feat/hwp-ai-engine-surface`, 둘 다 main에 병합 전)
 - 범위: `apps/hwp`(열기 방식, AI 도구, 편집 체인 검증, 패널 안내), `apps/shell`(홈 카드·메뉴·파일 선택), 시스템 프롬프트.
 - 선행 확인: 2026-10-02 실제 양식 확인 (서울시 정보소통광장 hwpx 4종, 프리폼 hwp 13종 중 6종을 앱 AI 패널로 채움). 결과는 §1.

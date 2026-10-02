@@ -34,6 +34,11 @@ The fork's material changes include:
   `deepseek-chat` / `deepseek-reasoner` names in stored routes are read as
   `deepseek-flash`); requests run in thinking mode without `temperature`, with one
   retry in plain mode if the server rejects missing `reasoning_content`;
+- "HWP from a form": a Home card opens a copy of a user's form as an untitled
+  Hangul tab (bytes only, 50 MB cap, Save As proposes `<form>_작성`); the Hangul
+  assistant gains `form_map` (fields, table cells and paragraphs from `rhwp dump`),
+  `delete_table`, a document-summary check for forms that fail the engine's save
+  round-trip check, 20 turns and clear end-of-run notes;
 - test builds: `GENOFFICE_SEED_DEEPSEEK_API_KEY` pre-loads a DeepSeek key through the
   normal verify-and-encrypt path when the profile has none;
 - provider-aware error handling and bounded retry suggestions;
