@@ -1129,18 +1129,31 @@ export function Home() {
     void window.aiOffice.newHwp(selectedProjectId ? { projectId: selectedProjectId } : undefined)
   }
 
+  const handleNewHwpFromForm = () => {
+    void window.aiOffice.newHwpFromForm(
+      selectedProjectId ? { projectId: selectedProjectId } : undefined,
+    )
+  }
+
   const NEW_ITEMS = [
-    { ext: 'docx', title: t('newDoc'), sub: '.docx', action: handleNewDoc },
-    { ext: 'xlsx', title: t('newSheet'), sub: '.xlsx', action: handleNewSheet },
-    { ext: 'pptx', title: t('newSlide'), sub: '.pptx', action: handleNewSlide },
-    { ext: 'hwp', title: t('newHwp'), sub: '.hwp', action: handleNewHwp },
+    { id: 'docx', ext: 'docx', title: t('newDoc'), sub: '.docx', action: handleNewDoc },
+    { id: 'xlsx', ext: 'xlsx', title: t('newSheet'), sub: '.xlsx', action: handleNewSheet },
+    { id: 'pptx', ext: 'pptx', title: t('newSlide'), sub: '.pptx', action: handleNewSlide },
+    { id: 'hwp', ext: 'hwp', title: t('newHwp'), sub: '.hwp', action: handleNewHwp },
+    {
+      id: 'hwp-form',
+      ext: 'hwp',
+      title: t('newHwpFromForm'),
+      sub: t('newHwpFromFormSub'),
+      action: handleNewHwpFromForm,
+    },
   ]
 
   function renderQuickCards() {
     return (
       <div className="quick-cards">
         {NEW_ITEMS.map((item) => (
-          <button key={item.ext} className="quick-card" onClick={() => void item.action()}>
+          <button key={item.id} className="quick-card" onClick={() => void item.action()}>
             <FileBadge ext={item.ext} size={30} />
             <span className="quick-text">
               <span className="quick-title-row">

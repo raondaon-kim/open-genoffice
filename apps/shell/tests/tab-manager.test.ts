@@ -90,6 +90,18 @@ vi.mock('../../slides/src/main/slides-main', () => ({
   slidesIsDirty: (...args: unknown[]) => slidesIsDirty(...(args as [])),
 }))
 
+const createHwpView = vi.fn(() => makeFakeView())
+const queueHwpForm = vi.fn()
+const markHwpNewBlank = vi.fn()
+
+vi.mock('../../hwp/src/main/hwp-main', () => ({
+  createHwpView: (...args: unknown[]) => createHwpView(...(args as [])),
+  hwpIsDirty: () => false,
+  markHwpNewBlank: (...args: unknown[]) => markHwpNewBlank(...args),
+  queueHwpForm: (...args: unknown[]) => queueHwpForm(...args),
+  requestHwpClose: () => Promise.resolve(true),
+}))
+
 import { TabManager } from '../src/main/tab-manager'
 
 const TAB_STRIP_HEIGHT = 40
@@ -432,5 +444,21 @@ describe('dirty-tab queries (shell close guard)', () => {
     manager.openSheetsTab()
     manager.openDocsTab('/tmp/a.docx')
     expect(manager.docsTabs().map((t) => t.id)).toEqual(['t1', 't3'])
+  })
+})
+
+describe('openHwpFormTab', () => {
+  it('opens an untitled hwp tab that receives a copy of the form, never its path', () => {
+    const data = new Uint8Array([7]).buffer
+    manager.openHwpFormTab({ fileName: '품의서.hwp', data }, '품의서 (새 문서)')
+    const view = lastCreatedView(createHwpView)
+    expect(createHwpView).toHaveBeenCalledWith()
+    expect(queueHwpForm).toHaveBeenCalledWith(view.webContents.id, { fileName: '품의서.hwp', data })
+    expect(markHwpNewBlank).not.toHaveBeenCalled()
+    expect(manager.list().at(-1)).toMatchObject({
+      kind: 'hwp',
+      title: '품의서 (새 문서)',
+      active: true,
+    })
   })
 })

@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { readFile, stat } from 'node:fs/promises'
 import { basename, dirname, extname, join } from 'node:path'
 import {
   BrowserWindow,
@@ -87,6 +88,7 @@ import { HOME_CHANNELS } from '../shared/home-api'
 import type { TabKind } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { normalizeRecentQuery, pageRecentPaths, statExistingPaths } from './recent-files'
+import { loadFormFile } from './hwp-form-open'
 import { TabManager } from './tab-manager'
 import { initAutoUpdater } from './updater'
 import {
@@ -239,6 +241,7 @@ const tMain = createI18n({
     untitledDoc: '未命名文档',
     untitledDeck: '未命名演示文稿',
     untitledHwp: '未命名 HWP',
+    untitledFromForm: '{name}（新建）',
     menuNewSlide: 'AI Slides',
     menuOpen: '打开…',
     menuSave: '保存',
@@ -274,6 +277,7 @@ const tMain = createI18n({
     untitledDoc: 'Untitled Document',
     untitledDeck: 'Untitled Presentation',
     untitledHwp: 'Untitled HWP',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Open…',
     menuSave: 'Save',
@@ -309,6 +313,7 @@ const tMain = createI18n({
     untitledDoc: '無題のドキュメント',
     untitledDeck: '無題のプレゼンテーション',
     untitledHwp: '無題の HWP',
+    untitledFromForm: '{name}（新規）',
     menuNewSlide: 'AI Slides',
     menuOpen: '開く…',
     menuSave: '保存',
@@ -344,6 +349,7 @@ const tMain = createI18n({
     untitledDoc: '제목 없는 문서',
     untitledDeck: '제목 없는 프레젠테이션',
     untitledHwp: '제목 없는 HWP',
+    untitledFromForm: '{name} (새 문서)',
     menuNewSlide: 'AI Slides',
     menuOpen: '열기…',
     menuSave: '저장',
@@ -379,6 +385,7 @@ const tMain = createI18n({
     untitledDoc: 'Document sans titre',
     untitledDeck: 'Présentation sans titre',
     untitledHwp: 'HWP sans titre',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Ouvrir…',
     menuSave: 'Enregistrer',
@@ -414,6 +421,7 @@ const tMain = createI18n({
     untitledDoc: 'Unbenanntes Dokument',
     untitledDeck: 'Unbenannte Präsentation',
     untitledHwp: 'Unbenanntes HWP',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Öffnen…',
     menuSave: 'Speichern',
@@ -449,6 +457,7 @@ const tMain = createI18n({
     untitledDoc: 'Documento sin título',
     untitledDeck: 'Presentación sin título',
     untitledHwp: 'HWP sin título',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Abrir…',
     menuSave: 'Guardar',
@@ -484,6 +493,7 @@ const tMain = createI18n({
     untitledDoc: 'เอกสารไม่มีชื่อ',
     untitledDeck: 'งานนำเสนอไม่มีชื่อ',
     untitledHwp: 'HWP ที่ยังไม่มีชื่อ',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'เปิด…',
     menuSave: 'บันทึก',
@@ -519,6 +529,7 @@ const tMain = createI18n({
     untitledDoc: 'Dokumen tanpa judul',
     untitledDeck: 'Presentasi tanpa judul',
     untitledHwp: 'HWP Tanpa Judul',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
@@ -554,6 +565,7 @@ const tMain = createI18n({
     untitledDoc: 'Документ без названия',
     untitledDeck: 'Презентация без названия',
     untitledHwp: 'Безымянный HWP',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Открыть…',
     menuSave: 'Сохранить',
@@ -589,6 +601,7 @@ const tMain = createI18n({
     untitledDoc: 'مستند بدون عنوان',
     untitledDeck: 'عرض تقديمي بدون عنوان',
     untitledHwp: 'HWP بدون عنوان',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'فتح…',
     menuSave: 'حفظ',
@@ -624,6 +637,7 @@ const tMain = createI18n({
     untitledDoc: 'Documento sem título',
     untitledDeck: 'Apresentação sem título',
     untitledHwp: 'HWP sem título',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Abrir…',
     menuSave: 'Salvar',
@@ -659,6 +673,7 @@ const tMain = createI18n({
     untitledDoc: 'Documento senza titolo',
     untitledDeck: 'Presentazione senza titolo',
     untitledHwp: 'HWP senza titolo',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Apri…',
     menuSave: 'Salva',
@@ -694,6 +709,7 @@ const tMain = createI18n({
     untitledDoc: 'Dokument bez tytułu',
     untitledDeck: 'Prezentacja bez tytułu',
     untitledHwp: 'HWP bez nazwy',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Otwórz…',
     menuSave: 'Zapisz',
@@ -729,6 +745,7 @@ const tMain = createI18n({
     untitledDoc: 'Naamloos document',
     untitledDeck: 'Naamloze presentatie',
     untitledHwp: 'Naamloos HWP',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Openen…',
     menuSave: 'Opslaan',
@@ -764,6 +781,7 @@ const tMain = createI18n({
     untitledDoc: 'Dokumen tanpa tajuk',
     untitledDeck: 'Persembahan tanpa tajuk',
     untitledHwp: 'HWP Tanpa Tajuk',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
@@ -799,6 +817,7 @@ const tMain = createI18n({
     untitledDoc: 'מסמך ללא שם',
     untitledDeck: 'מצגת ללא שם',
     untitledHwp: 'HWP ללא שם',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'פתיחה…',
     menuSave: 'שמירה',
@@ -834,6 +853,7 @@ const tMain = createI18n({
     untitledDoc: 'बिना शीर्षक दस्तावेज़',
     untitledDeck: 'बिना शीर्षक प्रस्तुति',
     untitledHwp: 'अनाम HWP',
+    untitledFromForm: '{name} (new)',
     menuNewSlide: 'AI Slides',
     menuOpen: 'खोलें…',
     menuSave: 'सहेजें',
@@ -869,6 +889,7 @@ const tMain = createI18n({
     untitledDoc: '未命名文件',
     untitledDeck: '未命名簡報',
     untitledHwp: '未命名 HWP',
+    untitledFromForm: '{name}（新建）',
     menuNewSlide: 'AI Slides',
     menuOpen: '開啟…',
     menuSave: '儲存',
@@ -1339,6 +1360,27 @@ function registerHomeIpc(): void {
       pendingNewFileProject.set('hwp', opts.projectId)
     }
     tabManager?.openHwpTab(undefined, { newBlank: true })
+  })
+
+  ipcMain.handle(HOME_CHANNELS.newHwpFromForm, async (event, opts?: { projectId?: string }) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
+    if (!win) return
+    const picked = await dialog.showOpenDialog(win, {
+      title: tm('dlgOpenTitle'),
+      filters: [{ name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] }],
+      properties: ['openFile'],
+    })
+    if (picked.canceled || !picked.filePaths[0]) return
+    const form = await loadFormFile(picked.filePaths[0], { stat, readFile })
+    if (!form.ok) {
+      await dialog.showMessageBox(win, { type: 'warning', message: form.error })
+      return
+    }
+    if (opts?.projectId && opts.projectId !== 'default') {
+      pendingNewFileProject.set('hwp', opts.projectId)
+    }
+    const name = form.fileName.replace(/\.(hwp|hwpx)$/i, '')
+    tabManager?.openHwpFormTab(form, tm('untitledFromForm', { name }))
   })
 
   ipcMain.handle(HOME_CHANNELS.removeRecent, (_event, paths: unknown) => {

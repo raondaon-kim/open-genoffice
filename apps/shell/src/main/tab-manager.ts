@@ -13,6 +13,7 @@ import {
   createHwpView,
   hwpIsDirty,
   markHwpNewBlank,
+  queueHwpForm,
   requestHwpClose,
 } from '../../../hwp/src/main/hwp-main'
 import { createPdfView, pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
@@ -197,6 +198,19 @@ export class TabManager {
       title: openPath ? basename(openPath) : this.untitled('hwp', 'Open GenOffice HWP'),
       filePath: openPath,
     })
+    this.activateTab(id)
+    return id
+  }
+
+  /** "New document from a form": an untitled hwp tab that opens a COPY of the form */
+  openHwpFormTab(form: { fileName: string; data: ArrayBuffer }, title: string): string {
+    const view = createHwpView()
+    queueHwpForm(view.webContents.id, { fileName: form.fileName, data: form.data })
+    const id = `t${this.nextId++}`
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.trackHtmlFullScreen(id, view)
+    this.tabs.push({ id, kind: 'hwp', view, title })
     this.activateTab(id)
     return id
   }

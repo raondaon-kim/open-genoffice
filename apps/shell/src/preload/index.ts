@@ -86,6 +86,9 @@ const homeApi: HomeApi = {
   async newHwp(opts) {
     await ipcRenderer.invoke(HOME_CHANNELS.newHwp, opts)
   },
+  async newHwpFromForm(opts) {
+    await ipcRenderer.invoke(HOME_CHANNELS.newHwpFromForm, opts)
+  },
   async removeRecent(paths) {
     await ipcRenderer.invoke(HOME_CHANNELS.removeRecent, paths)
   },
