@@ -288,3 +288,117 @@ describe('fetchExploreChips', () => {
     ).toHaveLength(3)
   })
 })
+
+describe('form_map', () => {
+  const fields = env({
+    fields: [
+      {
+        name: '발신기관명',
+        guide: '',
+        value: '서울대공원',
+        location: { section: 0, paragraph: 1 },
+      },
+      { name: '수신', guide: '수신처', value: '', location: { section: 0, paragraph: 2 } },
+    ],
+    untrustedFields: ['fields[].name', 'fields[].value', 'fields[].guide'],
+  })
+  const tables = env({
+    tables: [
+      {
+        index: 0,
+        section: 0,
+        paragraph: 4,
+        control: 0,
+        rows: 2,
+        cols: 2,
+        cells: [
+          { row: 0, col: 0, rowSpan: 1, colSpan: 1, text: '항목' },
+          { row: 0, col: 1, rowSpan: 1, colSpan: 1, text: '' },
+          { row: 1, col: 0, rowSpan: 1, colSpan: 1, text: '금액' },
+          { row: 1, col: 1, rowSpan: 1, colSpan: 1, text: ' ' },
+        ],
+      },
+    ],
+  })
+  const paragraphs = env({
+    paragraphs: [
+      {
+        section: 0,
+        paragraph: 0,
+        preview: '보고서 제목',
+        length: 6,
+        empty: false,
+        hasTable: false,
+      },
+      { section: 0, paragraph: 1, preview: '', length: 0, empty: true, hasTable: true },
+    ],
+  })
+
+  it('maps fields, table cells and body paragraphs in one call, fenced, with a summary', async () => {
+    const api = fakeApi({ fields, export_tables: tables, paragraphs })
+    const result = await readTools.execute(ctxWith(api), call('form_map'))
+    expect(result.isError).toBeUndefined()
+    const out = JSON.parse(result.output)
+    expect(out.summary).toMatch(/2 form field\(s\) \(1 empty\)/)
+    expect(out.summary).toMatch(/1 table\(s\) \(2 empty cell\(s\)\)/)
+    expect(out.summary).toMatch(/2 body paragraph\(s\) \(1 empty\)/)
+    expect(unwrap(out.fields[0].name)).toBe('발신기관명')
+    expect(out.fields[1]).toMatchObject({ empty: true })
+    expect(out.tables[0].cells[1]).toMatchObject({ row: 0, col: 1, empty: true })
+    expect(unwrap(out.tables[0].cells[0].text)).toBe('항목')
+    expect(out.paragraphs[0]).toMatchObject({ section: 0, paragraph: 0, length: 6 })
+    expect(unwrap(out.paragraphs[0].preview)).toBe('보고서 제목')
+    expect(out.tables[0].cells[0].text).toMatch(FENCE)
+    expect(out.paragraphs[0].preview).toMatch(FENCE)
+    expect(out).not.toHaveProperty('unavailable')
+  })
+
+  it('reports the parts it could not read and returns the rest', async () => {
+    const api = fakeApi({ fields, export_tables: tables, paragraphs: { error: 'dump failed' } })
+    const out = JSON.parse((await readTools.execute(ctxWith(api), call('form_map'))).output)
+    expect(out.unavailable).toEqual(['paragraphs'])
+    expect(out.fields).toHaveLength(2)
+  })
+
+  it('caps the paragraph list and says where to continue', async () => {
+    const many = env({
+      paragraphs: Array.from({ length: 450 }, (_, i) => ({
+        section: 0,
+        paragraph: i,
+        preview: `문단 ${i}`,
+        length: 5,
+        empty: false,
+        hasTable: false,
+      })),
+    })
+    const api = fakeApi({ fields, export_tables: tables, paragraphs: [many, many] })
+    const first = JSON.parse((await readTools.execute(ctxWith(api), call('form_map'))).output)
+    expect(first.paragraphs).toHaveLength(300)
+    expect(first.nextParagraphsFrom).toBe(300)
+    const second = JSON.parse(
+      (await readTools.execute(ctxWith(api), call('form_map', { paragraphsFrom: 300 }))).output,
+    )
+    expect(second.paragraphs[0].paragraph).toBe(300)
+    expect(second.paragraphs).toHaveLength(150)
+    expect(second).not.toHaveProperty('nextParagraphsFrom')
+  })
+
+  it('caps table cells across all tables and says so', async () => {
+    const big = env({
+      tables: [0, 1].map((index) => ({
+        index,
+        rows: 15,
+        cols: 15,
+        cells: Array.from({ length: 225 }, (_, i) => ({
+          row: Math.floor(i / 15),
+          col: i % 15,
+          text: '',
+        })),
+      })),
+    })
+    const api = fakeApi({ fields, export_tables: big, paragraphs })
+    const out = JSON.parse((await readTools.execute(ctxWith(api), call('form_map'))).output)
+    expect(out.tablesTruncated).toBe(true)
+    expect(out.tables[0].cells.length + out.tables[1].cells.length).toBe(400)
+  })
+})

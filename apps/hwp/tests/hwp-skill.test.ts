@@ -15,6 +15,7 @@ const EXPECTED = [
   'edit_text',
   'fill_fields',
   'find',
+  'form_map',
   'get_document_overview',
   'get_document_state',
   'insert_element',
@@ -26,7 +27,7 @@ const EXPECTED = [
 ]
 
 describe('hwp skill', () => {
-  it('exposes exactly the 14 tools of the spec, each with an object input schema', () => {
+  it('exposes exactly the 15 tools, each with an object input schema', () => {
     expect(AGENT_TOOLS.map((t) => t.name).sort()).toEqual(EXPECTED)
     expect(new Set(AGENT_TOOLS.map((t) => t.name)).size).toBe(AGENT_TOOLS.length)
     for (const tool of AGENT_TOOLS) expect(tool.inputSchema).toMatchObject({ type: 'object' })
@@ -92,5 +93,10 @@ describe('hwp skill', () => {
     )
     expect(api.createDocument).toHaveBeenCalledWith('# 제목', '보고서')
     expect(result.output).toMatch(/Created "doc\.hwpx"/)
+  })
+
+  it('steers form filling to form_map first', () => {
+    expect(SYSTEM_PROMPT).toMatch(/call form_map ONCE first/)
+    expect(SYSTEM_PROMPT).toMatch(/delete_table/)
   })
 })

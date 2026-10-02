@@ -8,6 +8,7 @@ export const READ_PAGES_MAX = 10
 export const READ_CHARS_CAP = 24_000
 export const TABLE_CELLS_CAP = 400
 export const FIND_DEFAULT_LIMIT = 20
+export const FORM_MAP_PARAGRAPHS_CAP = 300
 
 type Rec = Record<string, unknown>
 const arr = (value: unknown): Rec[] => (Array.isArray(value) ? (value as Rec[]) : [])
@@ -68,6 +69,20 @@ const tools: AgentToolDef[] = [
     description:
       'Current live state: format (hwp/hwpx), page count, unsaved-changes flag, change counter.',
     inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'form_map',
+    description:
+      'Map a form in ONE call: every form field (누름틀: name, guide, value, empty?), every table with each cell (row, col, text, empty?) and every body paragraph (section, paragraph, a short preview, full length, empty?, hasTable). Use it first when filling a form or a document with blanks, instead of calling find/read_table per cell. Paragraph previews are cut by the engine — use find or read_pages for the full text. Long documents return up to 300 paragraphs; continue with paragraphsFrom.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        paragraphsFrom: {
+          type: 'integer',
+          description: 'Index in the paragraph list to continue from',
+        },
+      },
+    },
   },
 ]
 
@@ -251,6 +266,78 @@ async function listFields(ctx: HwpAiContext): Promise<ToolExecution> {
   }
 }
 
+async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
+  const from = intArg(input, 'paragraphsFrom', { min: 0, fallback: 0 })
+  const unavailable: string[] = []
+  const part = async (name: 'fields' | 'export_tables' | 'paragraphs', label: string) => {
+    try {
+      return (await runQuery(ctx, name)).envelope
+    } catch {
+      unavailable.push(label)
+      return null
+    }
+  }
+  // one after another: each runQuery may send the snapshot first
+  const fieldsEnv = await part('fields', 'fields')
+  const tablesEnv = await part('export_tables', 'tables')
+  const paragraphsEnv = await part('paragraphs', 'paragraphs')
+  const nonce = newNonce()
+  const blank = (text: string) => text.trim().length === 0
+  const fields = arr(fieldsEnv?.fields).map((f) => ({
+    name: wrapText(str(f.name), nonce),
+    guide: wrapText(str(f.guide), nonce),
+    value: wrapText(str(f.value), nonce),
+    empty: blank(str(f.value)),
+  }))
+  let cellBudget = TABLE_CELLS_CAP
+  let tablesTruncated = false
+  const tables = arr(tablesEnv?.tables).map((t) => {
+    const cells = arr(t.cells)
+    const kept = cells.slice(0, Math.max(0, cellBudget))
+    cellBudget -= kept.length
+    if (kept.length < cells.length) tablesTruncated = true
+    return {
+      index: t.index,
+      rows: t.rows,
+      cols: t.cols,
+      cells: kept.map((c) => ({
+        row: c.row,
+        col: c.col,
+        text: wrapText(str(c.text), nonce),
+        empty: blank(str(c.text)),
+      })),
+    }
+  })
+  const allParagraphs = arr(paragraphsEnv?.paragraphs)
+  const paragraphs = allParagraphs.slice(from, from + FORM_MAP_PARAGRAPHS_CAP).map((p) => ({
+    section: p.section,
+    paragraph: p.paragraph,
+    preview: wrapText(str(p.preview), nonce),
+    length: p.length,
+    empty: p.empty === true,
+    hasTable: p.hasTable === true,
+  }))
+  const emptyCells = tables.reduce((n, t) => n + t.cells.filter((c) => c.empty).length, 0)
+  const summary = [
+    `${fields.length} form field(s) (${fields.filter((f) => f.empty).length} empty)`,
+    `${tables.length} table(s) (${emptyCells} empty cell(s))`,
+    `${allParagraphs.length} body paragraph(s) (${allParagraphs.filter((p) => p.empty === true).length} empty)`,
+  ].join(', ')
+  const next = from + FORM_MAP_PARAGRAPHS_CAP
+  return {
+    output: JSON.stringify({
+      summary,
+      fields,
+      tables,
+      tablesTruncated,
+      paragraphs,
+      ...(next < allParagraphs.length ? { nextParagraphsFrom: next } : {}),
+      ...(unavailable.length ? { unavailable } : {}),
+    }),
+    summary: `form map: ${fields.length} field(s), ${tables.length} table(s), ${allParagraphs.length} paragraph(s)`,
+  }
+}
+
 async function documentState(ctx: HwpAiContext): Promise<ToolExecution> {
   const state = await requireEditor(ctx).getDocumentState()
   return {
@@ -294,6 +381,8 @@ export const readTools: ToolModule = {
         return listFields(ctx)
       case 'get_document_state':
         return documentState(ctx)
+      case 'form_map':
+        return formMap(ctx, input)
       default:
         throw new ToolError(`Unknown read tool: ${call.name}`, 'unknown tool')
     }
