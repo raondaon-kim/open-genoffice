@@ -3,6 +3,7 @@ import {
   AI_PROVIDERS,
   OPENAI_COMPATIBLE_BASE_URLS,
   defaultAiSettings,
+  migrateLegacyRoute,
   resolveAiSettings,
 } from '../src/providers'
 
@@ -96,7 +97,7 @@ describe('bring-your-own-key OpenAI-compatible providers', () => {
       id: 'deepseek',
       label: 'DeepSeek',
       defaultBaseUrl: 'https://api.deepseek.com/v1',
-      defaultModel: 'deepseek-chat',
+      defaultModel: 'deepseek-flash',
     },
     {
       id: 'glm',
@@ -142,5 +143,25 @@ describe('bring-your-own-key OpenAI-compatible providers', () => {
     })
     // the manual base-URL provider is deliberately absent
     expect(OPENAI_COMPATIBLE_BASE_URLS.custom).toBeUndefined()
+  })
+})
+
+describe('DeepSeek model lineup', () => {
+  it('lists the current API models and defaults to the flash model', () => {
+    const provider = AI_PROVIDERS.find((meta) => meta.id === 'deepseek')!
+    expect(provider.models).toEqual(['deepseek-flash', 'deepseek-v4-pro'])
+    expect(provider.defaultModel).toBe('deepseek-flash')
+  })
+
+  it('maps the retired model names to deepseek-flash, for DeepSeek routes only', () => {
+    const flash = { providerId: 'deepseek', modelId: 'deepseek-flash' }
+    expect(migrateLegacyRoute({ providerId: 'deepseek', modelId: 'deepseek-chat' })).toEqual(flash)
+    expect(migrateLegacyRoute({ providerId: 'deepseek', modelId: 'deepseek-reasoner' })).toEqual(
+      flash,
+    )
+    const pro = { providerId: 'deepseek', modelId: 'deepseek-v4-pro' } as const
+    expect(migrateLegacyRoute(pro)).toBe(pro)
+    const other = { providerId: 'openrouter', modelId: 'deepseek-chat' } as const
+    expect(migrateLegacyRoute(other)).toBe(other)
   })
 })

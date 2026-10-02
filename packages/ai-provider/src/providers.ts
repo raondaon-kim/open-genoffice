@@ -1,4 +1,4 @@
-import type { AiProviderId, AiProviderMeta, AiSettings, LegacyAiSettings } from './types'
+import type { AiProviderId, AiProviderMeta, AiRoute, AiSettings, LegacyAiSettings } from './types'
 
 /**
  * Genspark server-side LLM proxy endpoints. All three protocols share the
@@ -12,6 +12,17 @@ export const GENSPARK_LLM_BASE_URLS = {
 } as const
 
 export const OPENROUTER_API_BASE_URL = 'https://openrouter.ai/api/v1'
+
+/** DeepSeek retired these names (2026-07-24); the API still answers them but the model list no longer carries them. */
+const RETIRED_DEEPSEEK_MODELS: ReadonlySet<string> = new Set(['deepseek-chat', 'deepseek-reasoner'])
+
+/** A stored route that names a retired model becomes its current replacement; everything else is returned as is. */
+export function migrateLegacyRoute(route: AiRoute): AiRoute {
+  if (route.providerId === 'deepseek' && RETIRED_DEEPSEEK_MODELS.has(route.modelId)) {
+    return { providerId: 'deepseek', modelId: 'deepseek-flash' }
+  }
+  return route
+}
 
 export const AI_PROVIDERS: AiProviderMeta[] = [
   {
@@ -92,8 +103,8 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     auth: 'bearer-key',
     modelSource: 'static',
     defaultBaseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-chat', 'deepseek-reasoner'],
-    defaultModel: 'deepseek-chat',
+    models: ['deepseek-flash', 'deepseek-v4-pro'],
+    defaultModel: 'deepseek-flash',
     keyPlaceholder: 'sk-...',
   },
   {

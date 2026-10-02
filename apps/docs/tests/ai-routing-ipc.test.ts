@@ -472,3 +472,32 @@ describe('public settings channel', () => {
     expect(order).toEqual(['ensureCodexStatus', 'getPublicSettings'])
   })
 })
+
+describe('retired DeepSeek model names in a conversation route', () => {
+  it('answers a stored deepseek-chat route as deepseek-flash', async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>()
+    const stored = { providerId: 'deepseek', modelId: 'deepseek-chat' }
+    registerAiRoutingIpc({
+      ipcMain: {
+        handle: (channel, listener) =>
+          handlers.set(channel, listener as (...args: unknown[]) => unknown),
+      },
+      settings: { getGlobalDefault: () => stored } as never,
+      getProjectStore: () =>
+        ({
+          getOrCreateChatAiMetadata: () => ({
+            schemaVersion: 1,
+            route: stored,
+            createdAt: '2026-10-02T00:00:00.000Z',
+            updatedAt: '2026-10-02T00:00:00.000Z',
+          }),
+        }) as never,
+      getGensparkApiKey: () => '',
+    })
+    const route = await handlers.get(AI_CHANNELS.getConversationRoute)!(
+      {},
+      { projectId: 'default', chatId: '0123456789abcdef' },
+    )
+    expect(route).toEqual({ providerId: 'deepseek', modelId: 'deepseek-flash' })
+  })
+})

@@ -26,6 +26,7 @@ export {
   OPENAI_COMPATIBLE_BASE_URLS,
   OPENROUTER_API_BASE_URL,
   defaultAiSettings,
+  migrateLegacyRoute,
   resolveAiSettings,
 } from './providers'
 export {

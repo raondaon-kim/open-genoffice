@@ -297,3 +297,21 @@ describe('AiSettingsService migration and public boundary', () => {
     )
   })
 })
+
+describe('retired DeepSeek model names', () => {
+  it('reads a stored deepseek-chat default as deepseek-flash', () => {
+    const { settingsPath, service } = fixture()
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        schemaVersion: 2,
+        globalDefault: { providerId: 'deepseek', modelId: 'deepseek-chat' },
+        providers: {},
+      }),
+    )
+    expect(service.getGlobalDefault()).toEqual({
+      providerId: 'deepseek',
+      modelId: 'deepseek-flash',
+    })
+  })
+})

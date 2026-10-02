@@ -3,6 +3,7 @@ import { dirname } from 'node:path'
 import {
   AI_PROVIDERS,
   defaultAiSettings,
+  migrateLegacyRoute,
   resolveAiSettings,
   verifyProviderApiKey,
   type AiProviderConfig,
@@ -86,7 +87,7 @@ function isProviderId(value: unknown): value is AiProviderId {
 function normalizeRoute(value: unknown): AiRoute | null {
   if (!isRecord(value) || !isProviderId(value.providerId)) return null
   if (typeof value.modelId !== 'string' || !value.modelId.trim()) return null
-  return { providerId: value.providerId, modelId: value.modelId.trim() }
+  return migrateLegacyRoute({ providerId: value.providerId, modelId: value.modelId.trim() })
 }
 
 function normalizePersistedSettings(value: unknown): PersistedAiSettings | null {

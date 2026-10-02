@@ -1,5 +1,6 @@
 import {
   chatForProvider,
+  migrateLegacyRoute,
   streamForProvider,
   type AiChatResponse,
   type AiProviderConfig,
@@ -557,11 +558,13 @@ function getOrCreateRoute(
   identity?: AiConversationIdentity,
 ): AiRoute {
   const globalDefault = options.settings.getGlobalDefault()
-  return identity
+  const route = identity
     ? options
         .getProjectStore()
         .getOrCreateChatAiMetadata(identity.projectId, identity.chatId, globalDefault).route
     : globalDefault
+  // a conversation created while DeepSeek still served the old names keeps working
+  return migrateLegacyRoute(route)
 }
 
 async function resolveSendRoute(
