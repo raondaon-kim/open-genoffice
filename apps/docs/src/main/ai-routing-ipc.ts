@@ -438,10 +438,13 @@ function parseMessages(value: unknown): AiStreamRequest['messages'] {
       }
       messages.push(parsed)
     } else if (message.role === 'assistant') {
-      assertOnlyKeys(message, ['role', 'text', 'toolCalls'], 'AI assistant message')
+      assertOnlyKeys(message, ['role', 'text', 'toolCalls', 'reasoning'], 'AI assistant message')
       const parsed: AiStreamRequest['messages'][number] = {
         role: 'assistant',
         text: boundedString(message.text, 'AI message text', MAX_USER_CHARS),
+      }
+      if (message.reasoning !== undefined) {
+        parsed.reasoning = boundedString(message.reasoning, 'AI message reasoning', MAX_USER_CHARS)
       }
       if (message.toolCalls !== undefined) {
         if (!Array.isArray(message.toolCalls) || message.toolCalls.length > MAX_TOOLS) {
@@ -744,6 +747,10 @@ export function registerAiRoutingIpc(options: RegisterAiRoutingIpcOptions): void
       const callbacks = {
         signal: controller.signal,
         onDelta: (text: string) => send({ requestId: request.requestId, type: 'delta', text }),
+        onReasoningDelta: (text: string) =>
+          send({ requestId: request.requestId, type: 'thinking', thinkingKind: 'reasoning', text }),
+        onReasoningSummaryDelta: (text: string) =>
+          send({ requestId: request.requestId, type: 'thinking', thinkingKind: 'summary', text }),
         onToolCall: (toolCall: AgentToolCall) =>
           send({ requestId: request.requestId, type: 'tool-call', toolCall }),
       }

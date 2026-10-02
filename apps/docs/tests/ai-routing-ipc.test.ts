@@ -33,6 +33,35 @@ describe('credential-safe AI request validation', () => {
     })
   })
 
+  it('accepts the raw reasoning of an assistant turn so it can be sent back', () => {
+    const request = parseAiStreamRequest({
+      requestId: 'request-1',
+      system: 'system',
+      messages: [
+        { role: 'user', text: 'hi' },
+        { role: 'assistant', text: 'ok', reasoning: 'plan' },
+      ],
+    })
+    expect(request.messages[1]).toEqual({ role: 'assistant', text: 'ok', reasoning: 'plan' })
+  })
+
+  it('rejects reasoning that is not text and reasoning on other roles', () => {
+    expect(() =>
+      parseAiStreamRequest({
+        requestId: 'request-1',
+        system: 'system',
+        messages: [{ role: 'assistant', text: 'ok', reasoning: 7 }],
+      }),
+    ).toThrow()
+    expect(() =>
+      parseAiStreamRequest({
+        requestId: 'request-1',
+        system: 'system',
+        messages: [{ role: 'user', text: 'ok', reasoning: 'x' }],
+      }),
+    ).toThrow('unsupported field: reasoning')
+  })
+
   it('rejects legacy renderer-supplied provider settings', () => {
     expect(() =>
       parseAiStreamRequest({
@@ -407,6 +436,39 @@ describe('Codex dispatch', () => {
     expect(send).toHaveBeenLastCalledWith(AI_CHANNELS.streamChunk, {
       requestId: 'codex-1',
       type: 'done',
+    })
+  })
+
+  it('forwards reasoning and reasoning summaries to the renderer as thinking chunks', async () => {
+    codexBridge.streamCodexAppServer.mockImplementation(async (...args: unknown[]) => {
+      const cb = args[5] as {
+        onReasoningDelta(text: string): void
+        onReasoningSummaryDelta(text: string): void
+      }
+      cb.onReasoningSummaryDelta('Reading the file')
+      cb.onReasoningDelta('raw thought')
+    })
+    const { handlers, send } = registerWithCodexRoute()
+    await handlers.get(AI_CHANNELS.stream)!(
+      { sender: { id: 5, isDestroyed: () => false, send } },
+      {
+        requestId: 'codex-think',
+        conversation: { projectId: 'default', chatId: '0123456789abcdef' },
+        system: 'system',
+        messages: [{ role: 'user', text: 'hi' }],
+      },
+    )
+    expect(send).toHaveBeenCalledWith(AI_CHANNELS.streamChunk, {
+      requestId: 'codex-think',
+      type: 'thinking',
+      thinkingKind: 'summary',
+      text: 'Reading the file',
+    })
+    expect(send).toHaveBeenCalledWith(AI_CHANNELS.streamChunk, {
+      requestId: 'codex-think',
+      type: 'thinking',
+      thinkingKind: 'reasoning',
+      text: 'raw thought',
     })
   })
 
