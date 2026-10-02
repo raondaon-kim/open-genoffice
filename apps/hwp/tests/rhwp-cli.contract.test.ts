@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { judgeLayoutTolerance, summaryOf } from '../src/main/layout-tolerance'
 import { resolveNativeBinary } from '../src/main/native-binary-path'
 import { runRhwp } from '../src/main/rhwp-cli'
+import { parseDumpParagraphs } from '../src/main/rhwp-paragraphs'
 import type { RhwpEnvelope } from '../src/shared/ai-contract'
 
 /**
@@ -359,6 +360,20 @@ describe.skipIf(!HAVE_BIN)('rhwp CLI contract (real binary)', () => {
       '--json',
     )
     expect(dry.envelope).toMatchObject({ notFound: ['__없는필드__'], filledCount: 0 })
+  })
+
+  it('dump lists body paragraphs with the same coordinates search reports', async () => {
+    const dumped = await runRhwp(BIN, ['dump', doc], { keepStdout: true })
+    expect(dumped.exitCode, dumped.stderr).toBe(0)
+    const paragraphs = parseDumpParagraphs(dumped.stdout ?? '')
+    expect(paragraphs.length).toBeGreaterThan(3)
+    const [hit] = await search(doc, '마지막 문단')
+    const same = paragraphs.find(
+      (p) => p.section === hit!.section && p.paragraph === hit!.paragraph,
+    )
+    expect(same?.preview).toContain('마지막 문단')
+    expect(paragraphs.some((p) => p.hasTable)).toBe(true)
+    expect(paragraphs.some((p) => p.empty)).toBe(true)
   })
 
   it('delete-table removes a whole table and passes the round-trip check', async () => {

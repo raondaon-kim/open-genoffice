@@ -124,3 +124,18 @@ describe('runRhwp', () => {
     expect(spawnImpl).not.toHaveBeenCalled()
   })
 })
+
+describe('runRhwp keepStdout', () => {
+  it('returns raw stdout only when asked to keep it', async () => {
+    const text = '--- 문단 0.0 --- cc=1, text_len=0, controls=0\n'
+    const kept = await runRhwp('/bin/rhwp', ['dump', 'a.hwpx'], {
+      spawnImpl: spawnWith(fakeProcess(text, '', 0)),
+      keepStdout: true,
+    })
+    expect(kept).toMatchObject({ exitCode: 0, envelope: null, stdout: text })
+    const dropped = await runRhwp('/bin/rhwp', ['dump', 'a.hwpx'], {
+      spawnImpl: spawnWith(fakeProcess(text, '', 0)),
+    })
+    expect(dropped).not.toHaveProperty('stdout')
+  })
+})

@@ -148,6 +148,11 @@ const BUILDERS: Record<AiQueryName, (args: Args, path: string) => string[]> = {
     checkAllowed(args, [])
     return ['word-count', '--json', path]
   },
+  paragraphs: (args, path) => {
+    checkAllowed(args, [])
+    // dump has no --json; main turns its text into an envelope (rhwp-paragraphs.ts)
+    return ['dump', path]
+  },
   verify: (args, path) => {
     checkAllowed(args, [
       'pages',

@@ -24,6 +24,8 @@ export interface RhwpResult {
   envelope: RhwpEnvelope | null
   /** diagnostics (LAYOUT_OVERFLOW, CONVERGENCE, 오류: …); never fed to the model unwrapped */
   stderr: string
+  /** raw stdout, only when the runner was asked to keep it (commands without --json, e.g. dump) */
+  stdout?: string
 }
 
 /** read-only rhwp commands main is willing to run on a snapshot */
@@ -40,6 +42,8 @@ export const AI_QUERY_NAMES = [
   'word_count',
   'verify',
   'inspect_injection',
+  /** body paragraphs from `rhwp dump` (main parses the text; see rhwp-paragraphs.ts) */
+  'paragraphs',
 ] as const
 export type AiQueryName = (typeof AI_QUERY_NAMES)[number]
 

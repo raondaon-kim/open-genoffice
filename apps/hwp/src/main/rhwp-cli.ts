@@ -22,6 +22,8 @@ export interface RunRhwpOptions {
   /** default 30 s — explain/search on a 30-page document take ~100-250 ms */
   timeoutMs?: number
   spawnImpl?: RhwpSpawn
+  /** also return raw stdout (dump has no --json) */
+  keepStdout?: boolean
 }
 
 export type RunRhwpFn = (
@@ -109,7 +111,12 @@ export function runRhwp(
         } else if (!isExitCode(code)) {
           reject(new Error(`${label} exited with unexpected code ${code}: ${stderr.slice(0, 800)}`))
         } else {
-          resolve({ exitCode: code, envelope: parseEnvelope(stdout), stderr })
+          resolve({
+            exitCode: code,
+            envelope: parseEnvelope(stdout),
+            stderr,
+            ...(options.keepStdout ? { stdout } : {}),
+          })
         }
       })
     })

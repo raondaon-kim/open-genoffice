@@ -24,6 +24,7 @@ import { safeDefaultSaveName } from '../shared/form-names'
 import { HwpIntentStore } from './hwp-intents'
 import type { NativeBinaryName } from './native-binary-path'
 import { runRhwp } from './rhwp-cli'
+import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import type { StaticRoot } from './static-server'
 
@@ -485,6 +486,10 @@ function registerHwpIpc(): void {
       const built = buildQueryArgs(request.tool, request.args ?? {}, path)
       if (!built.ok) return { ok: false, error: built.error }
       try {
+        if (request.tool === 'paragraphs') {
+          const dumped = await runRhwp(bin.path, built.args, { keepStdout: true })
+          return { ok: true, result: paragraphsResult(dumped) }
+        }
         return { ok: true, result: await runRhwp(bin.path, built.args) }
       } catch (err) {
         return { ok: false, error: errorText(err) }
