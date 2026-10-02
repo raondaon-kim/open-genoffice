@@ -10,7 +10,7 @@ import { AiMark } from '../ribbon-icons'
 import type { ChangePlan } from '../../domain/workbook.types'
 import type { AttachmentMeta } from '../../shared/desktop-api'
 import { useI18n, type TFunc } from '../i18n/locale'
-import { Markdown } from '@genoffice/ui'
+import { Markdown, ThinkingBox, thinkingLabels } from '@genoffice/ui'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
@@ -54,6 +54,8 @@ export interface AiChatMessage {
   readonly text: string
   readonly tools: readonly AiToolChip[]
   readonly streaming?: boolean | undefined
+  /** what the thinking box shows for this turn */
+  readonly thinking?: string | undefined
   readonly isError?: boolean | undefined
   /** A failed model turn may be retried through OpenRouter's router. */
   readonly retrySuggestion?: string | undefined
@@ -126,7 +128,7 @@ export function AiChatPanel({
   readonly onExpand: () => void
   readonly onCollapse: () => void
 }): React.JSX.Element {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const chatRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
   const stickToBottomRef = useRef(true)
@@ -291,6 +293,9 @@ export function AiChatPanel({
           <>
             {historicChat.map((entry, i) => (
               <div key={`h${i}`} className={`ai-msg ai-msg-${entry.role} ai-msg-historic`}>
+                {entry.role === 'assistant' && entry.thinking && (
+                  <ThinkingBox text={entry.thinking} live={false} labels={thinkingLabels(lang)} />
+                )}
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && <Markdown text={entry.text} />}
               </div>
@@ -321,6 +326,13 @@ export function AiChatPanel({
               entry.text
             ) : (
               <>
+                {entry.thinking && (
+                  <ThinkingBox
+                    text={entry.thinking}
+                    live={Boolean(entry.streaming && !entry.text)}
+                    labels={thinkingLabels(lang)}
+                  />
+                )}
                 {entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text ? (
                   <Markdown text={entry.text} />

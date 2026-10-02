@@ -97,7 +97,12 @@ import '@univerjs/preset-sheets-table/lib/index.css'
 import { greenTheme } from '@univerjs/themes'
 import { createUniver } from './create-univer'
 
-import { AgentLoop, composeSkills, type AgentImage } from '@genoffice/agent-core'
+import {
+  AgentLoop,
+  composeSkills,
+  toRestorableMessages,
+  type AgentImage,
+} from '@genoffice/agent-core'
 import {
   codexSignInNotice,
   openRouterRetrySuggestion,
@@ -775,6 +780,7 @@ export function App(): React.JSX.Element {
           msgs.map((m) => ({
             role: m.role,
             text: m.text,
+            ...(m.thinking ? { thinking: m.thinking } : {}),
             tools:
               m.tools?.map((t) => ({
                 summary: t.summary,
@@ -786,7 +792,7 @@ export function App(): React.JSX.Element {
         )
         // Restore model context: follow-ups after reopening the file continue the
         // previous conversation (only when the loop is idle and has no history)
-        agentLoopRef.current?.restore(msgs.map((m) => ({ role: m.role, text: m.text })))
+        agentLoopRef.current?.restore(toRestorableMessages(msgs))
       })
       .catch(() => {
         if (!cancelled) setRouteReady(true)
@@ -806,6 +812,7 @@ export function App(): React.JSX.Element {
       input?: string
       output?: string
     }>,
+    thought?: { reasoning?: string | undefined; thinking?: string | undefined },
   ) => {
     const ids = chatRefIdsRef.current
     const api = (window as Window & { projectApi?: typeof window.projectApi }).projectApi
@@ -831,6 +838,8 @@ export function App(): React.JSX.Element {
           : {}),
         ...(messageAttachments.length > 0 ? { attachments: messageAttachments } : {}),
         ...(role === 'assistant' && route ? { ai: { requested: route } } : {}),
+        ...(role === 'assistant' && thought?.reasoning ? { reasoning: thought.reasoning } : {}),
+        ...(role === 'assistant' && thought?.thinking ? { thinking: thought.thinking } : {}),
       })
       .catch(() => {
         /* silent */
@@ -878,6 +887,9 @@ export function App(): React.JSX.Element {
       // guide loading adds a tool round; the default 8 cuts off multi-step work
       maxTurns: 24,
       events: {
+        onThinking: (thinking) => {
+          patchLastAssistant((entry) => ({ ...entry, thinking }))
+        },
         onText: (text) => {
           setMessage(text || t('appAiThinking'))
           // When the model retries successfully and keeps streaming after a
@@ -930,7 +942,7 @@ export function App(): React.JSX.Element {
             }
           })
         },
-        onDone: ({ text, cancelled, turnLimit }) => {
+        onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
           const finalText = turnLimit
             ? [text, t('appAiTurnLimit')].filter(Boolean).join('\n\n')
             : text || (cancelled ? t('appAiStopped') : t('appAiNoSummary'))
@@ -946,7 +958,10 @@ export function App(): React.JSX.Element {
           // Persist the assistant message (side effect outside the updater;
           // tools stores the run's complete activity)
           if (!cancelled && finalText) {
-            persistChatMessage('assistant', finalText, runToolsRef.current)
+            persistChatMessage('assistant', finalText, runToolsRef.current, {
+              reasoning,
+              thinking,
+            })
           }
           void autoSaveCompletedAiRun().finally(() => setAiBusy(false))
         },
