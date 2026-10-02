@@ -43,4 +43,40 @@ describe('Docs AI transport', () => {
     expect(onDone).toHaveBeenCalledTimes(1)
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
+
+  it('forwards thinking chunks with their kind and keeps the stream open', () => {
+    let listener: ((chunk: AiStreamChunk) => void) | undefined
+    const aiStream = vi.fn()
+    const unsubscribe = vi.fn()
+    Object.defineProperty(window, 'desktop', {
+      configurable: true,
+      value: {
+        aiStream,
+        aiStreamCancel: vi.fn(),
+        onAiStream: (next: (chunk: AiStreamChunk) => void) => {
+          listener = next
+          return unsubscribe
+        },
+      } satisfies Partial<DesktopApi>,
+    })
+    const transport = createElectronTransport(() => ({ projectId: 'p', chatId: 'c' }))
+    const callbacks = {
+      onDelta: vi.fn(),
+      onThinking: vi.fn(),
+      onToolCall: vi.fn(),
+      onDone: vi.fn(),
+      onError: vi.fn(),
+    }
+    transport.stream({ system: 's', messages: [], tools: [] }, callbacks)
+    const requestId = (aiStream.mock.calls[0]![0] as { requestId: string }).requestId
+
+    listener?.({ requestId, type: 'thinking', thinkingKind: 'summary', text: 'Reading' })
+    listener?.({ requestId, type: 'thinking', thinkingKind: 'reasoning', text: 'raw' })
+    expect(callbacks.onThinking.mock.calls).toEqual([
+      ['Reading', 'summary'],
+      ['raw', 'reasoning'],
+    ])
+    expect(callbacks.onError).not.toHaveBeenCalled()
+    expect(unsubscribe).not.toHaveBeenCalled()
+  })
 })

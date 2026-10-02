@@ -9,6 +9,7 @@ import {
 import {
   AgentLoop,
   composeSkills,
+  toRestorableMessages,
   type AgentImage,
   type AgentTransport,
   type CompactionOptions,
@@ -35,6 +36,8 @@ import {
   AiTypingIndicator,
   Markdown,
   ModelPicker,
+  ThinkingBox,
+  thinkingLabels,
   type ModelPickerModel,
 } from '@genoffice/ui'
 import { AiMark } from '../components/icons'
@@ -91,6 +94,8 @@ interface ChatEntry {
   /** A failed model turn may be retried through OpenRouter's router. */
   retrySuggestion?: string
   retryRoute?: AiRoute
+  /** what the thinking box shows for this turn */
+  thinking?: string
   streaming?: boolean
   turnLimit?: boolean
   /** the run failed and this user message was rolled back out of the model context */
@@ -227,7 +232,7 @@ export function AiPanel({
   onCollapse,
   filePath,
 }: AiPanelProps) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   /** Wall-clock start of the current run, drives the elapsed badge */
@@ -356,6 +361,7 @@ export function AiPanel({
           msgs.map((m) => ({
             role: m.role,
             text: m.text,
+            ...(m.thinking ? { thinking: m.thinking } : {}),
             tools: m.tools?.map((t) => ({
               name: t.name,
               summary: t.summary,
@@ -374,7 +380,7 @@ export function AiPanel({
           setConversationHasImages(true)
         }
         // restore model context: follow-ups after reopening a file continue the previous conversation (only when the loop is idle with no history)
-        loopRef.current?.restore(msgs.map((m) => ({ role: m.role, text: m.text })))
+        loopRef.current?.restore(toRestorableMessages(msgs))
       } catch {
         if (!cancelled) {
           setRouteReady(true)
@@ -450,6 +456,7 @@ export function AiPanel({
     }>,
     attachments?: AttachmentMeta[],
     route?: AiRoute | null,
+    thought?: { reasoning?: string | undefined; thinking?: string | undefined },
   ) => {
     const ids = chatRefIds.current
     const api = (window as Window & { projectApi?: typeof window.projectApi }).projectApi
@@ -472,6 +479,8 @@ export function AiPanel({
             }
           : {}),
         ...(role === 'assistant' && route ? { ai: { requested: route } } : {}),
+        ...(role === 'assistant' && thought?.reasoning ? { reasoning: thought.reasoning } : {}),
+        ...(role === 'assistant' && thought?.thinking ? { thinking: thought.thinking } : {}),
       })
       .catch(() => {
         /* silent */
@@ -514,6 +523,7 @@ export function AiPanel({
       ]),
       captureSnapshot: () => editorRef.current.getJSON() as PmNode,
       events: {
+        onThinking: (thinking) => patchLastAssistant({ thinking }),
         onText: (text) => patchLastAssistant({ text }),
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -574,7 +584,7 @@ export function AiPanel({
           patchLastAssistant({ streaming: false })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
-        onDone: ({ text, cancelled, turnLimit }) => {
+        onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
           // module-level t: the loop instance is created only once; the component's t goes stale with the first-render closure
           const finalText = turnLimit
             ? [text, tModule('aiTurnLimit')].filter(Boolean).join('\n\n')
@@ -599,6 +609,7 @@ export function AiPanel({
               runToolsRef.current,
               undefined,
               activeRunRouteRef.current,
+              { reasoning, thinking },
             )
           }
         },
@@ -1053,6 +1064,9 @@ export function AiPanel({
           <>
             {historicChat.map((entry, i) => (
               <div key={`h${i}`} className={`ai-msg ai-msg-${entry.role} ai-msg-historic`}>
+                {entry.role === 'assistant' && entry.thinking && (
+                  <ThinkingBox text={entry.thinking} live={false} labels={thinkingLabels(lang)} />
+                )}
                 {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
                 {entry.text && <Markdown text={entry.text} />}
               </div>
@@ -1125,6 +1139,13 @@ export function AiPanel({
               key={i}
               className={`ai-msg ai-msg-${entry.role}${entry.role === 'assistant' && entry.streaming ? ' ai-msg-streaming' : ''}`}
             >
+              {entry.role === 'assistant' && entry.thinking && (
+                <ThinkingBox
+                  text={entry.thinking}
+                  live={Boolean(entry.streaming && !entry.text)}
+                  labels={thinkingLabels(lang)}
+                />
+              )}
               {entry.role === 'assistant' && !entry.text && entry.streaming ? (
                 <span className="ai-typing-row">
                   <AiTypingIndicator
