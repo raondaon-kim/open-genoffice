@@ -335,6 +335,7 @@ describe('streamForProvider: thinking', () => {
   const bodyOf = (fetchMock: ReturnType<typeof vi.fn>, call = 0) =>
     JSON.parse(fetchMock.mock.calls[call]![1].body as string) as {
       messages: Array<Record<string, unknown>>
+      max_tokens?: number
       temperature?: number
       thinking?: unknown
     }
@@ -440,6 +441,69 @@ describe('streamForProvider: thinking', () => {
     expect(retry.temperature).toBe(0.3)
     expect(retry.messages[2]).not.toHaveProperty('reasoning_content')
     expect(deltas).toEqual(['answer'])
+  })
+
+  it('gives thinking mode room for the reasoning: max_tokens covers reasoning and answer', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(answer())
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      [{ role: 'user', text: 'hi' }],
+      [],
+      8192,
+      cb,
+    )
+    expect((bodyOf(fetchMock) as { max_tokens: number }).max_tokens).toBe(32_768)
+  })
+
+  it('keeps the caller max_tokens when it is larger, and for the plain retry and other providers', async () => {
+    const huge = vi.fn().mockResolvedValue(answer())
+    vi.stubGlobal('fetch', huge)
+    const { cb } = collector()
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      [{ role: 'user', text: 'hi' }],
+      [],
+      100_000,
+      cb,
+    )
+    expect((bodyOf(huge) as { max_tokens: number }).max_tokens).toBe(100_000)
+
+    const retry = vi
+      .fn()
+      .mockResolvedValueOnce(
+        errorResponse(400, '{"error":{"message":"reasoning_content missing"}}'),
+      )
+      .mockResolvedValueOnce(answer())
+    vi.stubGlobal('fetch', retry)
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      [{ role: 'user', text: 'hi' }],
+      [],
+      8192,
+      cb,
+    )
+    expect((bodyOf(retry, 1) as { max_tokens: number }).max_tokens).toBe(8192)
+
+    const other = vi.fn().mockResolvedValue(answer())
+    vi.stubGlobal('fetch', other)
+    await streamForProvider(
+      'openai',
+      { apiKey: 'k', model: 'gpt-4.1-mini' },
+      'sys',
+      [{ role: 'user', text: 'hi' }],
+      [],
+      8192,
+      cb,
+    )
+    expect((bodyOf(other) as { max_tokens: number }).max_tokens).toBe(8192)
   })
 
   it('does not retry other 400 errors', async () => {

@@ -357,6 +357,9 @@ function openAiMessages(
 /** DeepSeek's V4 models run in thinking mode by default (spec §4.3). */
 export type OpenAiCompatibleVariant = 'deepseek'
 
+/** floor for max_tokens on a DeepSeek thinking-mode request (the V4 models allow up to 384K) */
+const DEEPSEEK_THINKING_MAX_TOKENS = 32_768
+
 export async function streamOpenAiCompatible(
   baseUrl: string,
   config: AiProviderConfig,
@@ -378,7 +381,10 @@ export async function streamOpenAiCompatible(
       },
       body: JSON.stringify({
         model: config.model,
-        max_tokens: maxTokens,
+        // in thinking mode max_tokens covers the reasoning too (measured: 300 left no room for an answer,
+        // an ordinary question reasons for ~4,600 tokens), so the usual 8k cap would cut answers and tool calls
+        max_tokens:
+          deepseek && thinking ? Math.max(maxTokens, DEEPSEEK_THINKING_MAX_TOKENS) : maxTokens,
         messages: openAiMessages(system, messages, deepseek && thinking),
         ...(tools.length > 0
           ? {
