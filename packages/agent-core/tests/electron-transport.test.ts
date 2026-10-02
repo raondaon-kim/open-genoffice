@@ -24,6 +24,7 @@ function setup() {
   })
   const cb = {
     onDelta: vi.fn(),
+    onThinking: vi.fn(),
     onToolCall: vi.fn(),
     onDone: vi.fn(),
     onError: vi.fn(),
@@ -47,6 +48,21 @@ describe('createIpcTransport', () => {
     expect(cb.onDelta).toHaveBeenNthCalledWith(1, 'hi')
     expect(cb.onDelta).toHaveBeenNthCalledWith(2, '')
     expect(cb.onToolCall).toHaveBeenCalledWith({ id: 'c1', name: 'read', input: {} })
+  })
+
+  it('forwards thinking chunks with their kind and keeps the stream open', () => {
+    const { cb, emit, unsubscribe } = setup()
+    emit({ type: 'thinking', thinkingKind: 'reasoning', text: 'raw ' })
+    emit({ type: 'thinking', thinkingKind: 'summary', text: 'summary' })
+    emit({ type: 'thinking', text: 'no kind means raw reasoning' })
+    emit({ type: 'thinking' }) // an empty chunk is dropped
+    expect(cb.onThinking.mock.calls).toEqual([
+      ['raw ', 'reasoning'],
+      ['summary', 'summary'],
+      ['no kind means raw reasoning', 'reasoning'],
+    ])
+    expect(cb.onError).not.toHaveBeenCalled()
+    expect(unsubscribe).not.toHaveBeenCalled()
   })
 
   it('ignores chunks for other requestIds', () => {

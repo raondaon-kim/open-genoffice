@@ -1,5 +1,6 @@
 import type {
   AgentStreamRequest,
+  AgentThinkingKind,
   AgentToolCall,
   AgentToolDef,
   AgentTransport,
@@ -13,8 +14,9 @@ import type {
  */
 export interface IpcStreamChunk {
   requestId: string
-  type: 'delta' | 'tool-call' | 'done' | 'error'
+  type: 'delta' | 'thinking' | 'tool-call' | 'done' | 'error'
   text?: string
+  thinkingKind?: AgentThinkingKind
   toolCall?: AgentToolCall
   error?: string
 }
@@ -53,6 +55,10 @@ export function createIpcTransport<S>(options: IpcTransportOptions<S>): AgentTra
         if (chunk.requestId !== requestId) return
         if (chunk.type === 'delta') {
           cb.onDelta(chunk.text ?? '')
+        } else if (chunk.type === 'thinking') {
+          if (chunk.text) {
+            cb.onThinking?.(chunk.text, chunk.thinkingKind === 'summary' ? 'summary' : 'reasoning')
+          }
         } else if (chunk.type === 'tool-call') {
           if (chunk.toolCall) cb.onToolCall(chunk.toolCall)
         } else if (chunk.type === 'done') {

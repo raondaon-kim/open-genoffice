@@ -25,11 +25,17 @@ export interface AgentRunResult {
   cancelled: boolean
   /** true when maxTurns was reached; text is the partial answer from the no-tools finalizing turn */
   turnLimit: boolean
+  /** the run's raw model reasoning, turns joined by a blank line; absent when the model produced none */
+  reasoning?: string
+  /** everything shown in the thinking box for the run (reasoning and summaries); absent when none */
+  thinking?: string
 }
 
 export interface AgentLoopEvents<TSnapshot> {
   /** cumulative assistant text of the current turn (call per delta) */
   onText?(text: string): void
+  /** cumulative thinking text of the current turn (reasoning and summaries), called per delta */
+  onThinking?(thinking: string): void
   /** a tool is about to execute (UI shows a live "running" indicator; onToolExecuted always follows) */
   onToolStart?(call: AgentToolCall): void
   onToolExecuted?(event: ToolExecutedEvent<TSnapshot>): void
@@ -137,6 +143,7 @@ function copyMessages(messages: readonly AgentMessage[]): AgentMessage[] {
       return {
         role: 'assistant',
         text: message.text,
+        ...(message.reasoning ? { reasoning: message.reasoning } : {}),
         ...(message.toolCalls
           ? {
               toolCalls: message.toolCalls.map((call) => ({
@@ -170,6 +177,7 @@ function messageSize(m: AgentMessage): number {
     return m.results.reduce((n, r) => n + utf8Size(r.output) + 40, 0)
   }
   let n = utf8Size(m.text)
+  if (m.role === 'assistant' && m.reasoning) n += utf8Size(m.reasoning)
   if (m.role === 'user' && m.images) {
     n += m.images.reduce((s, img) => s + img.base64.length, 0)
   }
@@ -232,6 +240,10 @@ export class AgentLoop<TSnapshot = unknown> {
   private mutationSeen = false
   private inputParseFails = 0
   private turnText = ''
+  private turnReasoning = ''
+  private turnThinking = ''
+  private runReasoning: string[] = []
+  private runThinking: string[] = []
   private toolCalls: AgentToolCall[] = []
   /** user message of the in-flight run; a failed run rolls it (and everything after) back out of history */
   private runUserMsg: AgentMessage | null = null
@@ -292,6 +304,8 @@ export class AgentLoop<TSnapshot = unknown> {
     this.running = true
     this.cancelled = false
     this.turns = 0
+    this.runReasoning = []
+    this.runThinking = []
     this.finalizing = false
     this.mutationSeen = false
     this.inputParseFails = 0
@@ -328,6 +342,13 @@ export class AgentLoop<TSnapshot = unknown> {
     this.runUserMsg = userMsg
     this.history.push(userMsg)
     this.startTurn()
+  }
+
+  private thinkingResult(): { reasoning?: string; thinking?: string } {
+    return {
+      ...(this.runReasoning.length > 0 ? { reasoning: this.runReasoning.join('\n\n') } : {}),
+      ...(this.runThinking.length > 0 ? { thinking: this.runThinking.join('\n\n') } : {}),
+    }
   }
 
   /**
@@ -597,6 +618,8 @@ export class AgentLoop<TSnapshot = unknown> {
     const generation = this.generation
     this.trimHistory()
     this.turnText = ''
+    this.turnReasoning = ''
+    this.turnThinking = ''
     this.toolCalls = []
     const modelSwitchContinuation = this.modelSwitchContinuationPending
       ? `\n\n${MODEL_SWITCH_CONTINUATION}`
@@ -618,6 +641,12 @@ export class AgentLoop<TSnapshot = unknown> {
           if (generation !== this.generation || settled) return
           this.turnText += text
           this.options.events?.onText?.(this.turnText)
+        },
+        onThinking: (text, kind) => {
+          if (generation !== this.generation || settled) return
+          if (kind === 'reasoning') this.turnReasoning += text
+          this.turnThinking += text
+          this.options.events?.onThinking?.(this.turnThinking)
         },
         onToolCall: (call) => {
           if (generation !== this.generation || settled) return
@@ -642,23 +671,35 @@ export class AgentLoop<TSnapshot = unknown> {
   private async finishTurn(): Promise<void> {
     const { events, skill, captureSnapshot } = this.options
     const toolCalls = this.toolCalls
+    if (this.turnReasoning) this.runReasoning.push(this.turnReasoning)
+    if (this.turnThinking) this.runThinking.push(this.turnThinking)
 
     // final turn: no tools requested, the user stopped the run, or the
     // no-tools finalizing turn after hitting the limit
     // (a cancelled turn drops its tool calls — no results would follow)
     if (toolCalls.length === 0 || this.cancelled || this.finalizing) {
-      this.history.push({ role: 'assistant', text: this.turnText })
+      this.history.push({
+        role: 'assistant',
+        text: this.turnText,
+        ...(this.turnReasoning ? { reasoning: this.turnReasoning } : {}),
+      })
       this.running = false
       this.runUserMsg = null
       events?.onDone?.({
         text: this.turnText,
         cancelled: this.cancelled,
         turnLimit: this.finalizing,
+        ...this.thinkingResult(),
       })
       return
     }
 
-    this.history.push({ role: 'assistant', text: this.turnText, toolCalls })
+    this.history.push({
+      role: 'assistant',
+      text: this.turnText,
+      toolCalls,
+      ...(this.turnReasoning ? { reasoning: this.turnReasoning } : {}),
+    })
     const generation = this.generation
     const results: AgentToolResult[] = []
     for (const call of toolCalls) {
@@ -721,7 +762,12 @@ export class AgentLoop<TSnapshot = unknown> {
     if (this.cancelled) {
       this.running = false
       this.runUserMsg = null
-      events?.onDone?.({ text: this.turnText, cancelled: true, turnLimit: false })
+      events?.onDone?.({
+        text: this.turnText,
+        cancelled: true,
+        turnLimit: false,
+        ...this.thinkingResult(),
+      })
       return
     }
 

@@ -4,6 +4,7 @@ export type {
   AgentStreamCallbacks,
   AgentStreamHandle,
   AgentStreamRequest,
+  AgentThinkingKind,
   AgentToolCall,
   AgentToolDef,
   AgentToolResult,
@@ -25,3 +26,5 @@ export type {
 } from './loop'
 export { createIpcTransport } from './electron-transport'
 export type { IpcStreamChunk, IpcStreamStart, IpcTransportOptions } from './electron-transport'
+export { toRestorableMessages } from './restore'
+export type { StoredChatMessage } from './restore'

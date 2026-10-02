@@ -975,3 +975,133 @@ describe('composeSkills', () => {
     expect(() => composeSkills('x', '', [make('a'), make('b')])).toThrow(/duplicate/)
   })
 })
+
+describe('AgentLoop thinking', () => {
+  it("keeps each turn's raw reasoning on its assistant message and reports the run's thinking", async () => {
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onThinking?.('plan ', 'reasoning')
+        cb.onThinking?.('step', 'reasoning')
+        cb.onToolCall({ id: 't1', name: 'do_thing', input: {} })
+        cb.onDone()
+      },
+      (cb) => {
+        cb.onThinking?.('check', 'reasoning')
+        cb.onDelta('ok')
+        cb.onDone()
+      },
+    ])
+    const onThinking = vi.fn()
+    const onDone = vi.fn()
+    const loop = new AgentLoop({ transport, skill: makeSkill(), events: { onThinking, onDone } })
+    loop.run('go')
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(onThinking.mock.calls.map((call) => call[0])).toEqual(['plan ', 'plan step', 'check'])
+    expect(onDone).toHaveBeenCalledWith({
+      text: 'ok',
+      cancelled: false,
+      turnLimit: false,
+      reasoning: 'plan step\n\ncheck',
+      thinking: 'plan step\n\ncheck',
+    })
+    expect(loop.messages[1]).toMatchObject({
+      role: 'assistant',
+      reasoning: 'plan step',
+      toolCalls: [{ id: 't1' }],
+    })
+    expect(loop.messages[3]).toMatchObject({ role: 'assistant', text: 'ok', reasoning: 'check' })
+    // the next request carries the first turn's reasoning back
+    expect(transport.requests[1]!.messages[1]).toMatchObject({ reasoning: 'plan step' })
+  })
+
+  it('shows summaries without treating them as model reasoning', async () => {
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onThinking?.('Reading the file', 'summary')
+        cb.onDelta('hi')
+        cb.onDone()
+      },
+    ])
+    const onDone = vi.fn()
+    const loop = new AgentLoop({ transport, skill: makeSkill(), events: { onDone } })
+    loop.run('x')
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalled())
+    expect(onDone).toHaveBeenCalledWith({
+      text: 'hi',
+      cancelled: false,
+      turnLimit: false,
+      thinking: 'Reading the file',
+    })
+    expect(loop.messages[1]).toEqual({ role: 'assistant', text: 'hi' })
+  })
+
+  it('stop: keeps the reasoning of the stopped turn in the context so later turns are not left blank', async () => {
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onThinking?.('partial', 'reasoning')
+        cb.onDelta('par') // never finishes; the user stops it
+      },
+      (cb) => {
+        cb.onDelta('next')
+        cb.onDone()
+      },
+    ])
+    const onDone = vi.fn()
+    const loop = new AgentLoop({ transport, skill: makeSkill(), events: { onDone } })
+    loop.run('one')
+    await flush()
+    loop.cancel()
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    expect(onDone.mock.calls[0]![0]).toMatchObject({ cancelled: true })
+    loop.run('two')
+    await vi.waitFor(() => expect(onDone).toHaveBeenCalledTimes(2))
+    expect(transport.requests[1]!.messages[1]).toEqual({
+      role: 'assistant',
+      text: 'par',
+      reasoning: 'partial',
+    })
+    // the second run reports only its own thinking (none)
+    expect(onDone.mock.calls[1]![0]).toEqual({ text: 'next', cancelled: false, turnLimit: false })
+  })
+
+  it('restore keeps stored reasoning on assistant messages', async () => {
+    const transport = scriptedTransport([
+      (cb) => {
+        cb.onDelta('ok')
+        cb.onDone()
+      },
+    ])
+    const loop = new AgentLoop({ transport, skill: makeSkill() })
+    loop.restore([
+      { role: 'user', text: 'q' },
+      { role: 'assistant', text: 'a', reasoning: 'r' },
+    ])
+    loop.run('next')
+    await flush()
+    expect(transport.requests[0]!.messages[1]).toEqual({
+      role: 'assistant',
+      text: 'a',
+      reasoning: 'r',
+    })
+  })
+
+  it('counts restored reasoning toward the compaction budget', () => {
+    const loop = new AgentLoop({
+      transport: scriptedTransport([]),
+      skill: makeSkill(),
+      compaction: { maxBytes: 300, keepRecentBytes: 100, disableLlmSummary: true },
+    })
+    loop.restore([
+      { role: 'user', text: 'q1' },
+      { role: 'assistant', text: 'a1', reasoning: 'r'.repeat(400) },
+      { role: 'user', text: 'q2' },
+      { role: 'assistant', text: 'a2' },
+    ])
+    // the visible text is a few bytes; only the reasoning pushes the history over 300,
+    // so the oldest turn is folded into the digest together with its reasoning
+    expect(
+      loop.messages.some((m) => m.role === 'assistant' && 'reasoning' in m && !!m.reasoning),
+    ).toBe(false)
+    expect(loop.messages.at(-1)).toEqual({ role: 'assistant', text: 'a2' })
+  })
+})
