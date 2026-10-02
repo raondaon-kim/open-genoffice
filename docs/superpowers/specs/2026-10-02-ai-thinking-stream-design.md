@@ -1,7 +1,7 @@
 # AI 생각 과정 실시간 표시와 DeepSeek 생각 모드 설계
 
 - 날짜: 2026-10-02
-- 상태: 설계 승인, 구현 전
+- 상태: 구현 완료 (2026-10-02) — 계획 docs/superpowers/plans/2026-10-02-ai-thinking-stream.md
 - 브랜치: `feat/ai-thinking-stream` (기반: `feat/hwp-ai-engine-surface` — 한글 AI 패널이 이 브랜치에만 있다)
 - 범위: `packages/ai-provider`, `packages/agent-core`, `packages/project-store`, `packages/ui`, 다섯 모듈
   (`apps/docs`·`apps/sheets`·`apps/slides`·`apps/pdf`·`apps/hwp`)의 AI 패널과 전송 층, `apps/docs` 메인의 AI 라우팅.

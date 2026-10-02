@@ -24,6 +24,18 @@ The fork's material changes include:
 - a global default model and sticky per-document provider/model selection;
 - model catalog discovery, compatibility filtering, and key verification;
 - cross-model conversation continuation without implicit fallback;
+- a collapsible "Thinking" box in all five AI panels (`@genoffice/ui` `ThinkingBox`):
+  live while the model thinks, one line afterwards; the thinking is saved with the
+  assistant message (`reasoning` and `thinking`, each capped at 32,000 characters)
+  and restored when a document reopens. Raw reasoning (DeepSeek
+  `reasoning_content`) is sent back to DeepSeek on later requests; reasoning
+  summaries (Codex) are display-only;
+- DeepSeek V4: the model list is `deepseek-flash` and `deepseek-v4-pro` (the retired
+  `deepseek-chat` / `deepseek-reasoner` names in stored routes are read as
+  `deepseek-flash`); requests run in thinking mode without `temperature`, with one
+  retry in plain mode if the server rejects missing `reasoning_content`;
+- test builds: `GENOFFICE_SEED_DEEPSEEK_API_KEY` pre-loads a DeepSeek key through the
+  normal verify-and-encrypt path when the profile has none;
 - provider-aware error handling and bounded retry suggestions;
 - independent application identity and update isolation;
 - Open GenOffice repository, packaging, documentation, and visual identity.

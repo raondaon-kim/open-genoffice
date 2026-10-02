@@ -29,6 +29,11 @@ Other versions are on the [Releases](https://github.com/sergedoub/open-genoffice
   out. API-key providers keep working alongside it.
 - Adds OpenRouter, Anthropic, OpenAI, DeepSeek, GLM (Z.ai), Kimi (Moonshot),
   and MiniMax with user-supplied API keys.
+- The AI panels show what the model is thinking in a collapsible "Thinking" box:
+  live while it thinks, one line afterwards. Codex shows its reasoning
+  summaries; DeepSeek (`deepseek-flash`, `deepseek-v4-pro`) shows its reasoning
+  and gets it back on the next request, so tool-heavy edits keep their chain of
+  thought.
 - Adds a Hangul (`.hwp`/`.hwpx`) module as a fifth shell tab: open existing
   documents, create new blank documents from Home, and ask the AI to read,
   edit, format, fill forms in, or generate documents. The assistant reads the
