@@ -89,6 +89,7 @@ import type { TabKind } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
 import { normalizeRecentQuery, pageRecentPaths, statExistingPaths } from './recent-files'
 import { loadFormFile } from './hwp-form-open'
+import { pendingProjectKey } from './pending-project'
 import { TabManager } from './tab-manager'
 import { initAutoUpdater } from './updater'
 import {
@@ -196,6 +197,8 @@ configureHwpRuntime({
   onSaved: (webContentsId, path) => {
     tabManager?.setHwpTabSaved(webContentsId, path)
     recordRecentFile(path)
+    // a new Hangul document started from a project view lands in that project
+    applyPendingProject(path)
   },
   onCreateDocument: (path) => {
     openDocumentPath(path)
@@ -928,7 +931,7 @@ let tabManager: TabManager | null = null
 
 /**
  * When the user creates a file from a specific project view, remember which
- * project the next save should belong to. key: 'doc' | 'sheet' | 'slide', value: projectId.
+ * project the next save should belong to. key: 'doc' | 'sheet' | 'slide' | 'hwp', value: projectId.
  * Consumed by each app's saveHook once the file first hits disk (P1 item 3).
  */
 const pendingNewFileProject = new Map<string, string>()
@@ -939,11 +942,7 @@ const pendingNewFileProject = new Map<string, string>()
  * Called from createShellWindow's opened/saved hooks.
  */
 function applyPendingProject(filePath: string): void {
-  const ext = extname(filePath).slice(1).toLowerCase()
-  let key: string | undefined
-  if (ext === 'docx') key = 'doc'
-  else if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') key = 'sheet'
-  else if (ext === 'pptx') key = 'slide'
+  const key = pendingProjectKey(filePath)
   if (!key) return
   const projectId = pendingNewFileProject.get(key)
   if (!projectId) return
