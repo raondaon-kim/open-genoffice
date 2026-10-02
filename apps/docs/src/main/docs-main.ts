@@ -67,6 +67,7 @@ import {
   registerAiRoutingIpc,
 } from './ai-routing-ipc'
 import { AiSecretStore } from './ai-secret-store'
+import { seedDeepSeekKey } from './ai-key-seed'
 import { AiSettingsService, createSafeStorageCipher } from './ai-settings-service'
 import { initDocsAutoUpdater } from './updater'
 
@@ -2284,14 +2285,25 @@ function getAiSettingsService(): AiSettingsService {
     getApiKey: (providerId) => secrets.get(providerId),
     codexModels: () => codex.listModels(),
   })
-  aiSettingsService = new AiSettingsService({
+  const service = new AiSettingsService({
     settingsPath: SETTINGS_PATH(),
     secretStore: secrets,
     catalogs,
     isGensparkConfigured: hasGskAuth,
     codex,
   })
-  return aiSettingsService
+  aiSettingsService = service
+  // test builds: pre-load a DeepSeek key from the environment (spec §4.6); a no-op without the variable.
+  // After app ready so safeStorage can encrypt.
+  void app.whenReady().then(() =>
+    seedDeepSeekKey({
+      secretStore: secrets,
+      settings: service,
+      env: process.env,
+      warn: (message) => console.warn(`[ai-seed] ${message}`),
+    }),
+  )
+  return service
 }
 
 /**
