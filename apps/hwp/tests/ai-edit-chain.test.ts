@@ -263,3 +263,87 @@ describe('runEditChain', () => {
     expect(existsSync(snapshot)).toBe(true)
   })
 })
+
+describe('round-trip check failure on a form that always fails it', () => {
+  const explainOf = (paragraphCount: number): RhwpResult => ({
+    exitCode: 0,
+    envelope: {
+      schemaVersion: '1.0',
+      fields: ['제목'],
+      tables: [{ rows: 2, cols: 2 }],
+      paragraphCount,
+      pageCount: 1,
+    },
+    stderr: '',
+  })
+  function verifyFails(paragraphsAfter: number) {
+    const calls: string[][] = []
+    const run: RunRhwpFn = async (_bin, args) => {
+      calls.push([...args])
+      if (args[0] === 'explain') return explainOf(args[1] === snapshot ? 9 : paragraphsAfter)
+      if (args[0] === 'ir-diff') {
+        return { exitCode: 3, envelope: { schemaVersion: '1.0', diffCount: 22 }, stderr: '' }
+      }
+      const output = args[args.indexOf('-o') + 1]!
+      writeFileSync(output, `${readFileSync(args[2]!, 'utf8')}+${args[1]}`)
+      return {
+        exitCode: 3,
+        envelope: {
+          schemaVersion: '1.0',
+          changedPages: [0],
+          verify: { diffCount: 22, identical: false },
+        },
+        stderr: '',
+      }
+    }
+    return { run, calls }
+  }
+
+  it('accepts the edit when the document summary matches the edit kind, and records it', async () => {
+    const { run } = verifyFails(9)
+    const result = await runEditChain({
+      rhwpPath: 'rhwp',
+      snapshotPath: snapshot,
+      workDir: dir,
+      ops: [{ op: 'replace_phrase', find: '붙임', replace: '첨부' }],
+      run,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.layoutTolerant).toEqual({ pagesBefore: 1, pagesAfter: 1 })
+    expect(result.journal.at(-1)).toMatchObject({ verify: 'layout-tolerant' })
+    expect(result.changedPages).toEqual([0])
+    expect(Buffer.from(result.data).toString()).toBe('ORIGINAL+replace-text')
+  })
+
+  it('refuses when the summary changed in a way the edit kind cannot explain', async () => {
+    const { run } = verifyFails(8)
+    const result = await runEditChain({
+      rhwpPath: 'rhwp',
+      snapshotPath: snapshot,
+      workDir: dir,
+      ops: [{ op: 'replace_phrase', find: '붙임', replace: '첨부' }],
+      run,
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toMatch(/paragraph count changed/)
+    expect(readdirSync(dir)).toEqual(['snap.hwpx'])
+  })
+
+  it('refuses when the summary cannot be read', async () => {
+    const { run: inner } = verifyFails(9)
+    const run: RunRhwpFn = async (bin, args) =>
+      args[0] === 'explain' ? { exitCode: 1, envelope: null, stderr: 'boom' } : inner(bin, args)
+    const result = await runEditChain({
+      rhwpPath: 'rhwp',
+      snapshotPath: snapshot,
+      workDir: dir,
+      ops: [{ op: 'replace_phrase', find: '붙임', replace: '첨부' }],
+      run,
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toMatch(/summary could not be read/)
+  })
+})

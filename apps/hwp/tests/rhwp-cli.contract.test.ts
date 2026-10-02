@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { judgeLayoutTolerance, summaryOf } from '../src/main/layout-tolerance'
 import { resolveNativeBinary } from '../src/main/native-binary-path'
 import { runRhwp } from '../src/main/rhwp-cli'
 import type { RhwpEnvelope } from '../src/shared/ai-contract'
@@ -358,5 +359,27 @@ describe.skipIf(!HAVE_BIN)('rhwp CLI contract (real binary)', () => {
       '--json',
     )
     expect(dry.envelope).toMatchObject({ notFound: ['__없는필드__'], filledCount: 0 })
+  })
+
+  it('explain exposes the summary the round-trip tolerance relies on, and it moves with the edit kind', async () => {
+    const before = summaryOf(await envelope('explain', doc, '--json'))
+    expect(before).not.toBeNull()
+    expect(before!.tables.length).toBeGreaterThan(0)
+    const grown = at('summary-row.hwpx')
+    expect((await edit(doc, grown, 'insert-row', '--table', '0', '--row', '0')).exitCode).toBe(0)
+    const afterRow = summaryOf(await envelope('explain', grown, '--json'))!
+    expect(afterRow.tables[0]!.rows).toBe(before!.tables[0]!.rows + 1)
+    expect(afterRow.paragraphCount).toBe(before!.paragraphCount)
+    expect(judgeLayoutTolerance(['insert_row'], before!, afterRow)).toEqual({ ok: true })
+    const shorter = at('summary-para.hwpx')
+    expect(
+      (await edit(doc, shorter, 'delete-paragraph', '--section', '0', '--para', '1')).exitCode,
+    ).toBe(0)
+    const afterPara = summaryOf(await envelope('explain', shorter, '--json'))!
+    expect(afterPara.paragraphCount).toBe(before!.paragraphCount - 1)
+    expect(judgeLayoutTolerance(['delete_paragraph'], before!, afterPara)).toEqual({ ok: true })
+    expect(judgeLayoutTolerance(['set_paragraph_text'], before!, afterPara)).toMatchObject({
+      ok: false,
+    })
   })
 })

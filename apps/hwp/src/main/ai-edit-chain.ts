@@ -3,6 +3,7 @@ import { mkdir, readFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AiEditResult, EditJournalEntry, RhwpResult } from '../shared/ai-contract'
 import { sha256Hex } from './ai-snapshots'
+import { judgeLayoutTolerance, summaryOf } from './layout-tolerance'
 import { compileEditOps } from './rhwp-edit-ops'
 import type { CompiledStep } from './rhwp-edit-ops'
 import { runRhwp } from './rhwp-cli'
@@ -60,6 +61,7 @@ export async function runEditChain(params: EditChainParams): Promise<AiEditResul
   const journal: EditJournalEntry[] = []
   const changed = new Set<number>()
   let current = params.snapshotPath
+  let layoutTolerant: { pagesBefore: number; pagesAfter: number } | undefined
 
   const cleanup = () => Promise.all(temps.map((path) => rm(path, { force: true })))
   const fail = async (
@@ -99,6 +101,18 @@ export async function runEditChain(params: EditChainParams): Promise<AiEditResul
       envelope: result.envelope,
     }
     if (result.exitCode !== 0) {
+      if (last && result.exitCode === 3 && existsSync(output)) {
+        // the save round-trip check failed: judge by the document summary (spec §4.3)
+        const verdict = await acceptRoundTripFailure(run, params, output)
+        if (verdict.ok) {
+          layoutTolerant = verdict.pages
+          journal.push({ ...base, verify: 'layout-tolerant' })
+          for (const page of pagesOf(result.envelope)) changed.add(page)
+          current = output
+          continue
+        }
+        return fail(step, `${describeRhwpFailure(result)} — ${verdict.reason}`, result)
+      }
       if (step.tolerate && result.exitCode === 1 && step.tolerate.test(result.stderr)) {
         journal.push({ ...base, tolerated: true })
         continue
@@ -139,6 +153,33 @@ export async function runEditChain(params: EditChainParams): Promise<AiEditResul
     outputSha: sha256Hex(new Uint8Array(data)),
     changedPages: [...changed].sort((a, b) => a - b),
     diffCount,
+    ...(layoutTolerant ? { layoutTolerant } : {}),
     journal,
+  }
+}
+
+async function acceptRoundTripFailure(
+  run: RunRhwpFn,
+  params: EditChainParams,
+  output: string,
+): Promise<
+  { ok: true; pages: { pagesBefore: number; pagesAfter: number } } | { ok: false; reason: string }
+> {
+  const unreadable = { ok: false as const, reason: 'the document summary could not be read' }
+  try {
+    const [before, after] = await Promise.all([
+      run(params.rhwpPath, ['explain', params.snapshotPath, '--json']),
+      run(params.rhwpPath, ['explain', output, '--json']),
+    ])
+    const a = before.exitCode === 0 ? summaryOf(before.envelope) : null
+    const b = after.exitCode === 0 ? summaryOf(after.envelope) : null
+    if (!a || !b) return unreadable
+    const ops = (params.ops as Array<{ op: string }>).map((op) => op.op)
+    const verdict = judgeLayoutTolerance(ops, a, b)
+    return verdict.ok
+      ? { ok: true, pages: { pagesBefore: a.pageCount, pagesAfter: b.pageCount } }
+      : verdict
+  } catch {
+    return unreadable
   }
 }

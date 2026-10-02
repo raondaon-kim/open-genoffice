@@ -125,6 +125,8 @@ export interface EditJournalEntry {
   tolerated?: boolean
   /** the step produced no output file (replace-text with 0 hits) */
   noop?: boolean
+  /** the engine's save round-trip check failed (a property of some forms) and the explain summary was checked instead */
+  verify?: 'layout-tolerant'
 }
 
 export type AiEditResult =
@@ -137,6 +139,8 @@ export type AiEditResult =
       changedPages: number[]
       /** ir-diff against the snapshot; null when ir-diff itself failed */
       diffCount: number | null
+      /** set when the round-trip check failed and the summary check accepted the edit */
+      layoutTolerant?: { pagesBefore: number; pagesAfter: number }
       journal: EditJournalEntry[]
     }
   | {
