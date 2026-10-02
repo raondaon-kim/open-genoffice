@@ -22,7 +22,14 @@ export function createElectronTransport(
       const unsubscribe = window.pdfApi.onAiStream((chunk) => {
         if (chunk.requestId !== requestId) return
         if (chunk.type === 'delta') callbacks.onDelta(chunk.text ?? '')
-        else if (chunk.type === 'tool-call') {
+        else if (chunk.type === 'thinking') {
+          if (chunk.text) {
+            callbacks.onThinking?.(
+              chunk.text,
+              chunk.thinkingKind === 'summary' ? 'summary' : 'reasoning',
+            )
+          }
+        } else if (chunk.type === 'tool-call') {
           if (chunk.toolCall) callbacks.onToolCall(chunk.toolCall)
         } else if (chunk.type === 'done') finish(callbacks.onDone)
         else finish(() => callbacks.onError(chunk.error ?? t('aiUnknownError')))

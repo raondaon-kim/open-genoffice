@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop } from '@genoffice/agent-core'
+import { AgentLoop, toRestorableMessages } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import {
   codexSignInNotice,
@@ -8,7 +8,14 @@ import {
   type AiModelSummary,
   type AiRoute,
 } from '@genoffice/ai-provider'
-import { AiComposer, AiTypingIndicator, Markdown, ModelPicker } from '@genoffice/ui'
+import {
+  AiComposer,
+  AiTypingIndicator,
+  Markdown,
+  ModelPicker,
+  ThinkingBox,
+  thinkingLabels,
+} from '@genoffice/ui'
 import type { ModelPickerModel } from '@genoffice/ui'
 import { aiLangDirective, t as tGlobal, useI18n } from '../i18n/locale'
 import type {
@@ -61,6 +68,8 @@ interface MessageChatEntry {
   /** the run failed and this user message was rolled back out of the model context */
   undelivered?: boolean
   tools?: ToolActivity[]
+  /** what the thinking box shows for this turn */
+  thinking?: string
 }
 
 type ChatEntry = MessageChatEntry | { role: 'divider'; text: string }
@@ -134,6 +143,7 @@ export function AiPanel({
     text: string,
     tools?: ProjectToolActivity[],
     route?: AiRoute | null,
+    thought?: { reasoning?: string | undefined; thinking?: string | undefined },
   ): void => {
     const identity = conversationRef.current
     if (!identity) return
@@ -144,6 +154,8 @@ export function AiPanel({
         text,
         ...(tools?.length ? { tools } : {}),
         ...(role === 'assistant' && route ? { ai: { requested: route } } : {}),
+        ...(role === 'assistant' && thought?.reasoning ? { reasoning: thought.reasoning } : {}),
+        ...(role === 'assistant' && thought?.thinking ? { thinking: thought.thinking } : {}),
       })
       .catch(() => {
         /* Persistence failure must not interrupt the active editing run. */
@@ -179,6 +191,10 @@ export function AiPanel({
       skill: createPdfSkill(deps),
       systemSuffix: () => aiLangDirective(langRef.current),
       events: {
+        onThinking: (thinking) => {
+          setPhase('thinking')
+          patchLast({ thinking })
+        },
         onText: (text) => {
           setPhase('replying')
           patchLast({ text })
@@ -208,7 +224,7 @@ export function AiPanel({
           patchLast({ streaming: false })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
-        onDone: ({ text, cancelled, turnLimit }) => {
+        onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
           const final = turnLimit
             ? [text, tGlobal('aiTurnLimit')].filter(Boolean).join('\n\n')
             : text || (cancelled ? tGlobal('aiStopped') : '')
@@ -219,7 +235,10 @@ export function AiPanel({
           setBusy(false)
           runDispatchPendingRef.current = false
           if (final && !cancelled) {
-            persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current)
+            persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current, {
+              reasoning,
+              thinking,
+            })
           }
         },
         onError: (error) => {
@@ -307,9 +326,7 @@ export function AiPanel({
           )
         }
         loopRef.current?.reset()
-        loopRef.current?.restore(
-          messages.map((message) => ({ role: message.role, text: message.text })),
-        )
+        loopRef.current?.restore(toRestorableMessages(messages))
         setChat(restorePdfTranscript(messages) as ChatEntry[])
         setRouteReady(true)
       } catch (error) {
@@ -564,12 +581,20 @@ export function AiPanel({
             )
           }
           const hasTools = (entry.tools?.length ?? 0) > 0
-          if (!entry.text && !hasTools) return null
+          const hasThinking = Boolean(entry.thinking)
+          if (!entry.text && !hasTools && !hasThinking) return null
           return (
             <div
               key={i}
               className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}`}
             >
+              {hasThinking && (
+                <ThinkingBox
+                  text={entry.thinking!}
+                  live={Boolean(entry.streaming && !entry.text)}
+                  labels={thinkingLabels(lang)}
+                />
+              )}
               {hasTools && <ToolChipList tools={entry.tools!} />}
               {entry.text && <Markdown text={entry.text} />}
               {entry.retrySuggestion && (

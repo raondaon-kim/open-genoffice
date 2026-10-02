@@ -232,6 +232,8 @@ export interface ProjectChatMessage {
   role: 'user' | 'assistant'
   text: string
   tools?: ProjectToolActivity[]
+  reasoning?: string
+  thinking?: string
   ai?: { requested: AiRoute; resolved?: AiRoute }
 }
 
@@ -241,6 +243,8 @@ export interface AppendProjectChatArgs {
   role: 'user' | 'assistant'
   text: string
   tools?: ProjectToolActivity[]
+  reasoning?: string
+  thinking?: string
   ai?: { requested: AiRoute; resolved?: AiRoute }
 }
 

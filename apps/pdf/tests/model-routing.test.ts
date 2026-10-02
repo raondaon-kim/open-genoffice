@@ -129,3 +129,16 @@ describe('PDF model routing', () => {
     expect(JSON.stringify(payload)).not.toContain('must-not-cross-ipc')
   })
 })
+
+describe('restorePdfTranscript thinking', () => {
+  it('carries the thinking of restored assistant messages', () => {
+    const messages = [
+      { seq: 0, ts: 't', role: 'user' as const, text: 'question' },
+      { seq: 1, ts: 't', role: 'assistant' as const, text: 'answer', thinking: 'plan' },
+    ]
+    expect(restorePdfTranscript(messages)).toEqual([
+      { role: 'user', text: 'question' },
+      { role: 'assistant', text: 'answer', thinking: 'plan' },
+    ])
+  })
+})

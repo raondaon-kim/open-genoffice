@@ -71,6 +71,7 @@ export type RestoredPdfChatEntry =
       role: 'user' | 'assistant'
       text: string
       tools?: ProjectChatMessage['tools']
+      thinking?: string
     }
   | { role: 'divider'; text: string }
 
@@ -90,6 +91,7 @@ export function restorePdfTranscript(
       role: message.role,
       text: message.text,
       ...(message.tools ? { tools: message.tools } : {}),
+      ...(message.thinking ? { thinking: message.thinking } : {}),
     })
     if (route) previousRoute = route
   }
