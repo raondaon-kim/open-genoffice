@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop } from '@genoffice/agent-core'
+import { AgentLoop, toRestorableMessages } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import { codexSignInNotice, openRouterRetrySuggestion } from '@genoffice/ai-provider'
 import type { AiModelSummary, AiRoute } from '@genoffice/ai-provider'
-import { AiComposer, Markdown, ModelPicker } from '@genoffice/ui'
+import { AiComposer, Markdown, ModelPicker, ThinkingBox, thinkingLabels } from '@genoffice/ui'
 import type { ModelPickerModel } from '@genoffice/ui'
 import type { AiConversationIdentity, ProjectChatMessage, PublicAiProvider } from '../../shared/ipc'
 import { createHwpSkill } from './hwp-skill'
@@ -99,6 +99,8 @@ interface ChatEntry {
   isError?: boolean
   retrySuggestion?: string
   tools?: ToolActivity[]
+  /** what the thinking box shows for this turn */
+  thinking?: string
 }
 
 type Phase = 'thinking' | 'replying' | 'working'
@@ -165,6 +167,10 @@ export function HwpAiPanel({
       transport: transportRef.current,
       skill: createHwpSkill(ctxRef.current),
       events: {
+        onThinking: (thinking) => {
+          setPhase('thinking')
+          patchLast({ thinking })
+        },
         onText: (text) => {
           setPhase('replying')
           patchLast({ text })
@@ -195,7 +201,7 @@ export function HwpAiPanel({
           patchLast({ streaming: false })
           setChat((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
         },
-        onDone: ({ text, cancelled, turnLimit }) => {
+        onDone: ({ text, cancelled, turnLimit, reasoning, thinking }) => {
           const final = turnLimit
             ? [text, 'Turn limit reached.'].filter(Boolean).join('\n\n')
             : text || (cancelled ? 'Stopped.' : '')
@@ -205,7 +211,10 @@ export function HwpAiPanel({
           }))
           setBusy(false)
           if (final && !cancelled) {
-            persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current)
+            persistMessage('assistant', final, runToolsRef.current, activeRunRouteRef.current, {
+              reasoning,
+              thinking,
+            })
           }
         },
         onError: (error) => {
@@ -251,6 +260,7 @@ export function HwpAiPanel({
     text: string,
     tools?: ToolActivity[],
     route?: AiRoute | null,
+    thought?: { reasoning?: string | undefined; thinking?: string | undefined },
   ): void => {
     const identity = conversationRef.current
     if (!identity || !text) return
@@ -261,6 +271,8 @@ export function HwpAiPanel({
         role,
         text,
         ...(role === 'assistant' && tools && tools.length > 0 ? { tools } : {}),
+        ...(role === 'assistant' && thought?.reasoning ? { reasoning: thought.reasoning } : {}),
+        ...(role === 'assistant' && thought?.thinking ? { thinking: thought.thinking } : {}),
         ...(role === 'assistant' && route
           ? { ai: { requested: { providerId: route.providerId, modelId: route.modelId } } }
           : {}),
@@ -340,14 +352,13 @@ export function HwpAiPanel({
         console.info(
           `[hwp-ai] route ready: ${route.providerId}/${route.modelId}, ${compatible.length} compatible model(s), ${messages.length > 0 ? 'transcript restored' : 'new conversation'}`,
         )
-        loopRef.current?.restore(
-          messages.map((message) => ({ role: message.role, text: message.text })),
-        )
+        loopRef.current?.restore(toRestorableMessages(messages))
         setChat(
           messages.map((message) => ({
             role: message.role,
             text: message.text,
             tools: message.tools,
+            ...(message.thinking ? { thinking: message.thinking } : {}),
           })),
         )
         setRouteReady(true)
@@ -531,15 +542,16 @@ export function HwpAiPanel({
         setChat((prev) =>
           prev
             .filter((entry) => !entry.isError)
-            .map((entry) => ({ role: entry.role, text: entry.text, tools: entry.tools })),
+            .map((entry) => ({
+              role: entry.role,
+              text: entry.text,
+              tools: entry.tools,
+              thinking: entry.thinking,
+            })),
         )
         void window.hwpApi
           .loadProjectChat({ projectId: identity.projectId, chatId: identity.chatId })
-          .then((messages) =>
-            loopRef.current?.restore(
-              messages.map((message) => ({ role: message.role, text: message.text })),
-            ),
-          )
+          .then((messages) => loopRef.current?.restore(toRestorableMessages(messages)))
           .catch(() => undefined)
       })
       .catch((err: unknown) => setModelNotice(err instanceof Error ? err.message : String(err)))
@@ -680,6 +692,7 @@ export function HwpAiPanel({
             {entry.role === 'assistant' &&
               entry.streaming &&
               !entry.text &&
+              !entry.thinking &&
               entry.tools?.length === 0 && (
                 <div className="hwp-ai__phase">
                   {phase === 'working'
@@ -689,6 +702,13 @@ export function HwpAiPanel({
                       : 'Thinking…'}
                 </div>
               )}
+            {entry.role === 'assistant' && entry.thinking && (
+              <ThinkingBox
+                text={entry.thinking}
+                live={Boolean(entry.streaming && !entry.text)}
+                labels={thinkingLabels(lang)}
+              />
+            )}
             {entry.tools?.map((tool, toolIndex) => (
               <details
                 key={toolIndex}

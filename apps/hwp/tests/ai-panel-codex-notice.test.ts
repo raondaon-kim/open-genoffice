@@ -8,6 +8,9 @@ vi.mock('@genoffice/ui', () => ({
   ModelPicker: () => React.createElement('div', { 'data-testid': 'picker' }),
   AiComposer: () => React.createElement('div', { 'data-testid': 'composer' }),
   Markdown: ({ text }: { text: string }) => React.createElement('div', null, text),
+  ThinkingBox: ({ text, live }: { text: string; live: boolean }) =>
+    React.createElement('div', { 'data-testid': 'thinking', 'data-live': String(live) }, text),
+  thinkingLabels: () => ({ thinking: 'Thinking…', show: 'Show', hide: 'Hide' }),
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'

@@ -7,6 +7,9 @@ vi.mock('@genoffice/ui', () => ({
   ModelPicker: () => React.createElement('div', { 'data-testid': 'picker' }),
   AiComposer: () => React.createElement('div', { 'data-testid': 'composer' }),
   Markdown: ({ text }: { text: string }) => React.createElement('div', null, text),
+  ThinkingBox: ({ text, live }: { text: string; live: boolean }) =>
+    React.createElement('div', { 'data-testid': 'thinking', 'data-live': String(live) }, text),
+  thinkingLabels: () => ({ thinking: 'Thinking…', show: 'Show', hide: 'Hide' }),
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'
@@ -44,7 +47,7 @@ function editor() {
   }
 }
 
-function installApi(explore: unknown) {
+function installApi(explore: unknown, chat: unknown[] = []) {
   const api = {
     resolveProjectChat: vi.fn(async () => ({ projectId: 'default', chatId: '0123456789abcdef' })),
     getAiPublicSettings: vi.fn(async () => ({
@@ -54,7 +57,7 @@ function installApi(explore: unknown) {
     listAiModels: vi.fn(async () => ({ models: [model] })),
     getAiConversationRoute: vi.fn(async () => route),
     setAiConversationRoute: vi.fn(async (_identity: unknown, next: unknown) => next),
-    loadProjectChat: vi.fn(async () => []),
+    loadProjectChat: vi.fn(async () => chat),
     getLanguage: vi.fn(async () => 'ko'),
     onAiStream: vi.fn(() => () => undefined),
     aiSnapshot: vi.fn(async () => ({ ok: true })),
@@ -143,6 +146,17 @@ describe('HWP AI panel — engine-suggested chips', () => {
     // a remount after collapse/expand gets the app's stack back
     await render(true, stack)
     expect(container.querySelector('.hwp-ai__undo')?.textContent).toMatch(/(1)/)
+  })
+
+  it('shows a collapsed thinking box for a restored assistant message', async () => {
+    installApi({ ok: false, error: 'explore failed' }, [
+      { seq: 0, ts: 't', role: 'user', text: 'question' },
+      { seq: 1, ts: 't', role: 'assistant', text: 'answer', thinking: 'plan the edit' },
+    ])
+    await render(true)
+    const box = container.querySelector('[data-testid="thinking"]')
+    expect(box?.textContent).toBe('plan the edit')
+    expect(box?.getAttribute('data-live')).toBe('false')
   })
 
   it('hides the undo button until an AI edit exists', async () => {

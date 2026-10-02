@@ -106,6 +106,8 @@ export interface ProjectChatMessage {
   role: 'user' | 'assistant'
   text: string
   tools?: ProjectToolActivity[]
+  reasoning?: string
+  thinking?: string
 }
 
 export interface HwpApi {
@@ -162,6 +164,8 @@ export interface HwpApi {
     role: 'user' | 'assistant'
     text: string
     tools?: ProjectToolActivity[]
+    reasoning?: string
+    thinking?: string
     ai?: { requested: AiRoute }
   }): Promise<void>
   loadProjectChat(args: {
