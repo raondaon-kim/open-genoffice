@@ -926,6 +926,15 @@ export function codexThreadStartParams(
   }
 }
 
+/** turn/start params; `summary: 'auto'` makes Codex stream reasoning summaries (shown in the thinking box) */
+export function codexTurnStartParams(
+  threadId: string,
+  input: unknown[],
+  outputSchema: unknown,
+): Record<string, unknown> {
+  return { threadId, input, outputSchema, summary: 'auto' }
+}
+
 export function activePermissionProfileId(result: unknown): string | undefined {
   const active = objectValue(objectValue(result)?.activePermissionProfile)
   return typeof active?.id === 'string' ? active.id : undefined
@@ -975,6 +984,7 @@ export async function waitForTurn(
   if (signal.aborted) throw cancelledError()
   let turnId = ''
   let finalText = ''
+  let summaryParts = 0
   let settled = false
   return new Promise<string>((resolve, reject) => {
     const finish = (error?: Error) => {
@@ -1012,6 +1022,9 @@ export async function waitForTurn(
       } else if (message.method === 'item/completed') {
         const item = objectValue(params.item)
         if (item?.type === 'agentMessage' && typeof item.text === 'string') finalText = item.text
+      } else if (message.method === 'item/reasoning/summaryPartAdded') {
+        // each part is its own bolded heading + text: keep them apart in the thinking box
+        if (summaryParts++ > 0) cb.onReasoningSummaryDelta?.('\n\n')
       } else if (message.method === 'item/reasoning/summaryTextDelta') {
         if (typeof params.delta === 'string') cb.onReasoningSummaryDelta?.(params.delta)
       } else if (message.method === 'turn/completed') {
@@ -1083,14 +1096,17 @@ async function runCodexAppServer(
         client,
         session.threadId,
         () =>
-          client.request('turn/start', {
-            threadId: session.threadId,
-            input: [
-              { type: 'text', text: prompt, text_elements: [] },
-              ...imagePaths.map((path) => ({ type: 'localImage', path })),
-            ],
-            outputSchema: codexAppServerOutputSchema(tools),
-          }),
+          client.request(
+            'turn/start',
+            codexTurnStartParams(
+              session.threadId,
+              [
+                { type: 'text', text: prompt, text_elements: [] },
+                ...imagePaths.map((path) => ({ type: 'localImage', path })),
+              ],
+              codexAppServerOutputSchema(tools),
+            ),
+          ),
         cb.signal,
         cb,
       )

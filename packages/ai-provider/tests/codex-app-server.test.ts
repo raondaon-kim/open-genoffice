@@ -11,6 +11,7 @@ import {
   codexAppServerLaunchArgs,
   codexAppServerOutputSchema,
   codexThreadStartParams,
+  codexTurnStartParams,
   parseCodexAppServerTurn,
   resolveCodexCliPath,
   waitForTurn,
@@ -218,6 +219,17 @@ describe('Codex app-server bridge', () => {
     ).toThrow(/Tool call arguments exceeded the codex-app-server buffer limit/)
   })
 
+  it('asks Codex for reasoning summaries on every turn', () => {
+    const input = [{ type: 'text', text: 'hi', text_elements: [] }]
+    const schema = { type: 'object' }
+    expect(codexTurnStartParams('th', input, schema)).toEqual({
+      threadId: 'th',
+      input,
+      outputSchema: schema,
+      summary: 'auto',
+    })
+  })
+
   it('reports reasoning summary deltas through onReasoningSummaryDelta', async () => {
     const summaries: string[] = []
     const transport = fakeTransport([
@@ -246,6 +258,33 @@ describe('Codex app-server bridge', () => {
       { ...noopCallbacks, onReasoningSummaryDelta: (text: string) => summaries.push(text) },
     )
     expect(summaries).toEqual(['Looking ', 'at the file'])
+  })
+
+  it('separates reasoning summary parts with a blank line, but not before the first', async () => {
+    const summaries: string[] = []
+    const part = { threadId: 'th', turnId: 't1' }
+    const transport = fakeTransport([
+      { method: 'item/reasoning/summaryPartAdded', params: { ...part, summaryIndex: 0 } },
+      { method: 'item/reasoning/summaryTextDelta', params: { ...part, delta: '**One**' } },
+      { method: 'item/reasoning/summaryPartAdded', params: { ...part, summaryIndex: 1 } },
+      { method: 'item/reasoning/summaryTextDelta', params: { ...part, delta: '**Two**' } },
+      {
+        method: 'item/completed',
+        params: { ...part, item: { type: 'agentMessage', text: 'done' } },
+      },
+      {
+        method: 'turn/completed',
+        params: { ...part, turn: { id: 't1', status: 'completed' } },
+      },
+    ])
+    await waitForTurn(
+      transport,
+      'th',
+      () => transport.request('turn/start', {}),
+      noopCallbacks.signal,
+      { ...noopCallbacks, onReasoningSummaryDelta: (text: string) => summaries.push(text) },
+    )
+    expect(summaries.join('')).toBe('**One**\n\n**Two**')
   })
 
   it('keeps waiting through transient stream errors Codex retries itself', async () => {
