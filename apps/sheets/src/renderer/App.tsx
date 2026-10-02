@@ -104,6 +104,13 @@ import {
   type AgentImage,
 } from '@genoffice/agent-core'
 import {
+  emptyThinkingState,
+  thinkingFinish,
+  thinkingTurnEnd,
+  thinkingUpdate,
+  type ThinkingState,
+} from './ai/thinking-state'
+import {
   codexSignInNotice,
   openRouterRetrySuggestion,
   type AiModelSummary,
@@ -869,6 +876,8 @@ export function App(): React.JSX.Element {
   /** AI plans apply asynchronously after propose_operations returns. Run
    * completion waits for these before doing the run's single auto-save. */
   const aiApplyPromisesRef = useRef<Promise<boolean>[]>([])
+  // one assistant entry spans a multi-step run: keep the finished turns' thinking
+  const thinkingStateRef = useRef<ThinkingState>(emptyThinkingState)
 
   const agentLoopRef = useRef<AgentLoop | null>(null)
   if (!agentLoopRef.current) {
@@ -887,15 +896,27 @@ export function App(): React.JSX.Element {
       // guide loading adds a tool round; the default 8 cuts off multi-step work
       maxTurns: 24,
       events: {
-        onThinking: (thinking) => {
-          patchLastAssistant((entry) => ({ ...entry, thinking }))
+        onThinking: (turnThinking) => {
+          const next = thinkingUpdate(thinkingStateRef.current, turnThinking)
+          thinkingStateRef.current = next.state
+          patchLastAssistant((entry) => ({ ...entry, thinking: next.text, thinkingLive: true }))
+        },
+        onTurnEnd: () => {
+          thinkingStateRef.current = thinkingTurnEnd(thinkingStateRef.current)
+          patchLastAssistant((entry) => ({ ...entry, thinkingLive: false }))
         },
         onText: (text) => {
           setMessage(text || t('appAiThinking'))
           // When the model retries successfully and keeps streaming after a
           // mid-run failure (e.g. one apply error), clear the error flag —
           // otherwise the whole successful message stays rendered in red.
-          patchLastAssistant((entry) => ({ ...entry, text, isError: false }))
+          patchLastAssistant((entry) => ({
+            ...entry,
+            text,
+            isError: false,
+            // the answer started: the thinking box collapses
+            ...(text ? { thinkingLive: false } : {}),
+          }))
         },
         onToolStart: (call) => {
           // Live "running" chip: replaced in place by onToolExecuted
@@ -952,6 +973,10 @@ export function App(): React.JSX.Element {
             text: finalText,
             streaming: false,
             isError: false,
+            ...(thinkingFinish(thinking, entry.thinking)
+              ? { thinking: thinkingFinish(thinking, entry.thinking) }
+              : {}),
+            thinkingLive: false,
             // A stop mid-tool can leave a running placeholder behind — drop it
             tools: entry.tools.filter((tl) => !tl.running),
           }))
@@ -1071,6 +1096,7 @@ export function App(): React.JSX.Element {
     if (!instruction.trim() || !loop || loop.busy || runStartingRef.current) return
     runStartingRef.current = true
     aiApplyPromisesRef.current = []
+    thinkingStateRef.current = emptyThinkingState
     setAiBusy(true)
     setMessage(t('appAiThinking'))
     appendChat({ role: 'assistant', text: '', tools: [], streaming: true })

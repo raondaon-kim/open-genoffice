@@ -56,6 +56,8 @@ export interface AiChatMessage {
   readonly streaming?: boolean | undefined
   /** what the thinking box shows for this turn */
   readonly thinking?: string | undefined
+  /** the model is still thinking (the answer has not started this turn) */
+  readonly thinkingLive?: boolean | undefined
   readonly isError?: boolean | undefined
   /** A failed model turn may be retried through OpenRouter's router. */
   readonly retrySuggestion?: string | undefined
@@ -329,7 +331,7 @@ export function AiChatPanel({
                 {entry.thinking && (
                   <ThinkingBox
                     text={entry.thinking}
-                    live={Boolean(entry.streaming && !entry.text)}
+                    live={Boolean(entry.streaming && entry.thinkingLive)}
                     labels={thinkingLabels(lang)}
                   />
                 )}
