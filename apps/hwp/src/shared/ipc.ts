@@ -68,7 +68,11 @@ export interface CreateDocumentResult {
 export type StudioUrlResult = { ok: true; url: string } | { ok: false; error: string }
 
 /** What this tab should do once its renderer mounts. */
-export type HwpOpenIntent = { mode: 'open'; path: string } | { mode: 'blank' }
+export type HwpOpenIntent =
+  | { mode: 'open'; path: string }
+  | { mode: 'blank' }
+  /** a copy of a form file: bytes and name only — the tab cannot save over the form */
+  | { mode: 'form'; fileName: string; data: ArrayBuffer }
 
 export interface AiConversationIdentity {
   projectId: string

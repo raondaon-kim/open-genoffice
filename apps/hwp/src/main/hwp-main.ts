@@ -20,6 +20,7 @@ import type {
 } from '../shared/ai-contract'
 import { runEditChain } from './ai-edit-chain'
 import { SnapshotStore } from './ai-snapshots'
+import { HwpIntentStore } from './hwp-intents'
 import type { NativeBinaryName } from './native-binary-path'
 import { runRhwp } from './rhwp-cli'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
@@ -231,10 +232,12 @@ export function configureHwpRuntime(paths: RuntimePaths): void {
   runtime = paths
 }
 
-/** Open paths queued at tab creation; the renderer consumes them after mount (avoids did-finish-load races) */
-const pendingByWc = new Map<number, string>()
-/** Views created for a new (untitled) document — no path is granted until Save As */
-const blankByWc = new Set<number>()
+/**
+ * What each view should open (a path, a blank document, a copy of a form); the
+ * renderer consumes it after mount (avoids did-finish-load races). Blank and
+ * form views get no path until Save As.
+ */
+const intents = new HwpIntentStore()
 /** File paths granted to each view — readFile/save only allow these */
 const allowedByWc = new Map<number, Set<string>>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
@@ -243,7 +246,15 @@ const saveWaiters = new Map<number, (ok: boolean) => void>()
 
 /** Mark the view as a fresh blank document instead of a file-backed one. */
 export function markHwpNewBlank(webContentsId: number): void {
-  blankByWc.add(webContentsId)
+  intents.markBlank(webContentsId)
+}
+
+/** Open a COPY of a form in this view: bytes and name only, no path is granted. */
+export function queueHwpForm(
+  webContentsId: number,
+  form: { fileName: string; data: ArrayBuffer },
+): void {
+  intents.queueForm(webContentsId, form)
 }
 
 export function hwpIsDirty(webContentsId: number): boolean {
@@ -345,13 +356,7 @@ function registerHwpIpc(): void {
   if (ipcRegistered) return
   ipcRegistered = true
 
-  ipcMain.handle(HWP_CHANNELS.consumePending, (e) => {
-    const blank = blankByWc.delete(e.sender.id)
-    if (blank) return { mode: 'blank' }
-    const path = pendingByWc.get(e.sender.id) ?? null
-    pendingByWc.delete(e.sender.id)
-    return path ? { mode: 'open', path } : null
-  })
+  ipcMain.handle(HWP_CHANNELS.consumePending, (e) => intents.consume(e.sender.id))
 
   ipcMain.handle(HWP_CHANNELS.readFile, async (e, path: unknown) => {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
@@ -509,7 +514,7 @@ function registerHwpIpc(): void {
 function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   const wcId = wc.id
   if (openPath && existsSync(openPath)) {
-    pendingByWc.set(wcId, openPath)
+    intents.queuePath(wcId, openPath)
     allowedByWc.set(wcId, new Set([openPath]))
   }
   // External links opened from inside the embedded studio go to the system browser
@@ -519,8 +524,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     return { action: 'deny' }
   })
   wc.once('destroyed', () => {
-    pendingByWc.delete(wcId)
-    blankByWc.delete(wcId)
+    intents.forget(wcId)
     allowedByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)
