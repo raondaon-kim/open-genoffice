@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentToolCall } from '@genoffice/agent-core'
+import type { AgentMessage, AgentToolCall } from '@genoffice/agent-core'
 import { sseLines, streamForProvider } from '../src/stream'
-import { okResponse, sseStream } from './test-utils'
+import { errorResponse, okResponse, sseStream } from './test-utils'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -329,4 +329,163 @@ it('rejects an unknown provider id', async () => {
   await expect(
     streamForProvider('unknown' as never, { apiKey: 'k', model: 'm' }, 'sys', [], [], 100, cb),
   ).rejects.toThrow(/Unknown provider/)
+})
+
+describe('streamForProvider: thinking', () => {
+  const bodyOf = (fetchMock: ReturnType<typeof vi.fn>, call = 0) =>
+    JSON.parse(fetchMock.mock.calls[call]![1].body as string) as {
+      messages: Array<Record<string, unknown>>
+      temperature?: number
+      thinking?: unknown
+    }
+  const toolTurn: AgentMessage[] = [
+    { role: 'user', text: 'hi' },
+    {
+      role: 'assistant',
+      text: '',
+      toolCalls: [{ id: 'c1', name: 'do', input: {} }],
+      reasoning: 'plan',
+    },
+    { role: 'tool', results: [{ id: 'c1', name: 'do', output: 'ok' }] },
+  ]
+  const answer = () =>
+    okResponse(sseStream(['data: {"choices":[{"delta":{"content":"answer"}}]}', 'data: [DONE]']))
+
+  it('streams reasoning_content as reasoning deltas, apart from the answer', async () => {
+    const body = sseStream([
+      'data: {"choices":[{"delta":{"reasoning_content":"think "}}]}',
+      'data: {"choices":[{"delta":{"reasoning_content":"hard"}}]}',
+      'data: {"choices":[{"delta":{"content":"answer"}}]}',
+      'data: [DONE]',
+    ])
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(okResponse(body)))
+    const { deltas, cb } = collector()
+    const reasoning: string[] = []
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      [{ role: 'user', text: 'hi' }],
+      [],
+      100,
+      { ...cb, onReasoningDelta: (text: string) => reasoning.push(text) },
+    )
+    expect(reasoning).toEqual(['think ', 'hard'])
+    expect(deltas).toEqual(['answer'])
+  })
+
+  it('sends earlier reasoning back and leaves temperature out in thinking mode', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(answer())
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      toolTurn,
+      [{ name: 'do', description: 'd', inputSchema: { type: 'object' } }],
+      100,
+      cb,
+    )
+    const sent = bodyOf(fetchMock)
+    expect(sent.messages[2]).toMatchObject({ role: 'assistant', reasoning_content: 'plan' })
+    expect(sent).not.toHaveProperty('temperature')
+    expect(sent).not.toHaveProperty('thinking')
+  })
+
+  it('leaves assistant turns without reasoning as they are', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(answer())
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      [
+        { role: 'user', text: 'hi' },
+        { role: 'assistant', text: 'Hello!' },
+        { role: 'user', text: 'again' },
+      ],
+      [],
+      100,
+      cb,
+    )
+    expect(bodyOf(fetchMock).messages[2]).not.toHaveProperty('reasoning_content')
+  })
+
+  it('retries once with thinking disabled when DeepSeek rejects reasoning_content', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        errorResponse(
+          400,
+          '{"error":{"message":"The reasoning_content in the thinking mode must be passed back to the API."}}',
+        ),
+      )
+      .mockResolvedValueOnce(answer())
+    vi.stubGlobal('fetch', fetchMock)
+    const { deltas, cb } = collector()
+    await streamForProvider(
+      'deepseek',
+      { apiKey: 'k', model: 'deepseek-flash' },
+      'sys',
+      toolTurn,
+      [{ name: 'do', description: 'd', inputSchema: { type: 'object' } }],
+      100,
+      cb,
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    const retry = bodyOf(fetchMock, 1)
+    expect(retry.thinking).toEqual({ type: 'disabled' })
+    expect(retry.temperature).toBe(0.3)
+    expect(retry.messages[2]).not.toHaveProperty('reasoning_content')
+    expect(deltas).toEqual(['answer'])
+  })
+
+  it('does not retry other 400 errors', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(errorResponse(400, '{"error":{"message":"invalid tools schema"}}'))
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    await expect(
+      streamForProvider(
+        'deepseek',
+        { apiKey: 'k', model: 'deepseek-flash' },
+        'sys',
+        [{ role: 'user', text: 'hi' }],
+        [],
+        100,
+        cb,
+      ),
+    ).rejects.toThrow(/HTTP 400/)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves other OpenAI-compatible providers unchanged but still forwards reasoning_content', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        okResponse(
+          sseStream(['data: {"choices":[{"delta":{"reasoning_content":"hm"}}]}', 'data: [DONE]']),
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+    const { cb } = collector()
+    const reasoning: string[] = []
+    await streamForProvider(
+      'openai',
+      { apiKey: 'k', model: 'gpt-4.1-mini' },
+      'sys',
+      toolTurn,
+      [],
+      100,
+      { ...cb, onReasoningDelta: (text: string) => reasoning.push(text) },
+    )
+    const sent = bodyOf(fetchMock)
+    expect(sent.temperature).toBe(0.3)
+    expect(sent).not.toHaveProperty('thinking')
+    expect(sent.messages[2]).not.toHaveProperty('reasoning_content')
+    expect(reasoning).toEqual(['hm'])
+  })
 })

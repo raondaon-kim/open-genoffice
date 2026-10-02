@@ -127,8 +127,10 @@ export interface AiStreamRequest {
 
 export interface AiStreamChunk {
   requestId: string
-  type: 'delta' | 'tool-call' | 'done' | 'error'
+  type: 'delta' | 'thinking' | 'tool-call' | 'done' | 'error'
   text?: string
+  /** for 'thinking' chunks: raw reasoning or a display-only summary */
+  thinkingKind?: 'reasoning' | 'summary'
   /** complete parsed tool call (emitted once its arguments finish streaming) */
   toolCall?: AgentToolCall
   error?: string

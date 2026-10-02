@@ -32,8 +32,10 @@ export function throwIfToolCountOverBudget(count: number, provider: string): voi
 export interface StreamCallbacks {
   onDelta: (text: string) => void
   onToolCall: (call: AgentToolCall) => void
-  /** raw model reasoning deltas (reasoning_content) */
+  /** raw model reasoning deltas (reasoning_content); the same provider may need them back on later requests */
   onReasoningDelta?: (text: string) => void
+  /** display-only reasoning summary deltas (Codex); never sent back */
+  onReasoningSummaryDelta?: (text: string) => void
   /** normalized stop reason ('max_tokens' when the output was cut off by the token limit) */
   onStopReason?: (reason: string) => void
   /** bytes arrived on the wire (keepalive for the stream watchdog) */

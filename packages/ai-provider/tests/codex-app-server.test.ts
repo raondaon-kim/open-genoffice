@@ -218,6 +218,36 @@ describe('Codex app-server bridge', () => {
     ).toThrow(/Tool call arguments exceeded the codex-app-server buffer limit/)
   })
 
+  it('reports reasoning summary deltas through onReasoningSummaryDelta', async () => {
+    const summaries: string[] = []
+    const transport = fakeTransport([
+      {
+        method: 'item/reasoning/summaryTextDelta',
+        params: { threadId: 'th', turnId: 't1', delta: 'Looking ' },
+      },
+      {
+        method: 'item/reasoning/summaryTextDelta',
+        params: { threadId: 'th', turnId: 't1', delta: 'at the file' },
+      },
+      {
+        method: 'item/completed',
+        params: { threadId: 'th', turnId: 't1', item: { type: 'agentMessage', text: 'done' } },
+      },
+      {
+        method: 'turn/completed',
+        params: { threadId: 'th', turnId: 't1', turn: { id: 't1', status: 'completed' } },
+      },
+    ])
+    await waitForTurn(
+      transport,
+      'th',
+      () => transport.request('turn/start', {}),
+      noopCallbacks.signal,
+      { ...noopCallbacks, onReasoningSummaryDelta: (text: string) => summaries.push(text) },
+    )
+    expect(summaries).toEqual(['Looking ', 'at the file'])
+  })
+
   it('keeps waiting through transient stream errors Codex retries itself', async () => {
     const transport = fakeTransport([
       {

@@ -308,7 +308,11 @@ export async function streamGemini(
 
 // ---- OpenAI-compatible (openai / deepseek / glm / kimi / minimax / openrouter / custom) ----
 
-function openAiMessages(system: string, messages: AgentMessage[]): unknown[] {
+function openAiMessages(
+  system: string,
+  messages: AgentMessage[],
+  sendReasoning = false,
+): unknown[] {
   const out: unknown[] = [{ role: 'system', content: system }]
   for (const m of messages) {
     if (m.role === 'user') {
@@ -330,6 +334,7 @@ function openAiMessages(system: string, messages: AgentMessage[]): unknown[] {
       out.push({
         role: 'assistant',
         content: m.text || null,
+        ...(sendReasoning && m.reasoning ? { reasoning_content: m.reasoning } : {}),
         ...(m.toolCalls && m.toolCalls.length > 0
           ? {
               tool_calls: m.toolCalls.map((call) => ({
@@ -349,6 +354,9 @@ function openAiMessages(system: string, messages: AgentMessage[]): unknown[] {
   return out
 }
 
+/** DeepSeek's V4 models run in thinking mode by default (spec §4.3). */
+export type OpenAiCompatibleVariant = 'deepseek'
+
 export async function streamOpenAiCompatible(
   baseUrl: string,
   config: AiProviderConfig,
@@ -357,30 +365,45 @@ export async function streamOpenAiCompatible(
   tools: AgentToolDef[],
   maxTokens: number,
   cb: StreamCallbacks,
+  variant?: OpenAiCompatibleVariant,
 ): Promise<void> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    signal: cb.signal,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: maxTokens,
-      messages: openAiMessages(system, messages),
-      ...(tools.length > 0
-        ? {
-            tools: tools.map((t) => ({
-              type: 'function',
-              function: { name: t.name, description: t.description, parameters: t.inputSchema },
-            })),
-          }
-        : {}),
-      temperature: 0.3,
-      stream: true,
-    }),
-  })
+  const deepseek = variant === 'deepseek'
+  const send = (thinking: boolean): Promise<Response> =>
+    fetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      signal: cb.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: maxTokens,
+        messages: openAiMessages(system, messages, deepseek && thinking),
+        ...(tools.length > 0
+          ? {
+              tools: tools.map((t) => ({
+                type: 'function',
+                function: { name: t.name, description: t.description, parameters: t.inputSchema },
+              })),
+            }
+          : {}),
+        // thinking mode takes no sampling parameters; a plain request keeps the old temperature
+        ...(deepseek && !thinking ? { thinking: { type: 'disabled' } } : {}),
+        ...(deepseek && thinking ? {} : { temperature: 0.3 }),
+        stream: true,
+      }),
+    })
+  let response = await send(true)
+  if (deepseek && response.status === 400) {
+    // the API may one day insist on reasoning_content we cannot supply (e.g. another model's turns):
+    // a 400 arrives before any chunk, so one plain retry cannot duplicate output
+    const detail = await response.text()
+    if (!/reasoning_content/.test(detail)) {
+      throw new Error(`HTTP 400: ${httpBodyDetail(detail, 400)}`)
+    }
+    response = await send(false)
+  }
   if (!response.ok || !response.body) {
     throw new Error(
       `HTTP ${response.status}: ${httpBodyDetail(await response.text(), response.status)}`,
@@ -406,6 +429,7 @@ export async function streamOpenAiCompatible(
       choices?: Array<{
         delta?: {
           content?: string
+          reasoning_content?: string
           tool_calls?: Array<{
             index: number
             id?: string
@@ -417,6 +441,7 @@ export async function streamOpenAiCompatible(
     }
     const choice = event.choices?.[0]
     if (!choice) continue
+    if (choice.delta?.reasoning_content) cb.onReasoningDelta?.(choice.delta.reasoning_content)
     if (choice.delta?.content) cb.onDelta(choice.delta.content)
     for (const tc of choice.delta?.tool_calls ?? []) {
       const pending = pendingTools.get(tc.index) ?? {
@@ -488,6 +513,16 @@ export async function streamForProvider(
     case 'gemini':
       return streamGemini(config, system, messages, tools, maxTokens, cb)
     case 'deepseek':
+      return streamOpenAiCompatible(
+        OPENAI_COMPATIBLE_BASE_URLS.deepseek!,
+        config,
+        system,
+        messages,
+        tools,
+        maxTokens,
+        cb,
+        'deepseek',
+      )
     case 'glm':
     case 'kimi':
     case 'minimax':

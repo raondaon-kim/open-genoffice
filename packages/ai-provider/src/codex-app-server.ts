@@ -1013,7 +1013,7 @@ export async function waitForTurn(
         const item = objectValue(params.item)
         if (item?.type === 'agentMessage' && typeof item.text === 'string') finalText = item.text
       } else if (message.method === 'item/reasoning/summaryTextDelta') {
-        if (typeof params.delta === 'string') cb.onReasoningDelta?.(params.delta)
+        if (typeof params.delta === 'string') cb.onReasoningSummaryDelta?.(params.delta)
       } else if (message.method === 'turn/completed') {
         const turn = objectValue(params.turn)
         if (typeof turn?.id === 'string') turnId = turn.id
