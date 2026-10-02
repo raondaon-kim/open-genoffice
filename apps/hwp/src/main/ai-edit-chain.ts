@@ -34,8 +34,15 @@ export function describeRhwpFailure(result: RhwpResult): string {
       return `Tool argument error (do not retry): ${result.stderr.trim().slice(0, 400)}`
     case 3:
       return `rhwp reported a negative result: ${JSON.stringify(result.envelope ?? {}).slice(0, 800)}`
-    default:
-      return `rhwp edit failed: ${(result.stderr.trim() || JSON.stringify(result.envelope ?? {})).slice(0, 800)}`
+    default: {
+      const detail = (result.stderr.trim() || JSON.stringify(result.envelope ?? {})).slice(0, 800)
+      const hint = /최소 1행/.test(result.stderr)
+        ? " — this is the table's only row: remove the whole table with delete_table instead."
+        : /마지막 문단은 삭제할 수 없/.test(result.stderr)
+          ? ' — the last paragraph of a section cannot be removed: empty it with set_paragraph_text and an empty text instead.'
+          : ''
+      return `rhwp edit failed: ${detail}${hint}`
+    }
   }
 }
 

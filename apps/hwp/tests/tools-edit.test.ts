@@ -302,3 +302,20 @@ describe('an .hwp (HWP5) document', () => {
     })
   })
 })
+
+describe('edit_table delete_table and the round-trip note', () => {
+  it('passes delete_table through and reports a tolerated round-trip check', async () => {
+    const api = fakeApi({}, (request) => ({
+      ...(okEdit(request) as Extract<AiEditResult, { ok: true }>),
+      layoutTolerant: { pagesBefore: 1, pagesAfter: 1 },
+    }))
+    const ctx = ctxWith(api, fakeEditor())
+    const result = await editTools.execute(
+      ctx,
+      call('edit_table', { ops: [{ op: 'delete_table', table: 1 }] }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(api.edits[0]!.ops).toEqual([{ op: 'delete_table', table: 1 }])
+    expect(result.output).toMatch(/round-trip check/)
+  })
+})

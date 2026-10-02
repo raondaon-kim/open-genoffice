@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runEditChain } from '../src/main/ai-edit-chain'
+import { describeRhwpFailure, runEditChain } from '../src/main/ai-edit-chain'
 import { sha256Hex } from '../src/main/ai-snapshots'
 import type { RunRhwpFn } from '../src/main/rhwp-cli'
 import type { RhwpResult } from '../src/shared/ai-contract'
@@ -345,5 +345,25 @@ describe('round-trip check failure on a form that always fails it', () => {
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.error).toMatch(/summary could not be read/)
+  })
+})
+
+describe('describeRhwpFailure hints', () => {
+  it('tells the model to delete the whole table when the only row is removed', () => {
+    const text = describeRhwpFailure({
+      exitCode: 1,
+      envelope: null,
+      stderr: '오류: 행 삭제 실패 - 렌더링 오류: 최소 1행은 유지해야 합니다',
+    })
+    expect(text).toMatch(/delete_table/)
+  })
+
+  it('tells the model to empty the text when the last paragraph of a section is removed', () => {
+    const text = describeRhwpFailure({
+      exitCode: 1,
+      envelope: null,
+      stderr: '오류: 문단 삭제 실패 - 렌더링 오류: 구역의 마지막 문단은 삭제할 수 없습니다',
+    })
+    expect(text).toMatch(/set_paragraph_text/)
   })
 })

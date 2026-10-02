@@ -361,6 +361,25 @@ describe.skipIf(!HAVE_BIN)('rhwp CLI contract (real binary)', () => {
     expect(dry.envelope).toMatchObject({ notFound: ['__없는필드__'], filledCount: 0 })
   })
 
+  it('delete-table removes a whole table and passes the round-trip check', async () => {
+    const before = summaryOf(await envelope('explain', doc, '--json'))!
+    const out = at('no-table.hwpx')
+    const result = await rhwp(
+      'edit',
+      'delete-table',
+      doc,
+      '--table',
+      '0',
+      '-o',
+      out,
+      '--json',
+      '--verify',
+    )
+    expect(result.exitCode, result.stderr).toBe(0)
+    const after = summaryOf(await envelope('explain', out, '--json'))!
+    expect(after.tables.length).toBe(before.tables.length - 1)
+  })
+
   it('explain exposes the summary the round-trip tolerance relies on, and it moves with the edit kind', async () => {
     const before = summaryOf(await envelope('explain', doc, '--json'))
     expect(before).not.toBeNull()

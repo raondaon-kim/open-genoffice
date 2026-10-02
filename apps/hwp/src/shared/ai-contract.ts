@@ -83,6 +83,7 @@ export type EditOp =
   | { op: 'merge_cells'; table: number; row: number; col: number; endRow: number; endCol: number }
   | { op: 'split_cell'; table: number; row: number; col: number }
   | { op: 'insert_table'; section: number; paragraph: number; rows: number; cols: number }
+  | { op: 'delete_table'; table: number }
   | { op: 'insert_footnote'; section: number; paragraph: number; charOffset: number; text?: string }
   | { op: 'insert_endnote'; section: number; paragraph: number; charOffset: number }
   | { op: 'insert_page_break'; section: number; paragraph: number; charOffset: number }

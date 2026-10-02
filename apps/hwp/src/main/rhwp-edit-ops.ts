@@ -285,6 +285,7 @@ const COMPILERS: Record<EditOp['op'], Compiler> = {
       ],
     },
   ],
+  delete_table: (raw) => [{ command: 'delete-table', flags: ['--table', n(index(raw, 'table'))] }],
   insert_footnote: (raw) => {
     const steps: Array<Omit<CompiledStep, 'opIndex'>> = [
       { command: 'insert-footnote', flags: atOffset(raw) },

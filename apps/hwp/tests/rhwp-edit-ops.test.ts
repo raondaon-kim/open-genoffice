@@ -299,3 +299,20 @@ describe('compileEditOps — validation', () => {
     ).toMatchObject({ error: expect.stringMatching(/lineSpacing/) })
   })
 })
+
+describe('delete_table', () => {
+  it('compiles to rhwp edit delete-table --table N', () => {
+    expect(compileEditOps([{ op: 'delete_table', table: 2 }])).toEqual({
+      ok: true,
+      steps: [{ opIndex: 0, command: 'delete-table', flags: ['--table', '2'] }],
+    })
+  })
+
+  it('rejects a missing or negative table index', () => {
+    expect(compileEditOps([{ op: 'delete_table' }])).toMatchObject({ ok: false, index: 0 })
+    expect(compileEditOps([{ op: 'delete_table', table: -1 }])).toMatchObject({
+      ok: false,
+      index: 0,
+    })
+  })
+})

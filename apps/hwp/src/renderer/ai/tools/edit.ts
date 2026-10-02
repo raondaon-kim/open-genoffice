@@ -29,6 +29,7 @@ export const TABLE_OPS = [
   'merge_cells',
   'split_cell',
   'insert_table',
+  'delete_table',
 ] as const
 export const ELEMENT_KINDS = [
   'footnote',
@@ -79,7 +80,7 @@ const tools: AgentToolDef[] = [
   },
   {
     name: 'edit_table',
-    description: `Edit tables as one batch (one reload). ops: set_cell {table, row, col, text} (merged cells are addressed by their anchor cell); insert_row {table, row, below?}; insert_col {table, col, right?}; delete_row {table, row}; delete_col {table, col}; merge_cells {table, row, col, endRow, endCol}; split_cell {table, row, col}; insert_table {section, paragraph, rows, cols} — new empty table at that paragraph. ${OP_DOC}`,
+    description: `Edit tables as one batch (one reload). ops: set_cell {table, row, col, text} (merged cells are addressed by their anchor cell); insert_row {table, row, below?}; insert_col {table, col, right?}; delete_row {table, row}; delete_col {table, col}; merge_cells {table, row, col, endRow, endCol}; split_cell {table, row, col}; insert_table {section, paragraph, rows, cols} — new empty table at that paragraph; delete_table {table} — remove a whole table (also the way to remove a one-row table). ${OP_DOC}`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -164,6 +165,9 @@ export function summarizeEdit(ops: EditOp[], result: Ok, focused: boolean): stri
   return [
     `Applied ${ops.length} op(s); ${result.diffCount ?? '?'} IR change(s); pages touched: ${pages.length ? pages.join(', ') : 'none reported'}.`,
     ...lines,
+    result.layoutTolerant
+      ? `The engine's save round-trip check always fails on this document, so the edit was checked against the document summary instead (form fields, table sizes and paragraph count are as expected; pages ${result.layoutTolerant.pagesBefore} → ${result.layoutTolerant.pagesAfter}).`
+      : '',
     focused ? 'The view moved to the first edited paragraph.' : '',
     'The document was reloaded with the change and is unsaved — the user saves with ⌘S. undo_ai_edit reverts this whole edit. Paragraph indices may have shifted: run find again before further edits.',
   ]
