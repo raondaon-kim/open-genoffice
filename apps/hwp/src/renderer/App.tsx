@@ -5,6 +5,7 @@ import { HwpAiPanel } from './ai/AiPanel'
 import { SnapshotStack } from './ai/snapshots'
 import type { HwpAiDeps } from './ai/context'
 import type { HwpApi } from '../shared/ipc'
+import { formCopyNames } from '../shared/form-names'
 
 declare global {
   interface Window {
@@ -42,6 +43,8 @@ export function App() {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<RhwpEditor | null>(null)
   const filePathRef = useRef<string | null>(null)
+  /** set when this tab started from a form: Save As proposes "<form>_작성.<ext>" */
+  const formNameRef = useRef<string | null>(null)
   const savingRef = useRef(false)
   const [phase, setPhase] = useState<Phase>('booting')
   const [error, setError] = useState<string | null>(null)
@@ -96,6 +99,16 @@ export function App() {
         if (disposed) return
         console.info(`[hwp] loaded ${basename(intent.path)}: ${result.pageCount} page(s)`)
         setPages(result.pageCount)
+      } else if (intent.mode === 'form') {
+        // a COPY of a form: no path, so saving always asks for a new file
+        filePathRef.current = null
+        formNameRef.current = intent.fileName
+        setDocName(formCopyNames(intent.fileName).tabName)
+        setAiPath(null)
+        const result = await editor.loadFile(new Uint8Array(intent.data), intent.fileName)
+        if (disposed) return
+        console.info(`[hwp] opened a copy of ${intent.fileName}: ${result.pageCount} page(s)`)
+        setPages(result.pageCount)
       } else {
         // blank new document — activate the hwpctrl plugin, then ask the studio
         // to create a clean blank document explicitly (file:new-doc) so the tab
@@ -115,7 +128,11 @@ export function App() {
         console.info('[hwp] new blank document ready')
         setPages(state.pageCount)
       }
-      setStatus('')
+      setStatus(
+        intent.mode === 'form'
+          ? 'New document from a form — the original file stays unchanged'
+          : '',
+      )
       setPhase('ready')
     })().catch((err: unknown) => {
       console.error('[hwp] failed to start document tab:', err)
@@ -160,7 +177,9 @@ export function App() {
       // Untitled document: ask the user for a destination first (Save As)
       let path = filePathRef.current
       if (!path) {
-        const picked = await window.hwpApi.saveAs()
+        const picked = await window.hwpApi.saveAs(
+          formNameRef.current ? formCopyNames(formNameRef.current).saveName : undefined,
+        )
         if (!picked.ok || !picked.path) {
           if (!picked.canceled) setStatus(`Save failed: ${picked.error ?? 'unknown error'}`)
           else setStatus('')

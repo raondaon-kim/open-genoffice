@@ -120,7 +120,7 @@ export interface HwpApi {
   readFile(path: string): Promise<ArrayBuffer>
   save(request: SaveHwpRequest): Promise<SaveHwpResult>
   /** ask main for a destination path for an untitled document (Save As); grants the returned path for this view */
-  saveAs(): Promise<SaveHwpResult & { path?: string; canceled?: boolean }>
+  saveAs(defaultName?: string): Promise<SaveHwpResult & { path?: string; canceled?: boolean }>
   /**
    * Compile Markdown (GFM tables included) into a NEW .hwpx document via the
    * HwpForge generator and open it in a new tab. Returns the created path.

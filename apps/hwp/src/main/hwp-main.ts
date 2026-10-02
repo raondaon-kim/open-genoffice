@@ -20,6 +20,7 @@ import type {
 } from '../shared/ai-contract'
 import { runEditChain } from './ai-edit-chain'
 import { SnapshotStore } from './ai-snapshots'
+import { safeDefaultSaveName } from '../shared/form-names'
 import { HwpIntentStore } from './hwp-intents'
 import type { NativeBinaryName } from './native-binary-path'
 import { runRhwp } from './rhwp-cli'
@@ -390,11 +391,15 @@ function registerHwpIpc(): void {
   // the renderer exports and calls HWP_CHANNELS.save with the granted path.
   ipcMain.handle(
     HWP_CHANNELS.saveAs,
-    async (e): Promise<SaveHwpResult & { path?: string; canceled?: boolean }> => {
+    async (
+      e,
+      defaultName: unknown,
+    ): Promise<SaveHwpResult & { path?: string; canceled?: boolean }> => {
       const parent = BrowserWindow.fromWebContents(e.sender)
       const options = {
         title: tm('saveAsTitle'),
-        defaultPath: 'untitled.hwp',
+        // a form copy proposes "<form>_작성.<ext>"; only a bare file name is accepted
+        defaultPath: safeDefaultSaveName(defaultName),
         filters: [{ name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] }],
       }
       const result =

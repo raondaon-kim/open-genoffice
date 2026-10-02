@@ -17,7 +17,7 @@ const api: HwpApi = {
   consumePending: () => ipcRenderer.invoke(HWP_CHANNELS.consumePending),
   readFile: (path) => ipcRenderer.invoke(HWP_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(HWP_CHANNELS.save, request),
-  saveAs: () => ipcRenderer.invoke(HWP_CHANNELS.saveAs),
+  saveAs: (defaultName) => ipcRenderer.invoke(HWP_CHANNELS.saveAs, defaultName),
   createDocument: (markdown, fileName) =>
     ipcRenderer.invoke(HWP_CHANNELS.createDocument, markdown, fileName),
   getStudioUrl: () => ipcRenderer.invoke(HWP_CHANNELS.getStudioUrl),
