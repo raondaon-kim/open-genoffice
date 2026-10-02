@@ -230,7 +230,7 @@ export function parseProjectAppendArgs(value: unknown): AppendChatArgs {
   if (!isRecord(value)) throw new Error('Project append request is required')
   assertOnlyKeys(
     value,
-    ['projectId', 'chatId', 'role', 'text', 'tools', 'attachments', 'ai'],
+    ['projectId', 'chatId', 'role', 'text', 'tools', 'attachments', 'ai', 'reasoning', 'thinking'],
     'Project append request',
   )
   if (value.role !== 'user' && value.role !== 'assistant')
@@ -242,6 +242,11 @@ export function parseProjectAppendArgs(value: unknown): AppendChatArgs {
     text: boundedString(value.text, 'Project chat text', MAX_CHAT_TEXT),
   }
   if (value.tools !== undefined) result.tools = parseChatTools(value.tools)
+  for (const field of ['reasoning', 'thinking'] as const) {
+    if (value[field] === undefined) continue
+    if (value.role !== 'assistant') throw new Error(`Only assistant messages carry ${field}`)
+    result[field] = boundedString(value[field], `Project chat ${field}`, MAX_CHAT_TEXT)
+  }
   if (value.attachments !== undefined) result.attachments = parseChatAttachments(value.attachments)
   if (value.ai !== undefined) {
     if (value.role !== 'assistant' || !isRecord(value.ai))

@@ -47,6 +47,15 @@ import type {
 
 /** Max stored characters for a single tool input/output field */
 const TOOL_FIELD_MAX_CHARS = 16_000
+const THINKING_FIELD_MAX_CHARS = 32_000
+
+/** the last `max` characters, never starting on a lone low surrogate */
+function keepTail(text: string, max: number): string {
+  if (text.length <= max) return text
+  const tail = text.slice(text.length - max)
+  const first = tail.charCodeAt(0)
+  return first >= 0xdc00 && first <= 0xdfff ? tail.slice(1) : tail
+}
 const AI_PROVIDER_IDS = new Set<AiProviderId>([
   'genspark',
   'codex',
@@ -414,6 +423,10 @@ export class ProjectStore {
           ...(t.input !== undefined ? { input: t.input.slice(0, TOOL_FIELD_MAX_CHARS) } : {}),
           ...(t.output !== undefined ? { output: t.output.slice(0, TOOL_FIELD_MAX_CHARS) } : {}),
         }))
+      }
+      if (msg.role === 'assistant') {
+        if (msg.reasoning) record.reasoning = keepTail(msg.reasoning, THINKING_FIELD_MAX_CHARS)
+        if (msg.thinking) record.thinking = keepTail(msg.thinking, THINKING_FIELD_MAX_CHARS)
       }
       if (msg.attachments !== undefined) record.attachments = msg.attachments
       if (msg.role === 'assistant' && msg.ai !== undefined) {

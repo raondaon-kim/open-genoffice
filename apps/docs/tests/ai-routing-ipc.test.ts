@@ -358,6 +358,15 @@ describe('project IPC trusted-boundary validation', () => {
     ).toThrow('AI provenance is invalid')
   })
 
+  it('accepts reasoning and thinking on assistant appends only', () => {
+    const base = { projectId: 'default', chatId: '0123456789abcdef', text: 'ok' }
+    expect(
+      parseProjectAppendArgs({ ...base, role: 'assistant', reasoning: 'raw', thinking: 'shown' }),
+    ).toMatchObject({ reasoning: 'raw', thinking: 'shown' })
+    expect(() => parseProjectAppendArgs({ ...base, role: 'user', reasoning: 'raw' })).toThrow()
+    expect(() => parseProjectAppendArgs({ ...base, role: 'assistant', thinking: 5 })).toThrow()
+  })
+
   it('rejects malformed tools and attachment metadata', () => {
     expect(() =>
       parseProjectAppendArgs({

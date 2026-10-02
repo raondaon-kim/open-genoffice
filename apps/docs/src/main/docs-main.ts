@@ -2467,6 +2467,8 @@ export function registerProjectIpc(): void {
     if (args.tools) msg.tools = args.tools
     if (args.attachments) msg.attachments = args.attachments
     if (args.ai) msg.ai = args.ai
+    if (args.reasoning) msg.reasoning = args.reasoning
+    if (args.thinking) msg.thinking = args.thinking
     store.appendChatMessage(args.projectId, args.chatId, msg)
   })
 

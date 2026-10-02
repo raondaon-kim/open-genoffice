@@ -397,6 +397,8 @@ export function registerPdfStandaloneProjectIpc(): void {
     if (args.tools) message.tools = args.tools
     if (args.attachments) message.attachments = args.attachments
     if (args.ai) message.ai = args.ai
+    if (args.reasoning) message.reasoning = args.reasoning
+    if (args.thinking) message.thinking = args.thinking
     getStandaloneProjectStore().appendChatMessage(args.projectId, args.chatId, message)
   })
   ipcMain.handle('project:loadChat', (_event, value: unknown) => {

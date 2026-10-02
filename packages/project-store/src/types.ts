@@ -84,6 +84,10 @@ export interface ChatMessage {
   fileRef?: string
   /** Tool activity (with truncated inputs/outputs) */
   tools?: ToolActivity[]
+  /** Raw model reasoning of an assistant message (sent back to providers that need it); the tail is kept past the cap */
+  reasoning?: string
+  /** What the panel's thinking box showed (raw reasoning or a Codex summary); the tail is kept past the cap */
+  thinking?: string
   /** Attachment metadata of a user message */
   attachments?: ChatAttachment[]
   /** AI route provenance, persisted only for assistant messages */

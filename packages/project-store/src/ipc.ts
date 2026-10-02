@@ -34,6 +34,8 @@ export interface AppendChatArgs {
   role: 'user' | 'assistant'
   text: string
   tools?: ToolActivity[]
+  reasoning?: string
+  thinking?: string
   attachments?: ChatAttachment[]
   /** Optional provider/model provenance; stored only on assistant messages. */
   ai?: ChatAiProvenance

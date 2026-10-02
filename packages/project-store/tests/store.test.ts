@@ -137,6 +137,58 @@ describe('appendChatMessage + loadChat', () => {
     expect(msgs[0].tools?.[0].name).toBe('write_file')
   })
 
+  it('stores reasoning and thinking on assistant messages only', () => {
+    store.appendChatMessage('default', 'chat-think', {
+      role: 'assistant',
+      text: 'done',
+      reasoning: 'raw thought',
+      thinking: 'shown thought',
+    })
+    store.appendChatMessage('default', 'chat-think', {
+      role: 'user',
+      text: 'hi',
+      reasoning: 'ignored',
+      thinking: 'ignored',
+    })
+    const msgs = store.loadChat('default', 'chat-think')
+    expect(msgs[0]).toMatchObject({ reasoning: 'raw thought', thinking: 'shown thought' })
+    expect(msgs[1]).not.toHaveProperty('reasoning')
+    expect(msgs[1]).not.toHaveProperty('thinking')
+  })
+
+  it('keeps the tail of reasoning and thinking beyond 32,000 characters', () => {
+    const long = `HEAD-${'x'.repeat(40_000)}-TAIL`
+    store.appendChatMessage('default', 'chat-long', {
+      role: 'assistant',
+      text: 'done',
+      reasoning: long,
+      thinking: long,
+    })
+    const msg = store.loadChat('default', 'chat-long')[0]!
+    for (const field of [msg.reasoning!, msg.thinking!]) {
+      expect(field.length).toBeLessThanOrEqual(32_000)
+      expect(field.endsWith('-TAIL')).toBe(true)
+      expect(field.startsWith('HEAD')).toBe(false)
+    }
+  })
+
+  it('does not start the kept tail in the middle of a surrogate pair', () => {
+    // 'a' + 20,000 emoji (two UTF-16 units each) + 'z' is 40,002 units: the cut at 8,002
+    // lands between the two halves of an emoji, so a plain slice would start on a lone low surrogate
+    const emoji = '😀'.repeat(20_000)
+    store.appendChatMessage('default', 'chat-emoji', {
+      role: 'assistant',
+      text: 'done',
+      reasoning: `a${emoji}z`,
+    })
+    const reasoning = store.loadChat('default', 'chat-emoji')[0]!.reasoning!
+    const first = reasoning.charCodeAt(0)
+    expect(first >= 0xdc00 && first <= 0xdfff).toBe(false)
+    expect(reasoning.endsWith('z')).toBe(true)
+    expect(reasoning.length).toBeLessThanOrEqual(32_000)
+    expect(() => encodeURIComponent(reasoning)).not.toThrow()
+  })
+
   it('persists requested and resolved AI route provenance on assistant messages', () => {
     store.appendChatMessage('default', 'chat-provenance', {
       role: 'assistant',
