@@ -1,0 +1,58 @@
+.thinking-box {
+  --thinking-box-muted: var(--color-text-secondary, #6b7280);
+  --thinking-box-rule: var(--color-border-default, #d8dadd);
+  --thinking-box-bg: var(--color-bg-subtle, #f3f4f6);
+  margin: 0 0 6px;
+  color: var(--thinking-box-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.thinking-box--live {
+  padding: 6px 8px;
+  border-left: 2px solid var(--thinking-box-rule);
+  border-radius: 0 6px 6px 0;
+  background: var(--thinking-box-bg);
+}
+
+.thinking-box__title {
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.thinking-box__body {
+  margin: 0;
+  max-height: 9em; /* six lines at 1.5 */
+  overflow-y: auto;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.thinking-box__body--full {
+  max-height: 24em;
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--thinking-box-rule);
+  border-radius: 0 6px 6px 0;
+  background: var(--thinking-box-bg);
+}
+
+.thinking-box__toggle {
+  appearance: none;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.thinking-box__toggle:hover {
+  text-decoration: underline;
+}
+
+.thinking-box__toggle:focus-visible {
+  outline: 2px solid var(--color-brand-secondary, #2563eb);
+  outline-offset: 2px;
+}
