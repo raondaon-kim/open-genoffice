@@ -57,7 +57,7 @@ export interface CharFormatProps {
   subscript?: boolean
   /** #rrggbb */
   textColor?: string
-  /** points */
+  /** points in the tool contract; compiled to 1/100 pt for the rhwp CLI (rhwp-edit-ops.ts) */
   fontSize?: number
 }
 

@@ -237,6 +237,25 @@ describe.skipIf(!HAVE_BIN)('rhwp CLI contract (real binary)', () => {
     expect(same.envelope).toMatchObject({ identical: true, diffCount: 0 })
   })
 
+  it('apply-char-format fontSize is in 1/100 pt (1300 = 13 pt), as the app converts it', async () => {
+    const out = at('size13.hwpx')
+    const result = await edit(
+      doc,
+      out,
+      'apply-char-format',
+      '--props',
+      '{"fontSize":1300}',
+      '--section',
+      '0',
+      '--para',
+      '2',
+    )
+    expect(result.exitCode, result.stderr).toBe(0)
+    const dumped = await runRhwp(BIN, ['dump', out], { keepStdout: true })
+    const block = (dumped.stdout ?? '').split('--- 문단 ').find((b) => b.startsWith('0.2 ')) ?? ''
+    expect(block).toMatch(/base=1300\b/)
+  })
+
   it('apply-char-format/apply-para-format change the document only for known props', async () => {
     const diffCount = async (sub: string, props: string): Promise<number> => {
       const out = at(`fmt-${Math.random().toString(36).slice(2)}.hwpx`)

@@ -126,7 +126,8 @@ function charProps(raw: unknown): CharFormatProps {
       if (typeof size !== 'number' || !Number.isSafeInteger(size) || size < 1 || size > 200) {
         throw new OpError('props.fontSize must be an integer point size in [1, 200]')
       }
-      out.fontSize = size
+      // the engine takes 1/100 pt (1300 = 13 pt); the tool contract is whole points
+      out.fontSize = size * 100
     } else {
       throw new OpError(`props.${key} is not a supported character format (rhwp would ignore it)`)
     }

@@ -193,7 +193,7 @@ describe('compileEditOps — golden argv per op (spec §6 + §14)', () => {
       command: 'apply-char-format',
       flags: [
         '--props',
-        '{"bold":true,"textColor":"#FF0000","fontSize":14}',
+        '{"bold":true,"textColor":"#FF0000","fontSize":1400}',
         '--section',
         '0',
         '--para',
