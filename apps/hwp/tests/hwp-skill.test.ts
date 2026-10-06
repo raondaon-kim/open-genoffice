@@ -100,6 +100,13 @@ describe('hwp skill', () => {
     expect(SYSTEM_PROMPT).toMatch(/delete_table/)
   })
 
+  it('separates instruction-only tables (remove) from layout tables (keep)', () => {
+    expect(SYSTEM_PROMPT).toMatch(/instruction/i)
+    expect(SYSTEM_PROMPT).toMatch(/delete_table/)
+    expect(SYSTEM_PROMPT).toMatch(/emptied table.*(height|extra page)/is)
+    expect(SYSTEM_PROMPT).toMatch(/approval|signature|header/i)
+  })
+
   it('keeps new text at the body size, away from the form thin spacer lines', () => {
     expect(SYSTEM_PROMPT).toMatch(/spacer/)
     expect(SYSTEM_PROMPT).toMatch(/bodyFontSize/)
