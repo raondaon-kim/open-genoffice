@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { editTools, snapshotFileName } from '../src/renderer/ai/tools/edit'
 import type { AiEditRequest, AiEditResult } from '../src/shared/ai-contract'
-import { call, ctxWith, fakeApi, fakeEditor, HWP5_BYTES, SHA, SHA_B } from './helpers/ai-fakes'
+import { call, ctxWith, env, fakeApi, fakeEditor, HWP5_BYTES, SHA, SHA_B } from './helpers/ai-fakes'
 
 const NEW = new TextEncoder().encode('NEW-HWPX')
 const okEdit = (request: AiEditRequest): AiEditResult => ({
@@ -317,5 +317,65 @@ describe('edit_table delete_table and the round-trip note', () => {
     expect(result.isError).toBeUndefined()
     expect(api.edits[0]!.ops).toEqual([{ op: 'delete_table', table: 1 }])
     expect(result.output).toMatch(/round-trip check/)
+  })
+})
+
+describe('text edits that come out tiny', () => {
+  const para = (paragraph: number, preview: string, fontSize: number, empty = false) => ({
+    section: 0,
+    paragraph,
+    preview,
+    length: preview.length,
+    empty,
+    hasTable: false,
+    fontSize,
+  })
+  const answers = (list: ReturnType<typeof para>[]) => ({ paragraphs: env({ paragraphs: list }) })
+  const run = async (list: ReturnType<typeof para>[], ops: unknown[]) => {
+    const api = fakeApi(answers(list), okEdit)
+    const result = await editTools.execute(ctxWith(api, fakeEditor()), call('edit_text', { ops }))
+    return { result, api }
+  }
+
+  it('warns, with the exact apply_format call, when written text is far below the body size', async () => {
+    const { result } = await run(
+      [para(0, '1. 관련', 13), para(1, '가. 근거 문서', 6), para(2, '나. 본문', 13)],
+      [{ op: 'set_paragraph_text', section: 0, paragraph: 1, text: '가. 근거 문서' }],
+    )
+    expect(result.isError).toBeUndefined()
+    expect(result.output).toMatch(/6 pt/)
+    expect(result.output).toMatch(/body text is 13 pt/)
+    expect(result.output).toMatch(
+      /apply_format.*"section":0,"paragraph":1,"length":8.*"fontSize":13/s,
+    )
+  })
+
+  it('says nothing when the written text matches the body size or small text was not written', async () => {
+    const { result } = await run(
+      [para(0, '1. 관련', 13), para(1, '가. 근거 문서', 13), para(2, '문의: 02-0000', 8)],
+      [{ op: 'set_paragraph_text', section: 0, paragraph: 1, text: '가. 근거 문서' }],
+    )
+    expect(result.output).not.toMatch(/apply_format/)
+  })
+
+  it('does not look at sizes for edits that write no body text', async () => {
+    const api = fakeApi(answers([para(0, 'x', 13)]), okEdit)
+    await editTools.execute(
+      ctxWith(api, fakeEditor()),
+      call('edit_text', { ops: [{ op: 'replace_phrase', find: '사업', replace: '프로젝트' }] }),
+    )
+    expect(api.queries.filter((q) => q.tool === 'paragraphs')).toHaveLength(0)
+  })
+
+  it('still reports the edit when the size check cannot run', async () => {
+    const api = fakeApi({}, okEdit)
+    const result = await editTools.execute(
+      ctxWith(api, fakeEditor()),
+      call('edit_text', {
+        ops: [{ op: 'set_paragraph_text', section: 0, paragraph: 1, text: '새 본문' }],
+      }),
+    )
+    expect(result.isError).toBeUndefined()
+    expect(result.output).toMatch(/Applied 1 op\(s\)/)
   })
 })

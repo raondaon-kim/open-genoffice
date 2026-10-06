@@ -471,4 +471,97 @@ describe('form_map', () => {
     expect(out.fields[0]).toMatchObject({ section: 0, paragraph: 2, fieldType: 'clickhere' })
     expect(out.tables[0].cells[0]).toMatchObject({ rowSpan: 1, colSpan: 2 })
   })
+
+  const sized = env({
+    paragraphs: [
+      {
+        section: 0,
+        paragraph: 0,
+        preview: '',
+        length: 0,
+        empty: true,
+        hasTable: false,
+        fontSize: 12,
+      },
+      {
+        section: 0,
+        paragraph: 1,
+        preview: '1. 본문',
+        length: 5,
+        empty: false,
+        hasTable: false,
+        fontSize: 13,
+      },
+      {
+        section: 0,
+        paragraph: 2,
+        preview: '',
+        length: 0,
+        empty: true,
+        hasTable: false,
+        fontSize: 6,
+      },
+      {
+        section: 0,
+        paragraph: 3,
+        preview: '2. 본문',
+        length: 5,
+        empty: false,
+        hasTable: false,
+        fontSize: 13,
+      },
+      {
+        section: 0,
+        paragraph: 4,
+        preview: '',
+        length: 0,
+        empty: true,
+        hasTable: false,
+        fontSize: 7,
+      },
+      {
+        section: 0,
+        paragraph: 5,
+        preview: '3. 본문',
+        length: 5,
+        empty: false,
+        hasTable: false,
+        fontSize: 13,
+      },
+      {
+        section: 0,
+        paragraph: 6,
+        preview: '큰 제목',
+        length: 4,
+        empty: false,
+        hasTable: false,
+        fontSize: 28,
+      },
+    ],
+  })
+
+  it('reports each paragraph size, the body size, and flags thin blank spacer lines', async () => {
+    const api = fakeApi({ fields, export_tables: tables, paragraphs: sized })
+    const out = JSON.parse((await readTools.execute(ctxWith(api), call('form_map'))).output)
+    expect(out.bodyFontSize).toBe(13)
+    expect(out.paragraphs[1]).toMatchObject({ fontSize: 13 })
+    expect(out.paragraphs[1]).not.toHaveProperty('spacer')
+    expect(out.paragraphs[2]).toMatchObject({ fontSize: 6, empty: true, spacer: true })
+    expect(out.paragraphs[4]).toMatchObject({ fontSize: 7, spacer: true })
+    // an empty 12 pt line near the body size and a big title are not spacers
+    expect(out.paragraphs[0]).not.toHaveProperty('spacer')
+    expect(out.paragraphs[6]).not.toHaveProperty('spacer')
+    expect(out.hint ?? '').toBe('')
+    expect(out.summary).toMatch(/2 spacer line\(s\)/)
+  })
+
+  it('a continuation page also carries the body size and spacer flags', async () => {
+    const api = fakeApi({ fields, export_tables: tables, paragraphs: [sized, sized] })
+    await readTools.execute(ctxWith(api), call('form_map'))
+    const out = JSON.parse(
+      (await readTools.execute(ctxWith(api), call('form_map', { paragraphsFrom: 2 }))).output,
+    )
+    expect(out.bodyFontSize).toBe(13)
+    expect(out.paragraphs[0]).toMatchObject({ paragraph: 2, spacer: true })
+  })
 })

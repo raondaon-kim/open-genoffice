@@ -1,6 +1,7 @@
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { HwpAiContext, ToolModule } from '../context'
 import { intArg, record, requireEditor, strArg, ToolError, toExecution } from '../errors'
+import { bodyFontSizeOf, isSpacerLine } from '../paragraph-size'
 import { newNonce, wrapText } from '../provenance'
 import { runQuery } from '../query'
 
@@ -74,7 +75,7 @@ const tools: AgentToolDef[] = [
   {
     name: 'form_map',
     description:
-      'Map a form in ONE call: every form field (누름틀: name, guide, value, empty?), every table with each cell (row, col, text, empty?) and every body paragraph (section, paragraph, a short preview, full length, empty?, hasTable). Use it first when filling a form or a document with blanks, instead of calling find/read_table per cell. Paragraph previews are cut by the engine — use find or read_pages for the full text. The result stays within 24,000 characters: long documents return up to 150 paragraphs per call (continue with paragraphsFrom — later parts return only paragraphs), and large tables are cut at 400 cells in total (each table gives cellCount and truncated; read the rest with read_table).',
+      'Map a form in ONE call: every form field (누름틀: name, guide, value, empty?), every table with each cell (row, col, text, empty?) and every body paragraph (section, paragraph, a short preview, full length, empty?, hasTable, fontSize in points, spacer? for thin blank lines far below bodyFontSize — do not write into those). Use it first when filling a form or a document with blanks, instead of calling find/read_table per cell. Paragraph previews are cut by the engine — use find or read_pages for the full text. The result stays within 24,000 characters: long documents return up to 150 paragraphs per call (continue with paragraphsFrom — later parts return only paragraphs), and large tables are cut at 400 cells in total (each table gives cellCount and truncated; read the rest with read_table).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -324,6 +325,12 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
       cells: kept.map(cellOf),
     }
   })
+  // body text size: the most common size among paragraphs that hold text. A blank paragraph
+  // far below it is one of the form's thin spacer lines (6-7 pt next to 13 pt body text):
+  // text written there (or a paragraph inserted after it) comes out tiny.
+  const bodyFontSize = bodyFontSizeOf(allParagraphs)
+  const isSpacer = (p: Rec): boolean => isSpacerLine(p, bodyFontSize)
+  const spacerCount = allParagraphs.filter(isSpacer).length
   const page = allParagraphs.slice(from, from + FORM_MAP_PARAGRAPHS_CAP).map((p) => ({
     section: p.section,
     paragraph: p.paragraph,
@@ -331,6 +338,8 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
     length: p.length,
     empty: p.empty === true,
     hasTable: p.hasTable === true,
+    ...(typeof p.fontSize === 'number' ? { fontSize: p.fontSize } : {}),
+    ...(isSpacer(p) ? { spacer: true } : {}),
   }))
 
   const emptyCells = tables.reduce((n, t) => n + t.cells.filter((c) => c.empty).length, 0)
@@ -339,7 +348,7 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
     : [
         `${fields.length} form field(s) (${fields.filter((f) => f.empty).length} empty)`,
         `${tables.length} table(s) (${emptyCells} empty cell(s) among those listed)`,
-        `${allParagraphs.length} body paragraph(s) (${allParagraphs.filter((p) => p.empty === true).length} empty)`,
+        `${allParagraphs.length} body paragraph(s) (${allParagraphs.filter((p) => p.empty === true).length} empty${spacerCount > 0 ? `, ${spacerCount} spacer line(s)` : ''})`,
       ].join(', ')
   const render = () => {
     const next = from + page.length
@@ -353,6 +362,7 @@ async function formMap(ctx: HwpAiContext, input: Rec): Promise<ToolExecution> {
     return JSON.stringify({
       summary,
       ...(continuing ? {} : { fields, tables }),
+      ...(bodyFontSize !== undefined ? { bodyFontSize } : {}),
       paragraphs: page,
       ...(next < allParagraphs.length ? { nextParagraphsFrom: next } : {}),
       ...(hints.length ? { truncated: true, hint: hints.join('; ') } : {}),

@@ -393,6 +393,9 @@ describe.skipIf(!HAVE_BIN)('rhwp CLI contract (real binary)', () => {
     expect(same?.preview).toContain('마지막 문단')
     expect(paragraphs.some((p) => p.hasTable)).toBe(true)
     expect(paragraphs.some((p) => p.empty)).toBe(true)
+    // the first run's size is read in points (dump prints 1/100 pt): plausible text sizes
+    const sizes = paragraphs.filter((p) => !p.empty).map((p) => p.fontSize)
+    expect(sizes.every((s) => typeof s === 'number' && s >= 5 && s <= 100)).toBe(true)
   })
 
   it('delete-table removes a whole table and passes the round-trip check', async () => {

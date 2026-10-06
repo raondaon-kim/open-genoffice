@@ -16,11 +16,14 @@ export interface DumpParagraph {
   length: number
   empty: boolean
   hasTable: boolean
+  /** size of the first character run in points (dump prints 1/100 pt); absent when not printed */
+  fontSize?: number
 }
 
 const HEADER = /^--- 문단 (\d+)\.(\d+) --- .*?text_len=(\d+)/
 const TEXT = /^ {2}텍스트: (.*)$/
 const TABLE = /^ {2}\[\d+\] 표:/
+const RUN = /^ {2}\[CS\] pos=\d+ .*?\bbase=(\d+)/
 
 function unquote(raw: string): string {
   if (raw === '(빈 문단)') return ''
@@ -59,7 +62,12 @@ export function parseDumpParagraphs(stdout: string): DumpParagraph[] {
       current.empty = value.length === 0
       continue
     }
-    if (TABLE.test(line)) current.hasTable = true
+    if (TABLE.test(line)) {
+      current.hasTable = true
+      continue
+    }
+    const run = RUN.exec(line)
+    if (run && current.fontSize === undefined) current.fontSize = Number(run[1]) / 100
   }
   return out
 }

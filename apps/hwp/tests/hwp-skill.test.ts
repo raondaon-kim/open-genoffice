@@ -99,4 +99,10 @@ describe('hwp skill', () => {
     expect(SYSTEM_PROMPT).toMatch(/call form_map ONCE first/)
     expect(SYSTEM_PROMPT).toMatch(/delete_table/)
   })
+
+  it('keeps new text at the body size, away from the form thin spacer lines', () => {
+    expect(SYSTEM_PROMPT).toMatch(/spacer/)
+    expect(SYSTEM_PROMPT).toMatch(/bodyFontSize/)
+    expect(SYSTEM_PROMPT).toMatch(/apply_format/)
+  })
 })

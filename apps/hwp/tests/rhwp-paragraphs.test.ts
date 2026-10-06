@@ -72,3 +72,24 @@ describe('paragraphsResult', () => {
     })
   })
 })
+
+describe('parseDumpParagraphs font size', () => {
+  const SIZED = [
+    '--- 문단 0.0 --- cc=1, text_len=0, controls=0 ',
+    '  텍스트: (빈 문단)',
+    '  [CS] pos=0 id=30 bold=false spacing=0% ratio=100% base=600 attr=0x00000000 text=#000000',
+    '--- 문단 0.1 --- cc=9, text_len=8, controls=0 ',
+    '  텍스트: "본문 문장입니다."',
+    '  [CS] pos=0 id=26 bold=false spacing=0% ratio=100% base=1300 attr=0x00000000 text=#000000',
+    '  [CS] pos=4 id=27 bold=true spacing=0% ratio=100% base=1500 attr=0x00000000 text=#000000',
+    '--- 문단 0.2 --- cc=3, text_len=2, controls=0 ',
+    '  텍스트: "끝"',
+  ].join('\n')
+
+  it('reads the size of the first character run in points (the dump prints 1/100 pt)', () => {
+    const [spacer, body, bare] = parseDumpParagraphs(SIZED)
+    expect(spacer).toMatchObject({ empty: true, fontSize: 6 })
+    expect(body).toMatchObject({ preview: '본문 문장입니다.', fontSize: 13 })
+    expect(bare).not.toHaveProperty('fontSize')
+  })
+})

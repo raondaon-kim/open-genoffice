@@ -12,6 +12,8 @@ import {
   toExecution,
 } from '../errors'
 import { withFence } from '../fence'
+import { findTinyWritten } from '../paragraph-size'
+import { runQuery } from '../query'
 import { ensureSnapshot } from '../snapshots'
 
 export const TEXT_OPS = [
@@ -340,10 +342,46 @@ function elementOp(input: Rec): EditOp {
   }
 }
 
+/** body text this batch wrote: set_paragraph_text and insert_paragraph_after (single paragraphs) */
+function writtenTexts(ops: EditOp[]): string[] {
+  const out: string[] = []
+  for (const op of ops) {
+    if ((op.op === 'set_paragraph_text' || op.op === 'insert_paragraph_after') && op.text.trim()) {
+      out.push(op.text)
+    }
+  }
+  return out
+}
+
+/**
+ * Text written into a form's thin spacer lines comes out tiny. Advisory only: look at the
+ * edited document and tell the model which written paragraphs are far below the body size and
+ * how to fix them. Any failure here is ignored — the edit itself already succeeded.
+ */
+async function tinyTextWarning(ctx: HwpAiContext, ops: EditOp[]): Promise<string> {
+  const written = writtenTexts(ops)
+  if (written.length === 0) return ''
+  try {
+    const { envelope } = await runQuery(ctx, 'paragraphs')
+    const list = Array.isArray(envelope.paragraphs) ? (envelope.paragraphs as Rec[]) : []
+    const tiny = findTinyWritten(list, written)
+    if (tiny.length === 0) return ''
+    return tiny
+      .map((t) => {
+        const target = `{"section":${t.section},"paragraph":${t.paragraph},"length":${t.length}}`
+        return `Warning: paragraph ${t.section}.${t.paragraph} was written at ${t.fontSize} pt but the body text is ${t.bodyFontSize} pt (it reused a thin blank line of the form). Fix it with apply_format {"target":${target},"format":{"fontSize":${t.bodyFontSize}}}.`
+      })
+      .join('\n')
+  } catch {
+    return ''
+  }
+}
+
 async function runOps(ctx: HwpAiContext, ops: EditOp[], label: string): Promise<ToolExecution> {
   const { result, focused } = await applyFileEdit(ctx, ops)
+  const warning = await tinyTextWarning(ctx, ops)
   return {
-    output: summarizeEdit(ops, result, focused),
+    output: [summarizeEdit(ops, result, focused), warning].filter(Boolean).join('\n'),
     mutated: true,
     summary: `${label}: ${ops.length} op(s) applied`,
   }
