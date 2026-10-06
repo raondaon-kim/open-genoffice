@@ -47,7 +47,9 @@ Other versions are on the [Releases](https://github.com/sergedoub/open-genoffice
   proposes `<form>_작성`), and the assistant fills it: `form_map` reads every
   form field, table cell and paragraph in one call, `delete_table` removes
   guidance tables, and forms whose layout the engine cannot round-trip exactly
-  are checked by their field/table/paragraph summary instead.
+  are checked by their field/table/paragraph summary instead. It knows the
+  form's body text size and avoids writing into its thin blank spacer lines, so
+  added paragraphs match the surrounding text.
 - The Hangul AI can _create_ rich documents (reports, syllabi, announcements)
   — text **and real tables** in one file — by generating `.hwpx` through the
   HwpForge engine (MIT/Apache-2.0), and ships a built-in K-12 school-form

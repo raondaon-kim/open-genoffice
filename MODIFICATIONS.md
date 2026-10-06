@@ -38,7 +38,11 @@ The fork's material changes include:
   Hangul tab (bytes only, 50 MB cap, Save As proposes `<form>_작성`); the Hangul
   assistant gains `form_map` (fields, table cells and paragraphs from `rhwp dump`),
   `delete_table`, a document-summary check for forms that fail the engine's save
-  round-trip check, 20 turns and clear end-of-run notes;
+  round-trip check, 20 turns and clear end-of-run notes. `form_map` also reports each
+  paragraph's size, the body text size and the form's thin blank spacer lines, and a
+  text edit that leaves written text far below the body size returns a warning with the
+  `apply_format` call that fixes it. Font sizes the AI sets are now converted to the
+  engine's 1/100 pt unit (they were 100x too small);
 - test builds: `GENOFFICE_SEED_DEEPSEEK_API_KEY` pre-loads a DeepSeek key through the
   normal verify-and-encrypt path when the profile has none;
 - provider-aware error handling and bounded retry suggestions;
