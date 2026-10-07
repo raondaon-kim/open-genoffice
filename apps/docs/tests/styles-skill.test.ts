@@ -122,7 +122,7 @@ describe('styledBlockNodes', () => {
         { role: r('tight'), text: '붙임' },
         { role: r('bullet'), text: '하나' },
       ],
-      { bullet: 7, ordered: null },
+      { bullet: '7', ordered: null },
     )
     expect(title!.attrs).toMatchObject({ align: 'center', spaceBefore: 0, spaceAfter: 240 })
     const titleStyle = title!.content![0]!.marks!.find((m) => m.type === 'docTextStyle')!
@@ -139,7 +139,7 @@ describe('styledBlockNodes', () => {
     expect(tight!.attrs).toMatchObject({ spaceBefore: 0, spaceAfter: 0 })
     expect(bullet).toMatchObject({
       type: 'docListItem',
-      attrs: { kind: 'bullet', numId: 7, indentLeft: 360, indentFirstLine: -360 },
+      attrs: { kind: 'bullet', numId: '7', indentLeft: 360, indentFirstLine: -360 },
     })
   })
 })

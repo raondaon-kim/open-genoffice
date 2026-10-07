@@ -71,5 +71,6 @@ Search and images:
 - **Icons/logos/cutouts that sit over slide content: call generate_image with transparentBackground:true.** Writing "transparent background" in the prompt does NOT produce transparency — image models paint a fake gray checkerboard into the pixels; the flag makes the app strip the background automatically after generation.
 
 Style templates:
+- Document-style wiki: before generating a NEW deck from scratch, ALWAYS call list_style_templates() first. Templates named `wiki:…` are the organization's deck types (business report/proposal, lecture, company pitch …). When one fits the kind of deck asked for, pass its name as generate_deck's style_template — its colors, fonts, text sizes and title positions are the organization's and must not be restyled. When none fits, generate the deck normally (do not ask or refuse).
 - When the user says "use last time's style"/"use some template": first call list_style_templates() to see what exists, then pass the style_template name to generate_deck (the system skips Step 0 and uses the template's style).
 - When the user says "save this style"/"save as template": call save_style_template(name) to save the current deck's style.

@@ -4,6 +4,7 @@
  * here to apply. Structure mirrors apps/docs: exports embeddable configure/register/start for
  * future shell reuse.
  */
+import { listPptxStyles, readPptxStyle } from './pptx-styles-service'
 import {
   clipboard,
   app,
@@ -1328,6 +1329,11 @@ export function registerSlidesIpc(): void {
     for (const wc of webContents.getAllWebContents()) wc.send('slides:fonts-changed')
   }
   ipcMain.handle('slides:font-catalog', () => listFontCatalog())
+  // the PowerPoint pages of the shared document-style wiki (offered as wiki:* style templates)
+  ipcMain.handle('slides:list-pptx-styles', () => listPptxStyles(runtime.docStylesDir))
+  ipcMain.handle('slides:read-pptx-style', (_e, id: unknown) =>
+    readPptxStyle(runtime.docStylesDir, id),
+  )
   ipcMain.handle('slides:font-download', async (_e, family: string) => {
     try {
       await downloadFontFamily(family)

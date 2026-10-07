@@ -443,6 +443,8 @@ const api: SlidesApi = {
     data: { topic: string; styleSkill: string; createdAt: string; layout?: unknown },
   ) => ipcRenderer.invoke('ai:save-style-template', name, data),
   listStyleTemplates: () => ipcRenderer.invoke('ai:list-style-templates'),
+  listPptxStyles: () => ipcRenderer.invoke('slides:list-pptx-styles'),
+  readPptxStyle: (id: string) => ipcRenderer.invoke('slides:read-pptx-style', id),
   loadStyleTemplate: (name: string) => ipcRenderer.invoke('ai:load-style-template', name),
   presenterStart: () => ipcRenderer.invoke('slides:presenter-start'),
   presenterSync: (state: ShowSyncState) => ipcRenderer.send('slides:presenter-sync', state),

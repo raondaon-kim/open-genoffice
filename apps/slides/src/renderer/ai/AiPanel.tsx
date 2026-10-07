@@ -1,3 +1,10 @@
+import {
+  isWikiTemplate,
+  WIKI_TEMPLATE_PREFIX,
+  wikiLayoutSkeleton,
+  wikiStyleSkill,
+  wikiTemplateName,
+} from './wiki-template'
 import { aiPanelWidthAtPointer, AiPanelSideButton } from '@genoffice/ui'
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import {
@@ -1312,15 +1319,32 @@ export function AiPanel({
           return { ok: false, error: String('') }
         }
       },
+      // saved templates plus the deck types of the document-style wiki (wiki:<id>)
       listStyleTemplates: async () => {
-        try {
-          return await window.slidesApi.listStyleTemplates()
-        } catch {
-          return []
-        }
+        const saved = await window.slidesApi.listStyleTemplates().catch(() => [])
+        const wiki = await window.slidesApi.listPptxStyles().catch(() => null)
+        const fromWiki =
+          wiki?.ok === true
+            ? wiki.styles.map((s) => ({
+                name: wikiTemplateName(s.id),
+                topic: `${s.title} — the organization's deck type (document-style wiki)`,
+                createdAt: '',
+              }))
+            : []
+        return [...fromWiki, ...saved]
       },
       loadStyleTemplate: async (name) => {
         try {
+          if (isWikiTemplate(name)) {
+            const r = await window.slidesApi.readPptxStyle(name.slice(WIKI_TEMPLATE_PREFIX.length))
+            if (!r.ok) return { ok: false, error: r.error }
+            return {
+              ok: true,
+              topic: r.style.title,
+              styleSkill: wikiStyleSkill(r.style, r.description),
+              layout: wikiLayoutSkeleton(r.style),
+            }
+          }
           return await window.slidesApi.loadStyleTemplate(name)
         } catch {
           return { ok: false, error: String('') }

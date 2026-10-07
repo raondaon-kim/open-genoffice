@@ -471,6 +471,7 @@ configureSlidesRuntime({
   rendererDevUrl: process.env.SLIDES_RENDERER_URL,
   rendererFilePath: join(SLIDES_OUT, 'renderer', 'index.html'),
   openGeneratedPath: (path) => openGeneratedDocument(path),
+  docStylesDir: HWP_DOC_STYLES_DIR,
 })
 configurePdfRuntime({
   preloadPath: join(PDF_OUT, 'preload', 'index.js'),

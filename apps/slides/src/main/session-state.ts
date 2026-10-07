@@ -31,6 +31,8 @@ export interface RuntimePaths {
   rendererFilePath?: string | undefined
   /** Shell router used to open exported PDFs in a new GenOffice tab. */
   openGeneratedPath?: (path: string) => boolean
+  /** the bundled document-style wiki folder (shell-provided; absent in standalone slides) */
+  docStylesDir?: string | undefined
 }
 
 export const runtime: RuntimePaths = {
@@ -43,6 +45,7 @@ export function configureSlidesRuntime(paths: RuntimePaths): void {
   runtime.preloadPath = paths.preloadPath
   runtime.rendererDevUrl = paths.rendererDevUrl
   runtime.rendererFilePath = paths.rendererFilePath
+  runtime.docStylesDir = paths.docStylesDir
   runtime.openGeneratedPath = paths.openGeneratedPath
 }
 

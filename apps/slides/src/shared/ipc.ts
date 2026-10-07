@@ -9,6 +9,7 @@ import type { AiPanelPrefs } from '@genoffice/ui'
  * them to the model and rebuilds the RenderSlide.
  */
 import type { RenderSlide } from '@genoffice/pptx-render'
+import type { PptxStyle } from '@genoffice/doc-styles'
 import type { CustGeomPathCmd, SlideComment, SectionInfo } from '@genoffice/pptx-engine'
 import type { FontSizeStep } from '@genoffice/pptx-ops/font-size'
 // the font catalog's shape is the store's to declare, not a copy kept in step by hand
@@ -60,6 +61,14 @@ export type { AgentToolCall, AgentToolDef } from '@genoffice/agent-core'
 export type UiTheme = 'light' | 'dark' | 'system'
 
 /** shell-wide AutoSave default; updatedAt is 0 until the user has ever set it */
+/** a PowerPoint page of the document-style wiki, as listed for the assistant */
+export interface PptxStyleSummary {
+  id: string
+  title: string
+  draft: boolean
+  evidence: { documents: number; note: string }
+}
+
 export interface AutoSaveDefault {
   on: boolean
   updatedAt: number
@@ -1794,6 +1803,13 @@ export interface SlidesApi {
       layout?: LayoutSkeleton
     },
   ) => Promise<{ ok: boolean; error?: string }>
+  /** the PowerPoint pages of the document-style wiki */
+  listPptxStyles: () => Promise<
+    { ok: true; styles: PptxStyleSummary[]; errors: string[] } | { ok: false; error: string }
+  >
+  readPptxStyle: (
+    id: string,
+  ) => Promise<{ ok: true; style: PptxStyle; description: string } | { ok: false; error: string }>
   /** List saved Style templates */
   listStyleTemplates: () => Promise<Array<{ name: string; topic: string; createdAt: string }>>
   /** Load a given Style template's content */
