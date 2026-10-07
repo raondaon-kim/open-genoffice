@@ -1,3 +1,17 @@
+> **Open GenOffice** — an independent fork of GenOffice, based on upstream main
+> `2490e20d` (2026-10-07). On top of upstream it adds a **Hangul
+> (`.hwp`/`.hwpx`) module** built on rhwp, an organization's **document-style
+> wiki** that the Hangul, Word and PowerPoint assistants read before writing a new
+> document, a **LiteLLM provider** with build-time organization defaults, and its
+> own app identity. See [MODIFICATIONS.md](MODIFICATIONS.md) for the list and
+> [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md); the upstream README follows unchanged.
+>
+> Company build (Windows): set `OPEN_GENOFFICE_LITELLM_URL=<proxy>/v1`,
+> `OPEN_GENOFFICE_LITELLM_MODEL=<model>` and
+> `OPEN_GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc`, then run
+> `npm run dist:win`. A first run uses the proxy and only asks for the user's
+> virtual key in Settings › AI.
+
 <p align="center">
   <a href="https://genoffice.ai/">
     <picture>

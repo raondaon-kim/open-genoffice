@@ -106,7 +106,12 @@ if (litellmUrl && litellmModel) {
 const shipOrgDefaults = existsSync(join(__dirname, ORG_DEFAULTS_REL))
 
 const winArch = winArm64 ? 'arm64' : 'x64'
-const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
+// OPEN_GENOFFICE_WIN_SIDECAR_TARGET overrides the cargo target the Windows sidecar is taken from
+// (e.g. x86_64-pc-windows-msvc on a build machine without the GNU toolchain; the sidecar's
+// .cargo/config.toml links the MSVC CRT statically, so the exe has no VC++ runtime dependency).
+const winSidecarTarget =
+  process.env.OPEN_GENOFFICE_WIN_SIDECAR_TARGET?.trim() ||
+  (winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu')
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
 
 function assertExtraResourceSources() {
