@@ -35,6 +35,7 @@ export interface PickImageResult {
 
 // ---- AI provider settings/config/streaming: canonical types live in @genoffice/ai-provider ----
 
+import type { DocxStyle } from '@genoffice/doc-styles'
 import type {
   AiChatRequest,
   AiChatResponse,
@@ -295,7 +296,22 @@ export interface SpellLanguages {
   available: string[]
 }
 
+/** a Word page of the document-style wiki, as listed for the assistant */
+export interface DocStyleSummary {
+  id: string
+  title: string
+  draft: boolean
+  evidence: { documents: number; note: string }
+}
+
 export interface DesktopApi {
+  /** the bundled document-style wiki: the Word pages and one page with its description */
+  listDocStyles(): Promise<
+    { ok: true; styles: DocStyleSummary[]; errors: string[] } | { ok: false; error: string }
+  >
+  readDocStyle(
+    id: string,
+  ): Promise<{ ok: true; style: DocxStyle; description: string } | { ok: false; error: string }>
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */

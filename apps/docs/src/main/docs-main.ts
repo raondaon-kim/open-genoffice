@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { listDocxStyles, readDocxStyle } from './doc-styles-service'
 import { handOffBytes } from './byte-handoff'
 import {
   appendFileSync,
@@ -2981,6 +2982,8 @@ interface DocsRuntimeConfig {
   rendererUrl?: string | undefined
   /** absolute path to the built docs renderer index.html */
   rendererFile: string
+  /** the bundled document-style wiki folder (shell-provided; absent in standalone docs) */
+  docStylesDir?: string | undefined
 }
 
 let runtime: DocsRuntimeConfig = {
@@ -4276,6 +4279,12 @@ export function registerDocsIpc(): void {
     requestDocsClose(event.sender, dialogParent(event)),
   )
   ipcMain.handle('docs:system-locale', () => app.getSystemLocale())
+
+  // the Word pages of the shared document-style wiki (read by the Word assistant)
+  ipcMain.handle('docs:list-doc-styles', () => listDocxStyles(runtime.docStylesDir))
+  ipcMain.handle('docs:read-doc-style', (_event, id: unknown) =>
+    readDocxStyle(runtime.docStylesDir, id),
+  )
 
   configureMetricsCache(userDataPath('font-metrics'))
   ipcMain.handle('docs:font-metrics', (_event, family: string) =>

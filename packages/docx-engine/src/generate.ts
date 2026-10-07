@@ -1305,7 +1305,8 @@ interface PPrChild {
 /** w:spacing element for a ParaFormat ('' when nothing is set) — shared by body and table-cell paragraphs */
 function paraSpacingXml(format: ParaFormat): string {
   const attrs: string[] = []
-  if (format.spaceBefore && format.spaceBefore > 0) {
+  // explicit 0 overrides the style's space-before in Word, so it must be written back too
+  if (format.spaceBefore !== undefined && format.spaceBefore >= 0) {
     attrs.push(`w:before="${Math.round(format.spaceBefore)}"`)
   }
   // explicit "0" must be written back: a bare literal would not override a
@@ -1507,12 +1508,14 @@ const JC_TO_ALIGN: Record<string, ParaFormat['align']> = {
 function rawSpacingUnchanged(raw: string | undefined, f: ParaFormat): boolean {
   const rule = rawAttr(raw, 'w:lineRule') ?? 'auto'
   const line = parseInt(rawAttr(raw, 'w:line') ?? '', 10)
-  const before = parseInt(rawAttr(raw, 'w:before') ?? '', 10)
+  const beforeStr = rawAttr(raw, 'w:before')
+  const before = parseInt(beforeStr ?? '', 10)
   const afterStr = rawAttr(raw, 'w:after')
   const after = parseInt(afterStr ?? '', 10)
-  const rawBefore = before > 0 ? before : undefined
+  const rawBefore = beforeStr !== undefined && before >= 0 ? before : undefined
   const rawAfter = afterStr !== undefined && after >= 0 ? after : undefined
-  const fBefore = f.spaceBefore && f.spaceBefore > 0 ? Math.round(f.spaceBefore) : undefined
+  const fBefore =
+    f.spaceBefore !== undefined && f.spaceBefore >= 0 ? Math.round(f.spaceBefore) : undefined
   const fAfter =
     f.spaceAfter !== undefined && f.spaceAfter >= 0 ? Math.round(f.spaceAfter) : undefined
   if (rawBefore !== fBefore || rawAfter !== fAfter) return false

@@ -150,6 +150,25 @@ describe('explicit w:after="0"', () => {
   })
 })
 
+describe('explicit w:before="0"', () => {
+  it('keeps the bytes when an explicit zero space-before is unchanged', async () => {
+    const raw =
+      '<w:pPr><w:spacing w:before="0" w:after="120" w:line="276" w:lineRule="auto"/></w:pPr>'
+    const bytes = await buildDocx({ bodyXml: `<w:p>${raw}<w:r><w:t>x</w:t></w:r></w:p>` })
+    const doc = await parseDocx(bytes)
+    expect(doc.blocks[0].format?.spaceBefore).toBe(0)
+    expect(mergePPrFormat(raw, doc.blocks[0].format)).toBe(raw)
+  })
+
+  it('writes w:before="0" when a paragraph gets an explicit zero space-before', () => {
+    const out = mergePPrFormat('<w:pPr><w:spacing w:before="240" w:after="0"/></w:pPr>', {
+      spaceBefore: 0,
+      spaceAfter: 0,
+    })
+    expect(out).toBe('<w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>')
+  })
+})
+
 describe('empty-paragraph size write-back (pPr w:rPr)', () => {
   it('inserts a fresh paragraph-mark rPr when the model carries a size', () => {
     expect(mergePPrFormat('<w:pPr></w:pPr>', { emptyRunSizeHalfPoints: 2 })).toBe(

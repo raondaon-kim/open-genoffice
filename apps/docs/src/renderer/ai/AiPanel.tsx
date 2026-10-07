@@ -41,6 +41,7 @@ import { DOCS_CONTINUE_INSTRUCTION } from './continuation'
 import { waitForFullContent } from '../phased-content'
 import { currentDocGeneration } from '../file-actions'
 import { createFilesSkill } from './files-skill'
+import { createStylesSkill } from './styles-skill'
 import { boundChatHistory } from './chat-retention'
 import { createElectronTransport } from './transport'
 import { useI18n, t as tModule, aiLangDirective, type StringKey } from '../i18n/locale'
@@ -768,6 +769,13 @@ export function AiPanel({
           () => docExtrasRef.current,
           () => notesAccessRef.current,
           () => mediaAnalysisAvailable(settingsRef.current, gskLoggedInRef.current),
+        ),
+        // the document-style wiki: read first, then write a whole document in its formatting
+        createStylesSkill(
+          () => editorRef.current,
+          numIds,
+          () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+          () => window.desktop,
         ),
         createFilesSkill(availableAttachments),
       ]),
