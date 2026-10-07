@@ -6,6 +6,7 @@ import { requestSlidesClose } from '../../../slides/src/main/slides-main'
 import { requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { requestHtmlClose } from '../../../html/src/main/html-main'
+import { requestHwpClose } from '../../../hwp/src/main/hwp-main'
 import type { TabManager } from './tab-manager'
 
 /**
@@ -32,6 +33,7 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
     const dirtyPdf = manager.dirtyPdfTabs()
     const dirtyMarkdown = manager.dirtyMarkdownTabs()
     const dirtyHtml = manager.dirtyHtmlTabs()
+    const dirtyHwp = manager.dirtyHwpTabs()
     const dirtySlides = manager.dirtySlidesTabs()
     const docsTabs = manager.docsTabs()
     // Nothing to protect, so let this close event through untouched. Cancelling
@@ -44,6 +46,7 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
       dirtyPdf.length === 0 &&
       dirtyMarkdown.length === 0 &&
       dirtyHtml.length === 0 &&
+      dirtyHwp.length === 0 &&
       dirtySlides.length === 0 &&
       docsTabs.length === 0
     ) {
@@ -73,6 +76,10 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
           for (const tab of dirtyHtml) {
             manager.activateTab(tab.id)
             if (!(await requestHtmlClose(tab.webContents, win))) return true
+          }
+          for (const tab of dirtyHwp) {
+            manager.activateTab(tab.id)
+            if (!(await requestHwpClose(tab.webContents, win))) return true
           }
           for (const tab of dirtySlides) {
             manager.activateTab(tab.id)

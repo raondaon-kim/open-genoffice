@@ -89,6 +89,7 @@ export const EXT_FAMILY: Record<string, readonly string[]> = {
   // the two views disagree about which files the filter means.
   md: ['md', 'markdown', 'txt', 'json'],
   html: ['html', 'htm'],
+  hwp: ['hwp', 'hwpx'],
 }
 
 /** Family-aware extension match for sidebar filters (recents and starred share it). */

@@ -7,6 +7,7 @@ import iconPptx from './assets/file-pptx.svg'
 import iconPdf from './assets/file-pdf.svg'
 import iconMd from './assets/file-md.svg'
 import iconHtml from './assets/file-html.svg'
+import iconHwp from './assets/file-hwp.svg'
 import type {
   AccountStatus,
   CloudProjectKind,
@@ -62,6 +63,8 @@ const FILE_ICONS: Record<string, string> = {
   markdown: iconMd,
   html: iconHtml,
   htm: iconHtml,
+  hwp: iconHwp,
+  hwpx: iconHwp,
 }
 
 /* Formats the open-local card advertises. Too long for the card at any window
@@ -237,6 +240,7 @@ const FILTERS: { key: string; label: StringKey }[] = [
   { key: 'pdf', label: 'filterPdf' },
   { key: 'md', label: 'filterMd' },
   { key: 'html', label: 'filterHtml' },
+  { key: 'hwp', label: 'filterHwp' },
 ]
 
 /** sidebar filter keys that stand for a family of extensions (mirrors recent-files.ts) */
@@ -246,6 +250,7 @@ const FILTER_FAMILY: Record<string, readonly string[]> = {
   pptx: ['pptx', 'ppt'],
   md: ['md', 'markdown', 'txt', 'json'],
   html: ['html', 'htm'],
+  hwp: ['hwp', 'hwpx'],
 }
 
 function matchesFilter(entry: RecentEntry, filter: string): boolean {
@@ -2105,6 +2110,19 @@ export function Home() {
       action: () => window.aiOffice.newMarkdown(newFileOpts),
     },
     {
+      ext: 'hwp',
+      title: t('newHwp'),
+      sub: '.hwp',
+      action: () => window.aiOffice.newHwp(newFileOpts),
+    },
+    {
+      key: 'hwp-form',
+      ext: 'hwp',
+      title: t('newHwpFromForm'),
+      sub: t('newHwpFromFormSub'),
+      action: () => window.aiOffice.newHwpFromForm(newFileOpts),
+    },
+    {
       ext: 'html',
       title: t('newHtml'),
       sub: '.html',
@@ -2122,7 +2140,11 @@ export function Home() {
     return (
       <div className="quick-cards">
         {NEW_ITEMS.map((item) => (
-          <button key={item.ext} className="quick-card" onClick={() => void item.action()}>
+          <button
+            key={'key' in item && item.key ? item.key : item.ext}
+            className="quick-card"
+            onClick={() => void item.action()}
+          >
             <FileBadge ext={item.ext} size={30} />
             <span className="quick-text">
               <span className="quick-title-row">

@@ -211,6 +211,10 @@ function assertModuleTreesPresent() {
     '../pdf/out',
     '../markdown/out',
     '../html/out',
+    '../hwp/out',
+    // the rhwp studio (tools/build-hwp-studio.mjs) and the document-style wiki pages
+    '../hwp/dist/studio',
+    '../hwp/resources/doc-styles',
     '../../packages/cli/dist/genoffice.cjs',
     '../../packages/cli/dist/node_modules/jsdom',
   ]) {
@@ -338,6 +342,21 @@ const config = {
     {
       from: '../html/out',
       to: 'modules/html',
+    },
+    // Hangul module: the app bundle, the bundled rhwp studio served from a
+    // loopback origin, and the document-style wiki read by the hwp, docs and
+    // slides assistants
+    {
+      from: '../hwp/out',
+      to: 'modules/hwp',
+    },
+    {
+      from: '../hwp/dist/studio',
+      to: 'modules/hwp-studio',
+    },
+    {
+      from: '../hwp/resources/doc-styles',
+      to: 'modules/hwp-doc-styles',
     },
     // PDF text editing engines: the bundled main resolves these under
     // Resources/wasm when node_modules is absent (apps/pdf/src/main/wasm-path.ts)
@@ -530,6 +549,15 @@ const config = {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
         to: 'native/xlsx-sidecar',
       },
+      // HwpForge document generator and the rhwp CLI (tools/fetch-rhwp-cli.mjs)
+      {
+        from: '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
+        to: 'native/hwpforge-mcp',
+      },
+      {
+        from: '../hwp/native/rhwp/darwin-arm64/rhwp',
+        to: 'native/rhwp',
+      },
     ],
   },
   win: {
@@ -543,6 +571,15 @@ const config = {
       {
         from: WIN_SIDECAR,
         to: 'native/xlsx-sidecar.exe',
+      },
+      // HwpForge document generator and the rhwp CLI (tools/fetch-rhwp-cli.mjs)
+      {
+        from: '../../node_modules/@hwpforge/mcp-win32-x64/bin/hwpforge-mcp.exe',
+        to: 'native/hwpforge-mcp.exe',
+      },
+      {
+        from: '../hwp/native/rhwp/win32-x64/rhwp.exe',
+        to: 'native/rhwp.exe',
       },
       {
         from: 'build/shell-new',

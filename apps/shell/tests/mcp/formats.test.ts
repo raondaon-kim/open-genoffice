@@ -95,7 +95,15 @@ describe('withSaveExtension', () => {
 describe('capabilityReport', () => {
   it('exposes editor truth alongside the mcp subset for every family', () => {
     const report = capabilityReport()
-    expect(report.map((r) => r.family)).toEqual(['docx', 'xlsx', 'pptx', 'md', 'html', 'pdf'])
+    expect(report.map((r) => r.family)).toEqual([
+      'docx',
+      'xlsx',
+      'pptx',
+      'md',
+      'html',
+      'pdf',
+      'hwp',
+    ])
     const docx = report.find((r) => r.family === 'docx')!
     expect(docx.editor.open).toEqual(['docx'])
     expect(docx.editor.export).toEqual(['pdf'])

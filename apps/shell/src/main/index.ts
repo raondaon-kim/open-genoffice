@@ -10,6 +10,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { readFile as readFileAsync, stat as statAsync } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import {
@@ -234,6 +235,8 @@ import {
   setMarkdownDocxExportedHook,
   setMarkdownFileSavedHook,
 } from '../../../markdown/src/main/markdown-main'
+import { configureHwpRuntime, flushHwpSave } from '../../../hwp/src/main/hwp-main'
+import { loadFormFile } from './hwp-form-open'
 import {
   configureHtmlRuntime,
   exportHtmlHeadless,
@@ -291,6 +294,7 @@ import { isMoveSource, isUserVisibleFile, type FileTargetSources } from './file-
 import {
   DOCX_RE,
   HTML_RE,
+  HWP_RE,
   PDF_RE,
   PPTX_RE,
   TEXT_RE,
@@ -416,6 +420,32 @@ const MARKDOWN_OUT = app.isPackaged
 const HTML_OUT = app.isPackaged
   ? join(process.resourcesPath, 'modules', 'html')
   : join(APPS_ROOT, 'html', 'out')
+const HWP_OUT = app.isPackaged
+  ? join(process.resourcesPath, 'modules', 'hwp')
+  : join(APPS_ROOT, 'hwp', 'out')
+const HWP_STUDIO_DIR = app.isPackaged
+  ? join(process.resourcesPath, 'modules', 'hwp-studio')
+  : join(APPS_ROOT, 'hwp', 'dist', 'studio')
+/** the bundled document-style wiki (Hangul, Word and PowerPoint pages) */
+const HWP_DOC_STYLES_DIR = app.isPackaged
+  ? join(process.resourcesPath, 'modules', 'hwp-doc-styles')
+  : join(APPS_ROOT, 'hwp', 'resources', 'doc-styles')
+const HWPFORGE_EXE = process.platform === 'win32' ? 'hwpforge-mcp.exe' : 'hwpforge-mcp'
+const HWPFORGE_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', HWPFORGE_EXE)
+  : join(
+      APPS_ROOT,
+      '..',
+      'node_modules',
+      '@hwpforge',
+      `mcp-${process.platform}-${process.arch}`,
+      'bin',
+      HWPFORGE_EXE,
+    )
+const RHWP_EXE = process.platform === 'win32' ? 'rhwp.exe' : 'rhwp'
+const RHWP_BIN = app.isPackaged
+  ? join(process.resourcesPath, 'native', RHWP_EXE)
+  : join(APPS_ROOT, 'hwp', 'native', 'rhwp', `${process.platform}-${process.arch}`, RHWP_EXE)
 const SIDECAR_BIN = app.isPackaged
   ? join(process.resourcesPath, 'native', SIDECAR_EXE)
   : join(APPS_ROOT, 'sheets', 'native', 'xlsx-engine', 'target', 'release', SIDECAR_EXE)
@@ -459,6 +489,25 @@ configureHtmlRuntime({
   rendererUrl: process.env.HTML_RENDERER_URL,
   rendererFile: join(HTML_OUT, 'renderer', 'index.html'),
   openGeneratedPath: (path) => openGeneratedDocument(path),
+})
+configureHwpRuntime({
+  preloadPath: join(HWP_OUT, 'preload', 'index.js'),
+  rendererUrl: process.env.HWP_RENDERER_URL,
+  rendererFile: join(HWP_OUT, 'renderer', 'index.html'),
+  studioDir: HWP_STUDIO_DIR,
+  docStylesDir: HWP_DOC_STYLES_DIR,
+  hwpforgePath: HWPFORGE_BIN,
+  rhwpPath: RHWP_BIN,
+  // an untitled Hangul document's first save (or Save As) lands on a new path
+  onSaved: (webContentsId, path) => {
+    tabManager?.setTabFileFor(webContentsId, path)
+    detachedSetFileFor(webContentsId, path)
+    recordRecentFile(path)
+    applyPendingDir(webContentsId, path)
+  },
+  onCreateDocument: (path) => {
+    openDocumentPath(path)
+  },
 })
 // privileged-scheme registration is only legal before app ready
 registerPrivilegedSchemes()
@@ -721,10 +770,13 @@ const tMain = createI18n({
     untitledDoc: '未命名文档',
     untitledDeck: '未命名演示文稿',
     untitledMarkdown: '未命名 Markdown',
+    untitledHwp: '未命名 HWP',
+    untitledFromForm: '{name}（新建）',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'HWP 文档',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '导出为 PDF…',
@@ -746,6 +798,7 @@ const tMain = createI18n({
     filterExcel: 'Excel 工作簿',
     filterPpt: 'PowerPoint 演示文稿',
     filterMarkdown: '文本文件 (Markdown, TXT, JSON)',
+    filterHwp: 'HWP 文档',
     filterHtml: 'HTML 文档',
     filterPdf: 'PDF 文档',
     errBadArgs: '参数无效',
@@ -814,10 +867,13 @@ const tMain = createI18n({
     untitledDoc: 'Untitled Document',
     untitledDeck: 'Untitled Presentation',
     untitledMarkdown: 'Untitled Markdown',
+    untitledHwp: 'Untitled HWP',
+    untitledFromForm: '{name} (new)',
     untitledHtml: 'Untitled HTML',
     untitledPdf: 'Untitled PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Hangul Document',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Export as PDF…',
@@ -839,6 +895,7 @@ const tMain = createI18n({
     filterExcel: 'Excel Workbooks',
     filterPpt: 'PowerPoint Presentations',
     filterMarkdown: 'Text Files (Markdown, TXT, JSON)',
+    filterHwp: 'Hangul Documents',
     filterHtml: 'HTML Documents',
     filterPdf: 'PDF Documents',
     errBadArgs: 'Invalid arguments',
@@ -915,10 +972,13 @@ const tMain = createI18n({
     untitledDoc: 'Tài liệu chưa có tiêu đề',
     untitledDeck: 'Bản trình bày chưa có tiêu đề',
     untitledMarkdown: 'Markdown chưa có tiêu đề',
+    untitledHwp: 'HWP chưa có tiêu đề',
+    untitledFromForm: '{name} (mới)',
     untitledHtml: 'HTML chưa có tiêu đề',
     untitledPdf: 'PDF chưa có tiêu đề',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Tài liệu Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Xuất dưới dạng PDF…',
@@ -940,6 +1000,7 @@ const tMain = createI18n({
     filterExcel: 'Sổ làm việc Excel',
     filterPpt: 'Bản trình bày PowerPoint',
     filterMarkdown: 'Tệp văn bản (Markdown, TXT, JSON)',
+    filterHwp: 'Tài liệu Hangul',
     filterHtml: 'Tài liệu HTML',
     filterPdf: 'Tài liệu PDF',
     errBadArgs: 'Đối số không hợp lệ',
@@ -1016,10 +1077,13 @@ const tMain = createI18n({
     untitledDoc: '無題のドキュメント',
     untitledDeck: '無題のプレゼンテーション',
     untitledMarkdown: '無題の Markdown',
+    untitledHwp: '無題の HWP',
+    untitledFromForm: '{name}（新規）',
     untitledHtml: '無題の HTML',
     untitledPdf: '無題の PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: '한글 ドキュメント',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF として書き出す…',
@@ -1041,6 +1105,7 @@ const tMain = createI18n({
     filterExcel: 'Excel ブック',
     filterPpt: 'PowerPoint プレゼンテーション',
     filterMarkdown: 'テキストファイル (Markdown, TXT, JSON)',
+    filterHwp: '한글 ドキュメント',
     filterHtml: 'HTML ドキュメント',
     filterPdf: 'PDF ドキュメント',
     errBadArgs: '引数が無効です',
@@ -1117,10 +1182,13 @@ const tMain = createI18n({
     untitledDoc: '제목 없는 문서',
     untitledDeck: '제목 없는 프레젠테이션',
     untitledMarkdown: '제목 없는 Markdown',
+    untitledHwp: '제목 없는 HWP',
+    untitledFromForm: '{name} (새 문서)',
     untitledHtml: '제목 없는 HTML',
     untitledPdf: '제목 없는 PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: '한글 문서',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF로 내보내기…',
@@ -1142,6 +1210,7 @@ const tMain = createI18n({
     filterExcel: 'Excel 통합 문서',
     filterPpt: 'PowerPoint 프레젠테이션',
     filterMarkdown: '텍스트 파일 (Markdown, TXT, JSON)',
+    filterHwp: '한글 문서',
     filterHtml: 'HTML 문서',
     filterPdf: 'PDF 문서',
     errBadArgs: '잘못된 인수입니다',
@@ -1217,10 +1286,13 @@ const tMain = createI18n({
     untitledDoc: 'Document sans titre',
     untitledDeck: 'Présentation sans titre',
     untitledMarkdown: 'Markdown sans titre',
+    untitledHwp: 'HWP sans titre',
+    untitledFromForm: '{name} (nouveau)',
     untitledHtml: 'HTML sans titre',
     untitledPdf: 'PDF sans titre',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Document Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporter en PDF…',
@@ -1242,6 +1314,7 @@ const tMain = createI18n({
     filterExcel: 'Classeurs Excel',
     filterPpt: 'Présentations PowerPoint',
     filterMarkdown: 'Fichiers texte (Markdown, TXT, JSON)',
+    filterHwp: 'Documents Hangul',
     filterHtml: 'Documents HTML',
     filterPdf: 'Documents PDF',
     errBadArgs: 'Arguments non valides',
@@ -1319,10 +1392,13 @@ const tMain = createI18n({
     untitledDoc: 'Unbenanntes Dokument',
     untitledDeck: 'Unbenannte Präsentation',
     untitledMarkdown: 'Unbenanntes Markdown',
+    untitledHwp: 'Unbenanntes HWP',
+    untitledFromForm: '{name} (neu)',
     untitledHtml: 'Unbenanntes HTML',
     untitledPdf: 'Unbenanntes PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Hangul-Dokument',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Als PDF exportieren…',
@@ -1344,6 +1420,7 @@ const tMain = createI18n({
     filterExcel: 'Excel-Arbeitsmappen',
     filterPpt: 'PowerPoint-Präsentationen',
     filterMarkdown: 'Textdateien (Markdown, TXT, JSON)',
+    filterHwp: 'Hangul-Dokumente',
     filterHtml: 'HTML-Dokumente',
     filterPdf: 'PDF-Dokumente',
     errBadArgs: 'Ungültige Argumente',
@@ -1422,10 +1499,13 @@ const tMain = createI18n({
     untitledDoc: 'Documento sin título',
     untitledDeck: 'Presentación sin título',
     untitledMarkdown: 'Markdown sin título',
+    untitledHwp: 'HWP sin título',
+    untitledFromForm: '{name} (nuevo)',
     untitledHtml: 'HTML sin título',
     untitledPdf: 'PDF sin título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Documento Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -1447,6 +1527,7 @@ const tMain = createI18n({
     filterExcel: 'Libros de Excel',
     filterPpt: 'Presentaciones de PowerPoint',
     filterMarkdown: 'Archivos de texto (Markdown, TXT, JSON)',
+    filterHwp: 'Documentos Hangul',
     filterHtml: 'Documentos HTML',
     filterPdf: 'Documentos PDF',
     errBadArgs: 'Argumentos no válidos',
@@ -1524,10 +1605,13 @@ const tMain = createI18n({
     untitledDoc: 'เอกสารไม่มีชื่อ',
     untitledDeck: 'งานนำเสนอไม่มีชื่อ',
     untitledMarkdown: 'Markdown ไม่มีชื่อ',
+    untitledHwp: 'HWP ที่ยังไม่มีชื่อ',
+    untitledFromForm: '{name} (ใหม่)',
     untitledHtml: 'HTML ไม่มีชื่อ',
     untitledPdf: 'PDF ไม่มีชื่อ',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'เอกสาร Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ส่งออกเป็น PDF…',
@@ -1549,6 +1633,7 @@ const tMain = createI18n({
     filterExcel: 'เวิร์กบุ๊ก Excel',
     filterPpt: 'งานนำเสนอ PowerPoint',
     filterMarkdown: 'ไฟล์ข้อความ (Markdown, TXT, JSON)',
+    filterHwp: 'เอกสาร Hangul',
     filterHtml: 'เอกสาร HTML',
     filterPdf: 'เอกสาร PDF',
     errBadArgs: 'อาร์กิวเมนต์ไม่ถูกต้อง',
@@ -1622,10 +1707,13 @@ const tMain = createI18n({
     untitledDoc: 'Dokumen tanpa judul',
     untitledDeck: 'Presentasi tanpa judul',
     untitledMarkdown: 'Markdown tanpa judul',
+    untitledHwp: 'HWP Tanpa Judul',
+    untitledFromForm: '{name} (baru)',
     untitledHtml: 'HTML tanpa judul',
     untitledPdf: 'PDF tanpa judul',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Dokumen Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Ekspor sebagai PDF…',
@@ -1647,6 +1735,7 @@ const tMain = createI18n({
     filterExcel: 'Buku Kerja Excel',
     filterPpt: 'Presentasi PowerPoint',
     filterMarkdown: 'File teks (Markdown, TXT, JSON)',
+    filterHwp: 'Dokumen Hangul',
     filterHtml: 'Dokumen HTML',
     filterPdf: 'Dokumen PDF',
     errBadArgs: 'Argumen tidak valid',
@@ -1724,10 +1813,13 @@ const tMain = createI18n({
     untitledDoc: 'Документ без названия',
     untitledDeck: 'Презентация без названия',
     untitledMarkdown: 'Markdown без названия',
+    untitledHwp: 'Безымянный HWP',
+    untitledFromForm: '{name} (новый)',
     untitledHtml: 'HTML без названия',
     untitledPdf: 'PDF без названия',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Документ Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Экспортировать в PDF…',
@@ -1749,6 +1841,7 @@ const tMain = createI18n({
     filterExcel: 'Книги Excel',
     filterPpt: 'Презентации PowerPoint',
     filterMarkdown: 'Текстовые файлы (Markdown, TXT, JSON)',
+    filterHwp: 'Документы Hangul',
     filterHtml: 'Документы HTML',
     filterPdf: 'Документы PDF',
     errBadArgs: 'Недопустимые аргументы',
@@ -1826,10 +1919,13 @@ const tMain = createI18n({
     untitledDoc: 'مستند بدون عنوان',
     untitledDeck: 'عرض تقديمي بدون عنوان',
     untitledMarkdown: 'Markdown بدون عنوان',
+    untitledHwp: 'HWP بدون عنوان',
+    untitledFromForm: '{name} (جديد)',
     untitledHtml: 'HTML بدون عنوان',
     untitledPdf: 'PDF بدون عنوان',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'مستند Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'تصدير بتنسيق PDF…',
@@ -1851,6 +1947,7 @@ const tMain = createI18n({
     filterExcel: 'مصنفات Excel',
     filterPpt: 'عروض PowerPoint التقديمية',
     filterMarkdown: 'ملفات نصية (Markdown, TXT, JSON)',
+    filterHwp: 'مستندات Hangul',
     filterHtml: 'مستندات HTML',
     filterPdf: 'مستندات PDF',
     errBadArgs: 'وسيطات غير صالحة',
@@ -1924,10 +2021,13 @@ const tMain = createI18n({
     untitledDoc: 'Documento sem título',
     untitledDeck: 'Apresentação sem título',
     untitledMarkdown: 'Markdown sem título',
+    untitledHwp: 'HWP sem título',
+    untitledFromForm: '{name} (novo)',
     untitledHtml: 'HTML sem título',
     untitledPdf: 'PDF sem título',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Documento Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportar como PDF…',
@@ -1949,6 +2049,7 @@ const tMain = createI18n({
     filterExcel: 'Pastas de trabalho do Excel',
     filterPpt: 'Apresentações do PowerPoint',
     filterMarkdown: 'Arquivos de texto (Markdown, TXT, JSON)',
+    filterHwp: 'Documentos Hangul',
     filterHtml: 'Documentos HTML',
     filterPdf: 'Documentos PDF',
     errBadArgs: 'Argumentos inválidos',
@@ -2026,10 +2127,13 @@ const tMain = createI18n({
     untitledDoc: 'Documento senza titolo',
     untitledDeck: 'Presentazione senza titolo',
     untitledMarkdown: 'Markdown senza titolo',
+    untitledHwp: 'HWP senza titolo',
+    untitledFromForm: '{name} (nuovo)',
     untitledHtml: 'HTML senza titolo',
     untitledPdf: 'PDF senza titolo',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Documento Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Esporta come PDF…',
@@ -2051,6 +2155,7 @@ const tMain = createI18n({
     filterExcel: 'Cartelle di lavoro Excel',
     filterPpt: 'Presentazioni PowerPoint',
     filterMarkdown: 'File di testo (Markdown, TXT, JSON)',
+    filterHwp: 'Documenti Hangul',
     filterHtml: 'Documenti HTML',
     filterPdf: 'Documenti PDF',
     errBadArgs: 'Argomenti non validi',
@@ -2128,10 +2233,13 @@ const tMain = createI18n({
     untitledDoc: 'Dokument bez tytułu',
     untitledDeck: 'Prezentacja bez tytułu',
     untitledMarkdown: 'Markdown bez tytułu',
+    untitledHwp: 'HWP bez nazwy',
+    untitledFromForm: '{name} (nowy)',
     untitledHtml: 'HTML bez tytułu',
     untitledPdf: 'PDF bez tytułu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Dokument Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksportuj jako PDF…',
@@ -2153,6 +2261,7 @@ const tMain = createI18n({
     filterExcel: 'Skoroszyty programu Excel',
     filterPpt: 'Prezentacje programu PowerPoint',
     filterMarkdown: 'Pliki tekstowe (Markdown, TXT, JSON)',
+    filterHwp: 'Dokumenty Hangul',
     filterHtml: 'Dokumenty HTML',
     filterPdf: 'Dokumenty PDF',
     errBadArgs: 'Nieprawidłowe argumenty',
@@ -2230,10 +2339,13 @@ const tMain = createI18n({
     untitledDoc: 'Dokument bez názvu',
     untitledDeck: 'Prezentace bez názvu',
     untitledMarkdown: 'Markdown bez názvu',
+    untitledHwp: 'HWP bez názvu',
+    untitledFromForm: '{name} (nový)',
     untitledHtml: 'HTML bez názvu',
     untitledPdf: 'PDF bez názvu',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Dokument Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exportovat jako PDF…',
@@ -2255,6 +2367,7 @@ const tMain = createI18n({
     filterExcel: 'Sešity Excel',
     filterPpt: 'Prezentace PowerPoint',
     filterMarkdown: 'Textové soubory (Markdown, TXT, JSON)',
+    filterHwp: 'Dokumenty Hangul',
     filterHtml: 'Dokumenty HTML',
     filterPdf: 'Dokumenty PDF',
     errBadArgs: 'Neplatné argumenty',
@@ -2330,10 +2443,13 @@ const tMain = createI18n({
     untitledDoc: 'Naamloos document',
     untitledDeck: 'Naamloze presentatie',
     untitledMarkdown: 'Naamloos Markdown',
+    untitledHwp: 'Naamloos HWP',
+    untitledFromForm: '{name} (nieuw)',
     untitledHtml: 'Naamloos HTML',
     untitledPdf: 'Naamloze PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Hangul-document',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Exporteren als PDF…',
@@ -2355,6 +2471,7 @@ const tMain = createI18n({
     filterExcel: 'Excel-werkmappen',
     filterPpt: 'PowerPoint-presentaties',
     filterMarkdown: 'Tekstbestanden (Markdown, TXT, JSON)',
+    filterHwp: 'Hangul-documenten',
     filterHtml: 'HTML-documenten',
     filterPdf: 'PDF-documenten',
     errBadArgs: 'Ongeldige argumenten',
@@ -2432,10 +2549,13 @@ const tMain = createI18n({
     untitledDoc: 'Dokumen tanpa tajuk',
     untitledDeck: 'Persembahan tanpa tajuk',
     untitledMarkdown: 'Markdown tanpa tajuk',
+    untitledHwp: 'HWP Tanpa Tajuk',
+    untitledFromForm: '{name} (baharu)',
     untitledHtml: 'HTML tanpa tajuk',
     untitledPdf: 'PDF tanpa tajuk',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Dokumen Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'Eksport sebagai PDF…',
@@ -2457,6 +2577,7 @@ const tMain = createI18n({
     filterExcel: 'Buku Kerja Excel',
     filterPpt: 'Persembahan PowerPoint',
     filterMarkdown: 'Fail teks (Markdown, TXT, JSON)',
+    filterHwp: 'Dokumen Hangul',
     filterHtml: 'Dokumen HTML',
     filterPdf: 'Dokumen PDF',
     errBadArgs: 'Argumen tidak sah',
@@ -2533,10 +2654,13 @@ const tMain = createI18n({
     untitledDoc: 'מסמך ללא שם',
     untitledDeck: 'מצגת ללא שם',
     untitledMarkdown: 'Markdown ללא שם',
+    untitledHwp: 'HWP ללא שם',
+    untitledFromForm: '{name} (חדש)',
     untitledHtml: 'HTML ללא שם',
     untitledPdf: 'PDF ללא שם',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'מסמך Hangul',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'ייצוא כ-PDF…',
@@ -2558,6 +2682,7 @@ const tMain = createI18n({
     filterExcel: 'חוברות עבודה של Excel',
     filterPpt: 'מצגות PowerPoint',
     filterMarkdown: 'קובצי טקסט (Markdown, TXT, JSON)',
+    filterHwp: 'מסמכי Hangul',
     filterHtml: 'מסמכי HTML',
     filterPdf: 'מסמכי PDF',
     errBadArgs: 'ארגומנטים לא חוקיים',
@@ -2632,10 +2757,13 @@ const tMain = createI18n({
     untitledDoc: 'बिना शीर्षक दस्तावेज़',
     untitledDeck: 'बिना शीर्षक प्रस्तुति',
     untitledMarkdown: 'अनाम Markdown',
+    untitledHwp: 'अनाम HWP',
+    untitledFromForm: '{name} (नया)',
     untitledHtml: 'अनाम HTML',
     untitledPdf: 'अनाम PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'Hangul दस्तावेज़',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: 'PDF के रूप में निर्यात…',
@@ -2657,6 +2785,7 @@ const tMain = createI18n({
     filterExcel: 'Excel वर्कबुक',
     filterPpt: 'PowerPoint प्रस्तुतियाँ',
     filterMarkdown: 'पाठ फ़ाइलें (Markdown, TXT, JSON)',
+    filterHwp: 'Hangul दस्तावेज़',
     filterHtml: 'HTML दस्तावेज़',
     filterPdf: 'PDF दस्तावेज़',
     errBadArgs: 'अमान्य आर्ग्युमेंट',
@@ -2734,10 +2863,13 @@ const tMain = createI18n({
     untitledDoc: '未命名文件',
     untitledDeck: '未命名簡報',
     untitledMarkdown: '未命名 Markdown',
+    untitledHwp: '未命名 HWP',
+    untitledFromForm: '{name}（新建）',
     untitledHtml: '未命名 HTML',
     untitledPdf: '未命名 PDF',
     menuNewSlide: 'AI Slides',
     menuNewMarkdown: 'AI Markdown',
+    menuNewHwp: 'HWP 文件',
     menuNewHtml: 'AI HTML',
     menuNewPdf: 'AI PDF',
     menuExportPdf: '匯出為 PDF…',
@@ -2759,6 +2891,7 @@ const tMain = createI18n({
     filterExcel: 'Excel 活頁簿',
     filterPpt: 'PowerPoint 簡報',
     filterMarkdown: '文字檔 (Markdown, TXT, JSON)',
+    filterHwp: 'HWP 文件',
     filterHtml: 'HTML 文件',
     filterPdf: 'PDF 文件',
     errBadArgs: '參數無效',
@@ -3011,6 +3144,7 @@ const SEARCH_EXT_FAMILY: Record<string, readonly string[]> = {
   pptx: ['pptx', 'ppt'],
   md: ['md', 'markdown', 'txt', 'json'],
   html: ['html', 'htm'],
+  hwp: ['hwp', 'hwpx'],
 }
 
 /** one recursive watcher per tree root; follows the save-folder setting and the added folders */
@@ -3049,6 +3183,9 @@ function applyMenuFor(kind: TabKind): void {
       break
     case 'markdown':
       buildMarkdownMenu()
+      break
+    case 'hwp':
+      buildHwpMenu()
       break
     case 'html':
       buildHtmlMenu()
@@ -3120,9 +3257,11 @@ function createShellWindow(): void {
           ? tm('untitledDeck')
           : kind === 'markdown'
             ? tm('untitledMarkdown')
-            : kind === 'html'
-              ? tm('untitledHtml')
-              : tm('untitledSheet'),
+            : kind === 'hwp'
+              ? tm('untitledHwp')
+              : kind === 'html'
+                ? tm('untitledHtml')
+                : tm('untitledSheet'),
   )
   tabManager = manager
 
@@ -3328,6 +3467,8 @@ const OPEN_DIALOG_EXTENSIONS = [
   'json',
   'html',
   'htm',
+  'hwp',
+  'hwpx',
 ]
 
 function notifyUnsupportedFile(filePath: string): void {
@@ -3434,6 +3575,13 @@ function routeDocumentPath(filePath: string): boolean {
     const existing = tabManager.findPdfTabByPath(filePath)
     if (existing) tabManager.activateTab(existing)
     else tabManager.openPdfTab(filePath)
+    return true
+  }
+  if (HWP_RE.test(filePath)) {
+    recordRecentFile(filePath)
+    const existing = tabManager.findHwpTabByPath(filePath)
+    if (existing) tabManager.activateTab(existing)
+    else tabManager.openHwpTab(filePath)
     return true
   }
   if (TEXT_RE.test(filePath)) {
@@ -3651,6 +3799,16 @@ function newMarkdownTab(): void {
     bindPendingDir('markdown', tabManager?.openMarkdownTab())
     recordStarPromptDocOpen()
     analytics.track('file_new', { kind: 'md' })
+  } catch (err) {
+    surfaceNewTabError(err)
+  }
+}
+
+function newHwpTab(): void {
+  try {
+    bindPendingDir('hwp', tabManager?.openHwpTab(undefined, { newBlank: true }))
+    recordStarPromptDocOpen()
+    analytics.track('file_new', { kind: 'hwp' })
   } catch (err) {
     surfaceNewTabError(err)
   }
@@ -3877,6 +4035,7 @@ function registerHomeIpc(): void {
         { name: tm('filterPdf'), extensions: ['pdf'] },
         { name: tm('filterMarkdown'), extensions: ['md', 'markdown', 'txt', 'json'] },
         { name: tm('filterHtml'), extensions: ['html', 'htm'] },
+        { name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] },
       ],
       properties: ['openFile', 'multiSelections'],
     })
@@ -3901,6 +4060,34 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.newMarkdown, (_event, opts?: NewFileOpts) => {
     rememberPendingDir('markdown', opts)
     newMarkdownTab()
+  })
+
+  ipcMain.handle(HOME_CHANNELS.newHwp, (_event, opts?: NewFileOpts) => {
+    rememberPendingDir('hwp', opts)
+    newHwpTab()
+  })
+
+  // "HWP from a form": a copy of the user's form opens as a new, untitled document
+  ipcMain.handle(HOME_CHANNELS.newHwpFromForm, async (event, opts?: NewFileOpts) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? shellWindow
+    if (!win) return
+    const picked = await dialog.showOpenDialog(win, {
+      title: tm('dlgOpenTitle'),
+      filters: [{ name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] }],
+      properties: ['openFile'],
+    })
+    if (picked.canceled || !picked.filePaths[0]) return
+    const form = await loadFormFile(picked.filePaths[0], {
+      stat: statAsync,
+      readFile: readFileAsync,
+    })
+    if (!form.ok) {
+      await dialog.showMessageBox(win, { type: 'warning', message: form.error })
+      return
+    }
+    rememberPendingDir('hwp', opts)
+    const name = form.fileName.replace(/\.(hwp|hwpx)$/i, '')
+    bindPendingDir('hwp', tabManager?.openHwpFormTab(form, tm('untitledFromForm', { name })))
   })
 
   ipcMain.handle(HOME_CHANNELS.newHtml, (_event, opts?: NewFileOpts) => {
@@ -4480,6 +4667,7 @@ const TAB_MENU_ICON: Record<TabKind, keyof MenuIconSet> = {
   pdf: 'pdf',
   markdown: 'md',
   html: 'html',
+  hwp: 'docx',
 }
 
 // tab views see neither DOM events nor a focus change when the user clicks the
@@ -4683,6 +4871,11 @@ function registerTabsIpc(): void {
         click: () => newMarkdownTab(),
       },
       {
+        label: tm('menuNewHwp'),
+        icon: menuIcons().docx,
+        click: () => newHwpTab(),
+      },
+      {
         label: tm('menuNewHtml'),
         icon: menuIcons().html,
         click: () => newHtmlTab(),
@@ -4735,6 +4928,7 @@ function buildHomeMenu(): void {
         },
         { label: tm('menuNewSlide'), click: () => newSlideTab() },
         { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+        { label: tm('menuNewHwp'), click: () => newHwpTab() },
         { label: tm('menuNewHtml'), click: () => newHtmlTab() },
         { label: tm('menuNewPdf'), click: () => void newPdfTab() },
         { type: 'separator' },
@@ -4841,6 +5035,58 @@ function buildPdfMenu(): void {
         checkUpdatesMenuItem(appMenuLabels(currentLang())),
         aboutMenuItem(appMenuLabels(currentLang())),
       ],
+    },
+  ]
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+// ---- hwp menu (hwp-main has no menu of its own; the shell owns hwp tabs) ----
+
+function activeHwpTarget() {
+  return activeEditorTarget('hwp', () => tabManager?.activeHwpTab())
+}
+
+function buildHwpMenu(): void {
+  const isMac = process.platform === 'darwin'
+  const template: MenuItemConstructorOptions[] = [
+    ...(isMac ? [{ role: 'appMenu' as const }] : []),
+    {
+      label: tm('menuFile'),
+      submenu: [
+        {
+          label: tm('menuOpen'),
+          accelerator: 'CmdOrCtrl+O',
+          click: () => void openFileViaDialog(),
+        },
+        { type: 'separator' },
+        {
+          label: tm('backToHome'),
+          accelerator: 'Shift+CmdOrCtrl+H',
+          click: () => tabManager?.openHomeTab(),
+        },
+        { type: 'separator' },
+        {
+          label: tm('menuSave'),
+          accelerator: 'CmdOrCtrl+S',
+          click: () => {
+            const tab = activeHwpTarget()
+            if (tab) void flushHwpSave(tab.webContents)
+          },
+        },
+        { type: 'separator' },
+        {
+          label: tm('menuClose'),
+          accelerator: 'CmdOrCtrl+W',
+          click: () => tabManager?.closeActiveTab(),
+        },
+      ],
+    },
+    { role: 'editMenu', label: tm('menuEdit') },
+    { role: 'windowMenu', label: tm('menuWindow') },
+    {
+      role: 'help',
+      label: tm('menuHelp'),
+      submenu: [{ label: tm('thirdPartyNotices'), click: () => void openThirdPartyNotices() }],
     },
   ]
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
@@ -5490,6 +5736,7 @@ function installDockMenu(): void {
       },
       { label: tm('menuNewSlide'), click: () => newSlideTab() },
       { label: tm('menuNewMarkdown'), click: () => newMarkdownTab() },
+      { label: tm('menuNewHwp'), click: () => newHwpTab() },
       { label: tm('menuNewPdf'), click: () => void newPdfTab() },
     ]),
   )

@@ -8,6 +8,8 @@ const XLSX_RE = /\.(xlsx|xlsm|xls|csv|tsv)$/i
 const PPTX_RE = /\.pptx$/i
 const PDF_RE = /\.pdf$/i
 const HTML_RE = /\.html?$/i
+/** Hangul word processor documents (the hwp module opens both formats) */
+const HWP_RE = /\.(hwp|hwpx)$/i
 
 /**
  * Every extension the markdown app opens: block documents, plus the plain text
@@ -17,7 +19,7 @@ const HTML_RE = /\.html?$/i
  */
 const TEXT_RE = /\.(md|markdown|txt|json)$/i
 
-export { DOCX_RE, XLSX_RE, PPTX_RE, PDF_RE, HTML_RE, TEXT_RE }
+export { DOCX_RE, XLSX_RE, PPTX_RE, PDF_RE, HTML_RE, TEXT_RE, HWP_RE }
 
 /** The app kind a path belongs to, or undefined when nothing opens it. */
 export function appForPath(path: string): DocumentTabKind | undefined {
@@ -27,6 +29,7 @@ export function appForPath(path: string): DocumentTabKind | undefined {
   if (PDF_RE.test(path)) return 'pdf'
   if (TEXT_RE.test(path)) return 'markdown'
   if (HTML_RE.test(path)) return 'html'
+  if (HWP_RE.test(path)) return 'hwp'
   return undefined
 }
 

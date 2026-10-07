@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- frame-src: the bundled rhwp studio iframe — same loopback origin in production ('self'),
+         the loopback port while the renderer runs on the Vite dev server (127.0.0.1:*).
+         The studio document applies its own CSP inside; WASM runs there, not here. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'self' http://127.0.0.1:*; connect-src 'self' ws://localhost:*"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Open GenOffice HWP</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

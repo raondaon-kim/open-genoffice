@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 
-const SUPPORTED_LAUNCH_RE = /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|pdf|md|markdown|txt|json|html?)$/i
+const SUPPORTED_LAUNCH_RE =
+  /\.(docx|xlsx|xlsm|xls|csv|tsv|pptx|pdf|md|markdown|txt|json|html?|hwp|hwpx)$/i
 const UNSUPPORTED_LAUNCH_RE = /\.(doc|rtf|odt|ppt|pps|odp|ods|xlsb|pages|key|numbers)$/i
 
 interface LaunchPayload {

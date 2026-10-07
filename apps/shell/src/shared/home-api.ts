@@ -210,6 +210,10 @@ export interface HomeApi {
   newSlide(opts?: NewFileOpts): Promise<void>
   /** open a blank markdown editor tab */
   newMarkdown(opts?: NewFileOpts): Promise<void>
+  /** open a new blank Hangul (.hwp) document tab */
+  newHwp(opts?: NewFileOpts): Promise<void>
+  /** pick a Hangul form and open a copy of it as a new, untitled document */
+  newHwpFromForm(opts?: NewFileOpts): Promise<void>
   /** open a blank html editor tab */
   newHtml(opts?: NewFileOpts): Promise<void>
   /** create a blank single-page PDF in the default save folder and open it */
@@ -512,6 +516,8 @@ export const HOME_CHANNELS = {
   newSheet: 'home:new-sheet',
   newSlide: 'home:new-slide',
   newMarkdown: 'home:new-markdown',
+  newHwp: 'home:new-hwp',
+  newHwpFromForm: 'home:new-hwp-from-form',
   newHtml: 'home:new-html',
   newPdf: 'home:new-pdf',
   removeRecent: 'home:remove-recent',

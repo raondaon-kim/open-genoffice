@@ -22,6 +22,7 @@ import {
 import { pdfIsDirty, requestPdfClose } from '../../../pdf/src/main/pdf-main'
 import { markdownIsDirty, requestMarkdownClose } from '../../../markdown/src/main/markdown-main'
 import { htmlIsDirty, requestHtmlClose } from '../../../html/src/main/html-main'
+import { hwpIsDirty, requestHwpClose } from '../../../hwp/src/main/hwp-main'
 import { canonicalPath } from './tab-manager'
 import type { DetachedTab } from './tab-manager'
 import type { OpenDocumentTab, TabKind } from '../shared/tabs-api'
@@ -112,6 +113,7 @@ const DEFAULT_SIZE: Record<string, { width: number; height: number }> = {
   pdf: { width: 1200, height: 900 },
   markdown: { width: 1200, height: 850 },
   html: { width: 1200, height: 850 },
+  hwp: { width: 1360, height: 900 },
 }
 
 /** where the pointer sits inside a freshly torn-off window's title bar */
@@ -224,6 +226,8 @@ async function detachedIsDirty(rec: DetachedRecord): Promise<boolean> {
       return markdownIsDirty(wc.id)
     case 'html':
       return htmlIsDirty(wc.id)
+    case 'hwp':
+      return hwpIsDirty(wc.id)
     default:
       return false
   }
@@ -248,6 +252,8 @@ async function confirmDetachedClose(rec: DetachedRecord): Promise<boolean> {
       return requestMarkdownClose(wc, win)
     case 'html':
       return requestHtmlClose(wc, win)
+    case 'hwp':
+      return requestHwpClose(wc, win)
     default:
       return true
   }

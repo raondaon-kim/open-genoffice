@@ -41,3 +41,9 @@ __pycache__/
 # One-off verification tests kept while chasing a fix; promote to a real test
 # file (or delete) instead of committing them under this name.
 _scratch-*
+
+# rhwp: sparse upstream clone and fetched CLI (tools/build-hwp-studio.mjs, tools/fetch-rhwp-cli.mjs);
+# the built studio lands in apps/hwp/dist/studio, covered by dist/ above
+/apps/hwp/.build/
+/apps/hwp/native/
+/scripts/drivers/probe-*.mjs

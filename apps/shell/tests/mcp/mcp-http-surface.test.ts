@@ -268,6 +268,7 @@ describe('MCP surface over Streamable HTTP (/mcp)', () => {
         'md',
         'html',
         'pdf',
+        'hwp',
       ])
       // the format registry's editor truth survives the wire
       expect(infoJson.families.find((f) => f.family === 'xlsx')!.editor.open).toEqual([

@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "title": "픽스처 문서",
+  "blocks": [
+    { "type": "heading", "text": "1. 개요", "level": 1 },
+    { "type": "paragraph", "text": "첫 문단입니다. 사업 계획을 설명합니다." },
+    { "type": "paragraph", "text": "둘째 문단 — 예산은 1,200,000원이다." },
+    {
+      "type": "table",
+      "rows": [
+        ["항목", "금액"],
+        ["인건비", "800,000"],
+        ["재료비", "400,000"]
+      ]
+    },
+    { "type": "paragraph", "text": "마지막 문단." }
+  ]
+}

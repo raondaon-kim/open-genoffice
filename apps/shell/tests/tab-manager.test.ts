@@ -134,6 +134,18 @@ vi.mock('../../markdown/src/main/markdown-main', () => ({
   requestMarkdownClose: (...args: unknown[]) => requestMarkdownClose(...(args as [])),
 }))
 
+const createHwpView = vi.fn(() => makeFakeView())
+const hwpIsDirty = vi.fn(() => false)
+const requestHwpClose = vi.fn(() => Promise.resolve(true))
+
+vi.mock('../../hwp/src/main/hwp-main', () => ({
+  createHwpView: (...args: unknown[]) => createHwpView(...(args as [])),
+  hwpIsDirty: (...args: unknown[]) => hwpIsDirty(...(args as [])),
+  markHwpNewBlank: vi.fn(),
+  queueHwpForm: vi.fn(),
+  requestHwpClose: (...args: unknown[]) => requestHwpClose(...(args as [])),
+}))
+
 const createHtmlView = vi.fn(() => makeFakeView())
 const createHtmlPresentView = vi.fn(() => makeFakeView())
 const htmlIsDirty = vi.fn(() => false)
@@ -710,6 +722,15 @@ describe('file path bookkeeping', () => {
       open: () => {
         manager.openMarkdownTab('/tmp/one.md')
         return lastCreatedView(createMarkdownView)
+      },
+    },
+    {
+      kind: 'hwp',
+      file: '/tmp/one.hwp',
+      renamed: '/tmp/two.hwp',
+      open: () => {
+        manager.openHwpTab('/tmp/one.hwp')
+        return lastCreatedView(createHwpView)
       },
     },
     {

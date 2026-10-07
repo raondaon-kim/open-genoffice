@@ -19,6 +19,13 @@ import {
   requestMarkdownClose,
 } from '../../../markdown/src/main/markdown-main'
 import {
+  createHwpView,
+  hwpIsDirty,
+  markHwpNewBlank,
+  queueHwpForm,
+  requestHwpClose,
+} from '../../../hwp/src/main/hwp-main'
+import {
   createHtmlPresentView,
   createHtmlView,
   htmlIsDirty,
@@ -260,6 +267,8 @@ export class TabManager {
         return pdfIsDirty(wc.id)
       case 'markdown':
         return markdownIsDirty(wc.id)
+      case 'hwp':
+        return hwpIsDirty(wc.id)
       case 'html':
         return htmlIsDirty(wc.id)
       case 'slides':
@@ -376,6 +385,37 @@ export class TabManager {
       title: openPath ? basename(openPath) : this.untitled('markdown', 'AI Markdown'),
       filePath: openPath,
     })
+    this.activateTab(id)
+    return id
+  }
+
+  openHwpTab(openPath?: string, options?: { newBlank?: boolean }): string {
+    const view = createHwpView(openPath)
+    if (options?.newBlank || !openPath) markHwpNewBlank(view.webContents.id)
+    const id = `t${this.nextId++}`
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.trackHtmlFullScreen(view)
+    this.tabs.push({
+      id,
+      kind: 'hwp',
+      view,
+      title: openPath ? basename(openPath) : this.untitled('hwp', 'Hangul'),
+      filePath: openPath,
+    })
+    this.activateTab(id)
+    return id
+  }
+
+  /** "New document from a form": an untitled hwp tab that opens a COPY of the form */
+  openHwpFormTab(form: { fileName: string; data: ArrayBuffer }, title: string): string {
+    const view = createHwpView()
+    queueHwpForm(view.webContents.id, { fileName: form.fileName, data: form.data })
+    const id = `t${this.nextId++}`
+    this.shellWindow.contentView.addChildView(view)
+    view.setVisible(false)
+    this.trackHtmlFullScreen(view)
+    this.tabs.push({ id, kind: 'hwp', view, title })
     this.activateTab(id)
     return id
   }
@@ -539,6 +579,13 @@ export class TabManager {
       .map((t) => ({ id: t.id, webContents: t.view!.webContents }))
   }
 
+  /** hwp tabs whose renderer reports unsaved editor changes (shell-close guard) */
+  dirtyHwpTabs(): Array<{ id: string; webContents: WebContents }> {
+    return this.tabs
+      .filter((t) => t.kind === 'hwp' && t.view && hwpIsDirty(t.view.webContents.id))
+      .map((t) => ({ id: t.id, webContents: t.view!.webContents }))
+  }
+
   /** html tabs whose renderer reports unsaved edits (shell-close guard) */
   dirtyHtmlTabs(): Array<{ id: string; webContents: WebContents }> {
     return this.tabs
@@ -591,11 +638,13 @@ export class TabManager {
           ? requestPdfClose
           : tab.kind === 'markdown' && markdownIsDirty(tab.view.webContents.id)
             ? requestMarkdownClose
-            : tab.kind === 'html' && htmlIsDirty(tab.view.webContents.id)
-              ? requestHtmlClose
-              : tab.kind === 'slides' && slidesIsDirty(tab.view.webContents.id)
-                ? requestSlidesClose
-                : null)
+            : tab.kind === 'hwp' && hwpIsDirty(tab.view.webContents.id)
+              ? requestHwpClose
+              : tab.kind === 'html' && htmlIsDirty(tab.view.webContents.id)
+                ? requestHtmlClose
+                : tab.kind === 'slides' && slidesIsDirty(tab.view.webContents.id)
+                  ? requestSlidesClose
+                  : null)
     // docs dirty state lives in the renderer and needs an async query; skip the guard when clean (avoids a flash activation)
     if (!closeGuard && tab.kind === 'docs' && tab.view) {
       this.closingIds.add(id)
@@ -769,6 +818,18 @@ export class TabManager {
 
   findMarkdownTabByPath(path?: string): string | undefined {
     return this.findTabOfKindByPath('markdown', path)
+  }
+
+  findHwpTabByPath(path?: string): string | undefined {
+    return this.findTabOfKindByPath('hwp', path)
+  }
+
+  /** the active tab's hwp view, if the active tab is a Hangul document (hwp menu target) */
+  activeHwpTab(): { id: string; webContents: WebContents; filePath?: string } | undefined {
+    const tab = this.tabs.find((t) => t.id === this.activeId)
+    return tab?.kind === 'hwp' && tab.view
+      ? { id: tab.id, webContents: tab.view.webContents, filePath: tab.filePath }
+      : undefined
   }
 
   findHtmlTabByPath(path?: string): string | undefined {
