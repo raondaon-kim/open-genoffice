@@ -237,6 +237,7 @@ import {
 } from '../../../markdown/src/main/markdown-main'
 import { configureHwpRuntime, flushHwpSave } from '../../../hwp/src/main/hwp-main'
 import { loadFormFile } from './hwp-form-open'
+import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
 import {
   configureHtmlRuntime,
   exportHtmlHeadless,
@@ -376,6 +377,27 @@ if (!app.isPackaged)
     'userData',
     process.env.GENOFFICE_USER_DATA ?? join(app.getPath('appData'), 'GenOffice Dev'),
   )
+
+// A company build ships org-defaults.json (the in-house LiteLLM proxy and default model) beside
+// its resources; an unpacked run can point OPEN_GENOFFICE_ORG_DEFAULTS at one. Only a first run
+// is seeded — existing AI settings are the user's.
+{
+  const orgDefaultsPath = app.isPackaged
+    ? join(process.resourcesPath, 'org-defaults.json')
+    : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
+  const aiSettingsPath = join(app.getPath('userData'), 'ai-settings.json')
+  const seeded = orgDefaultsPath
+    ? firstRunAiSettings(existsSync(aiSettingsPath), readOrgDefaults(orgDefaultsPath))
+    : null
+  if (seeded) {
+    try {
+      mkdirSync(app.getPath('userData'), { recursive: true })
+      writeFileSync(aiSettingsPath, JSON.stringify(seeded, null, 2))
+    } catch (err) {
+      console.warn('[org-defaults] could not seed the AI settings:', err)
+    }
+  }
+}
 
 /**
  * `--headless-export <file> --to <format> --out <path> [--json]`: one document, no

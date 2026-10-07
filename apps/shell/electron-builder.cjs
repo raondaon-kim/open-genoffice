@@ -27,7 +27,7 @@
  */
 
 const { execFileSync } = require('node:child_process')
-const { existsSync, readFileSync, rmSync } = require('node:fs')
+const { existsSync, readFileSync, rmSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 
 function normalizeHttpsBaseUrl(name, value) {
@@ -73,6 +73,27 @@ const winArm64 = process.env.GENOFFICE_WIN_ARM64 === '1'
 if (winArm64 && !process.env.ELECTRON_BUILDER_7Z_FILTER) {
   process.env.ELECTRON_BUILDER_7Z_FILTER = 'BCJ'
 }
+// Company builds: OPEN_GENOFFICE_LITELLM_URL (+ _MODEL) make the in-house LiteLLM proxy the AI
+// provider of a new install. The values go into build/org-defaults.json (gitignored) and ship
+// beside the resources; the shell seeds them on a first run only (src/main/org-defaults.ts).
+// Unset, nothing is written and the build behaves like upstream.
+const ORG_DEFAULTS_REL = 'build/org-defaults.json'
+const litellmUrl = (process.env.OPEN_GENOFFICE_LITELLM_URL ?? '').trim()
+const litellmModel = (process.env.OPEN_GENOFFICE_LITELLM_MODEL ?? '').trim()
+if (litellmUrl && litellmModel) {
+  writeFileSync(
+    join(__dirname, ORG_DEFAULTS_REL),
+    JSON.stringify(
+      { ai: { provider: 'litellm', baseUrl: litellmUrl, model: litellmModel } },
+      null,
+      2,
+    ),
+  )
+} else {
+  rmSync(join(__dirname, ORG_DEFAULTS_REL), { force: true })
+}
+const shipOrgDefaults = existsSync(join(__dirname, ORG_DEFAULTS_REL))
+
 const winArch = winArm64 ? 'arm64' : 'x64'
 const winSidecarTarget = winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu'
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
@@ -358,6 +379,7 @@ const config = {
       from: '../hwp/resources/doc-styles',
       to: 'modules/hwp-doc-styles',
     },
+    ...(shipOrgDefaults ? [{ from: ORG_DEFAULTS_REL, to: 'org-defaults.json' }] : []),
     // PDF text editing engines: the bundled main resolves these under
     // Resources/wasm when node_modules is absent (apps/pdf/src/main/wasm-path.ts)
     {

@@ -428,6 +428,17 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     defaultModel: 'kimi-k2.7-code',
     keyPlaceholder: 'API Key',
   },
+  // an organization's LiteLLM proxy (OpenAI-compatible): base URL + per-user virtual key;
+  // the model list comes from the proxy's /models. Kept apart from 'custom' so a local model
+  // server can still use that slot.
+  {
+    id: 'litellm',
+    label: 'LiteLLM',
+    models: [],
+    defaultModel: '',
+    keyPlaceholder: 'sk-… (virtual key)',
+    needsBaseUrl: true,
+  },
   {
     id: 'custom',
     label: 'Custom',

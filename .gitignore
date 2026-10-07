@@ -47,3 +47,4 @@ _scratch-*
 /apps/hwp/.build/
 /apps/hwp/native/
 /scripts/drivers/probe-*.mjs
+/apps/shell/build/org-defaults.json

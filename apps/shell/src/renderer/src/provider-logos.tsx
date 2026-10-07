@@ -277,6 +277,21 @@ const LOGOS: Record<AiProviderId, ReactNode> = {
       <path d="M8.5 14.2c.9-1 2.2-1.5 3.5-1.5s2.6.5 3.5 1.5" strokeLinecap="round" />
     </svg>
   ),
+  // a generic gateway mark (proxy fan-out), drawn in the text color like the custom slot
+  litellm: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 12h6M14 6.5h6M14 12h6M14 17.5h6M10 12l4-5.5M10 12l4 5.5" />
+      <circle cx="4" cy="12" r="1.6" />
+    </svg>
+  ),
   custom: (
     <svg
       viewBox="0 0 24 24"

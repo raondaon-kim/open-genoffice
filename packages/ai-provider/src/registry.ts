@@ -385,6 +385,18 @@ export const AI_PROVIDER_ADAPTERS: Record<AiProviderId, ProviderAdapter> = {
       anthropic: /^(minimax-|qwen3\.8-flash$)/,
     }),
   },
+  litellm: {
+    meta: metaOf('litellm'),
+    capabilities: { auth: 'api-key', vision: true },
+    resolveEndpoint(config) {
+      if (!config.baseUrl) throw new Error('The LiteLLM provider requires the proxy Base URL')
+      return {
+        protocol: 'openai-compatible',
+        baseUrl: normalizeBaseUrl(config.baseUrl, ''),
+        ...(modelHasFixedSampling(config.model) ? { omitTemperature: true } : {}),
+      }
+    },
+  },
   custom: {
     meta: metaOf('custom'),
     capabilities: { auth: 'api-key', vision: true },

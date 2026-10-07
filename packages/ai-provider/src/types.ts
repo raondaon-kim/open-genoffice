@@ -25,6 +25,7 @@ export type AiProviderId =
   | 'cheaperinference'
   | 'opencode-zen'
   | 'opencode-go'
+  | 'litellm'
   | 'custom'
 
 /** Genspark account status (gsk login state; the sole auth source for AI features) */
