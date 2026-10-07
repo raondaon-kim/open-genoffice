@@ -3,11 +3,12 @@
  * auto-update feed URL can be injected at build time instead of living in
  * the repo).
  *
- * GENOFFICE_UPDATE_URL — public base URL of the update channel (the generic
- * provider prefix that serves latest.yml / latest-mac.yml). Required for
- * release builds; CI provides it as a repository secret. For local release
- * builds put it in apps/shell/electron-builder.env (gitignored) — the
- * electron-builder CLI loads that file automatically.
+ * OPEN_GENOFFICE_UPDATE_URL — Open GenOffice update-channel URL (the generic
+ * provider prefix that serves latest.yml / latest-mac.yml), HTTPS and never a
+ * Genspark feed. For local release builds put it in
+ * apps/shell/electron-builder.env (gitignored) — the electron-builder CLI loads
+ * that file automatically. Upstream's GENOFFICE_UPDATE_URL is ignored so an
+ * environment set up for upstream cannot point this app at Genspark's feed.
  *
  * When the variable is unset (forks, PR smoke builds, plain local packaging)
  * the publish config is omitted: electron-builder then bakes no
@@ -43,7 +44,17 @@ function normalizeHttpsBaseUrl(name, value) {
   }
 }
 
-const updateUrl = process.env.GENOFFICE_UPDATE_URL
+const FORK_UPDATE_URL_ENV = 'OPEN_GENOFFICE_UPDATE_URL'
+function normalizeForkUpdateUrl(value) {
+  if (!value || !value.trim()) return undefined
+  const base = normalizeHttpsBaseUrl(FORK_UPDATE_URL_ENV, value)
+  const hostname = new URL(base).hostname.toLowerCase().replace(/\.+$/, '')
+  if (hostname === 'genspark.ai' || hostname.endsWith('.genspark.ai')) {
+    throw new Error(`${FORK_UPDATE_URL_ENV} must not point to a Genspark update feed`)
+  }
+  return base
+}
+const updateUrl = normalizeForkUpdateUrl(process.env[FORK_UPDATE_URL_ENV])
 const ga4MeasurementId = process.env.GENOFFICE_GA4_MEASUREMENT_ID
 const ga4ApiSecret = process.env.GENOFFICE_GA4_API_SECRET
 const fontCdnUrl = normalizeHttpsBaseUrl(
@@ -321,8 +332,8 @@ function ensureThirdPartyNotices() {
 
 /** @type {import('electron-builder').Configuration} */
 const config = {
-  appId: 'com.genoffice.app',
-  productName: 'GenOffice',
+  appId: 'com.sergedoub.opengenoffice',
+  productName: 'Open GenOffice',
   // Resolved from the installed electron package so dependency bumps can
   // never leave a stale hard-coded pin behind (packaging would silently ship
   // the old runtime).
@@ -583,6 +594,7 @@ const config = {
     ],
   },
   win: {
+    artifactName: 'OpenGenOfficeSetup-v${version}-${arch}.${ext}',
     target: [
       {
         target: 'nsis',

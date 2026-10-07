@@ -1,10 +1,8 @@
 import { execSync, spawn } from 'node:child_process'
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   renameSync,
   rmSync,
   statSync,
@@ -375,7 +373,7 @@ import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 if (!app.isPackaged)
   app.setPath(
     'userData',
-    process.env.GENOFFICE_USER_DATA ?? join(app.getPath('appData'), 'GenOffice Dev'),
+    process.env.GENOFFICE_USER_DATA ?? join(app.getPath('appData'), 'Open GenOffice Dev'),
   )
 
 // A company build ships org-defaults.json (the in-house LiteLLM proxy and default model) beside
@@ -409,14 +407,6 @@ const headlessArgv = parseHeadlessExportArgv(process.argv)
 if (headlessArgv.kind !== 'none') {
   setHeadlessMode(true)
   app.dock?.hide()
-}
-
-// The product rename from "AI Office" to GenOffice changed the userData path; migrate old user data once
-if (app.isPackaged) {
-  const oldDir = join(app.getPath('appData'), 'AI Office')
-  const newDir = app.getPath('userData')
-  const newEmpty = !existsSync(newDir) || readdirSync(newDir).length === 0
-  if (newEmpty && existsSync(oldDir)) cpSync(oldDir, newDir, { recursive: true })
 }
 
 // module build outputs: packaged builds carry them as extraResources
