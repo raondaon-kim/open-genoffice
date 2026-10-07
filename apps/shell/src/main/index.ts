@@ -378,18 +378,30 @@ if (!app.isPackaged)
 
 // A company build ships org-defaults.json (the in-house LiteLLM proxy and default model) beside
 // its resources; an unpacked run can point OPEN_GENOFFICE_ORG_DEFAULTS at one. Only a first run
-// is seeded — existing AI settings are the user's.
+// is seeded — existing AI settings are the user's. Settings left by the pre-upstream fork (a
+// format upstream cannot read) are kept as ai-settings.pre-upstream.json and replaced.
 {
   const orgDefaultsPath = app.isPackaged
     ? join(process.resourcesPath, 'org-defaults.json')
     : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
   const aiSettingsPath = join(app.getPath('userData'), 'ai-settings.json')
+  let existing: unknown
+  if (existsSync(aiSettingsPath)) {
+    try {
+      existing = JSON.parse(readFileSync(aiSettingsPath, 'utf8'))
+    } catch {
+      existing = null
+    }
+  }
   const seeded = orgDefaultsPath
-    ? firstRunAiSettings(existsSync(aiSettingsPath), readOrgDefaults(orgDefaultsPath))
+    ? firstRunAiSettings(existing, readOrgDefaults(orgDefaultsPath))
     : null
   if (seeded) {
     try {
       mkdirSync(app.getPath('userData'), { recursive: true })
+      if (existing !== undefined) {
+        renameSync(aiSettingsPath, join(app.getPath('userData'), 'ai-settings.pre-upstream.json'))
+      }
       writeFileSync(aiSettingsPath, JSON.stringify(seeded, null, 2))
     } catch (err) {
       console.warn('[org-defaults] could not seed the AI settings:', err)

@@ -43,15 +43,29 @@ export function readOrgDefaults(path: string): OrgAiDefaults | null {
 }
 
 /**
+ * Whether existing AI settings are in upstream's format (a provider id at the top level). The
+ * August fork wrote {schemaVersion, globalDefault, providers} with keys in a separate encrypted
+ * store; upstream cannot read that and falls back to Genspark, so such a file counts as absent.
+ */
+export function isUpstreamAiSettings(existing: unknown): boolean {
+  return (
+    !!existing &&
+    typeof existing === 'object' &&
+    typeof (existing as { provider?: unknown }).provider === 'string'
+  )
+}
+
+/**
  * The ai-settings.json a first run starts from, or null when nothing should be written
- * (settings already exist, or the build carries no defaults). The settings readers merge this
- * partial file over their own defaults.
+ * (usable settings already exist, or the build carries no defaults). `existing` is the parsed
+ * current file, or undefined when there is none. The settings readers merge this partial file
+ * over their own defaults.
  */
 export function firstRunAiSettings(
-  settingsExist: boolean,
+  existing: unknown,
   defaults: OrgAiDefaults | null,
 ): Record<string, unknown> | null {
-  if (settingsExist || !defaults) return null
+  if (!defaults || isUpstreamAiSettings(existing)) return null
   return {
     provider: defaults.provider,
     providers: {

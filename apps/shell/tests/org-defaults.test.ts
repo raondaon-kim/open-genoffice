@@ -2,7 +2,12 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { firstRunAiSettings, parseOrgDefaults, readOrgDefaults } from '../src/main/org-defaults'
+import {
+  firstRunAiSettings,
+  isUpstreamAiSettings,
+  parseOrgDefaults,
+  readOrgDefaults,
+} from '../src/main/org-defaults'
 
 const good = { ai: { provider: 'litellm', baseUrl: 'http://proxy.internal:4000/v1', model: 'm-1' } }
 
@@ -33,15 +38,25 @@ describe('organization AI defaults', () => {
     expect(readOrgDefaults(join(dir, 'ok.json'))?.model).toBe('m-1')
   })
 
-  it('seeds only a first run, and never with a key', () => {
+  it('seeds a first run (no file) and never with a key', () => {
     const defaults = parseOrgDefaults(good)
-    expect(firstRunAiSettings(true, defaults)).toBeNull()
-    expect(firstRunAiSettings(false, null)).toBeNull()
-    expect(firstRunAiSettings(false, defaults)).toEqual({
+    expect(firstRunAiSettings(undefined, null)).toBeNull()
+    expect(firstRunAiSettings(undefined, defaults)).toEqual({
       provider: 'litellm',
       providers: {
         litellm: { apiKey: '', model: 'm-1', baseUrl: 'http://proxy.internal:4000/v1' },
       },
     })
+  })
+
+  it('keeps settings in upstream format and replaces ones upstream cannot read', () => {
+    const defaults = parseOrgDefaults(good)
+    expect(firstRunAiSettings({ provider: 'openai', providers: {} }, defaults)).toBeNull()
+    // the pre-upstream fork format: no top-level provider
+    const fork = { schemaVersion: 2, globalDefault: { providerId: 'deepseek' }, providers: {} }
+    expect(isUpstreamAiSettings(fork)).toBe(false)
+    expect(firstRunAiSettings(fork, defaults)?.provider).toBe('litellm')
+    // an unreadable file parses to null and is replaced too
+    expect(firstRunAiSettings(null, defaults)?.provider).toBe('litellm')
   })
 })
