@@ -100,6 +100,11 @@ export interface PptxStyle extends PageCommon {
   roles: PptxRole[]
   layouts: PptxLayout[]
   skeleton: PptxSlot[]
+  /**
+   * deck-type writing rules for the assistant (density, page anatomy, conventions); when absent the
+   * generic presentation rules apply (a few short phrases per slide)
+   */
+  rules?: string[]
 }
 
 function box(raw: unknown, path: string): Box {
@@ -213,5 +218,13 @@ export function validatePptx(raw: Rec): PptxStyle {
     roles,
     layouts,
     skeleton: validateSkeleton(raw.skeleton, 'layout', layoutIds) as PptxSlot[],
+    ...(raw.rules === undefined ? {} : { rules: rulesOf(raw.rules) }),
   }
+}
+
+function rulesOf(raw: unknown): string[] {
+  if (!Array.isArray(raw) || raw.length > 12) {
+    throw new Invalid('rules must be a list of at most 12 lines')
+  }
+  return raw.map((r, i) => str(r, `rules[${i}]`, 300))
 }

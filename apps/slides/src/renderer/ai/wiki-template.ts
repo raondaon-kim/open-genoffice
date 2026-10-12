@@ -177,7 +177,13 @@ export function wikiStyleSkill(style: PptxStyle, description: string): string {
     '    kpi_cards_row | chart_with_insight',
     '',
     'Deck type rules',
-    '  Content pages: 3-5 short phrases (one line each, no full sentences, no trailing periods); numbers and key terms first; split a long explanation over two pages.',
+    // a deck type may bring its own rules (a bid proposal is dense by design); otherwise the
+    // generic presentation rule applies
+    ...(style.rules?.length
+      ? style.rules.map((r) => `  ${r}`)
+      : [
+          '  Content pages: 3-5 short phrases (one line each, no full sentences, no trailing periods); numbers and key terms first; split a long explanation over two pages.',
+        ]),
     '  Keep the title box of each page type exactly where the template chrome pins it.',
     '',
     `Overall style: ${summary || style.title}`,
