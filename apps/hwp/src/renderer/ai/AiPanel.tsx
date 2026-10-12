@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop } from '@genoffice/agent-core'
+import { AgentLoop, composeSkills } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { AiComposer, Markdown } from '@genoffice/ui'
-import type { AiConversationIdentity, ProjectChatMessage } from '../../shared/ipc'
+import type { AiConversationIdentity, HwpAttachment, ProjectChatMessage } from '../../shared/ipc'
+import { createFilesSkill } from './files-skill'
 import { createHwpSkill, HWP_MAX_TURNS } from './hwp-skill'
 import { persistedRunText, runEndText } from './run-notice'
 import { shouldRebindChat } from './chat-identity'
@@ -88,6 +89,10 @@ export function HwpAiPanel({
   langRef.current = lang
   const mutationsRef = useRef(0)
   const [templateBusy, setTemplateBusy] = useState<string | null>(null)
+  // files attached to the next requests (an RFP, a source report); read with read_attachment
+  const [attachments, setAttachments] = useState<HwpAttachment[]>([])
+  const attachmentsRef = useRef<HwpAttachment[]>([])
+  attachmentsRef.current = attachments
   const [undoDepth, setUndoDepth] = useState(() => deps.stack.depth)
   const [chips, setChips] = useState<string[]>([])
   const chatRef = useRef<HTMLDivElement>(null)
@@ -122,7 +127,13 @@ export function HwpAiPanel({
   if (!loopRef.current) {
     loopRef.current = new AgentLoop({
       transport: transportRef.current,
-      skill: createHwpSkill(ctxRef.current),
+      skill: composeSkills('hwp+files', '', [
+        createHwpSkill(ctxRef.current),
+        createFilesSkill(
+          () => attachmentsRef.current,
+          () => window.hwpApi,
+        ),
+      ]),
       maxTurns: HWP_MAX_TURNS,
       events: {
         onText: (text) => {
@@ -569,6 +580,50 @@ export function HwpAiPanel({
       </div>
 
       <AiComposer
+        header={
+          attachments.length > 0 ? (
+            <div className="hwp-ai__attachments">
+              {attachments.map((a) => (
+                <span key={a.path} className="hwp-ai__attachment" title={a.path}>
+                  {a.name}
+                  <button
+                    type="button"
+                    aria-label={lang === 'ko' ? '첨부 제거' : 'Remove attachment'}
+                    disabled={busy}
+                    onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : undefined
+        }
+        footerStart={
+          <button
+            type="button"
+            className="hwp-ai__attach"
+            disabled={busy}
+            title={
+              lang === 'ko'
+                ? '파일 첨부 (제안요청서, 참고 문서: hwp·pdf·docx …)'
+                : 'Attach files (an RFP, reference documents: hwp, pdf, docx …)'
+            }
+            onClick={() =>
+              void window.hwpApi
+                .pickAttachments()
+                .then((picked) =>
+                  setAttachments((prev) => [
+                    ...prev,
+                    ...picked.filter((p) => !prev.some((x) => x.path === p.path)),
+                  ]),
+                )
+                .catch(() => undefined)
+            }
+          >
+            📎
+          </button>
+        }
         value={prompt}
         busy={busy}
         placeholder="Ask about this document…"

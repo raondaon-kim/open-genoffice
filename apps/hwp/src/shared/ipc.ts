@@ -31,7 +31,22 @@ export const HWP_CHANNELS = {
   aiEdit: 'hwp:ai-edit',
   getLanguage: 'hwp:get-language',
   languageChanged: 'hwp:language-changed',
+  pickAttachments: 'hwp:pick-attachments',
+  readAttachment: 'hwp:read-attachment',
 } as const
+
+/** a file the user attached to an AI request (path stays in this machine) */
+export interface HwpAttachment {
+  path: string
+  name: string
+  /** lowercase, without the dot */
+  ext: string
+  sizeBytes: number
+}
+
+export type HwpAttachmentRead =
+  | { ok: true; name: string; totalChars: number; offset: number; text: string }
+  | { ok: false; error: string }
 
 // ---- AI + project chat channels: the shell registers these globally ----
 
@@ -169,6 +184,10 @@ export interface HwpApi {
   sendSaveResult(ok: boolean): void
   getLanguage(): Promise<Lang>
   getTheme(): Promise<UiTheme>
+  /** pick files to attach to the AI request (dialog); only picked files can be read */
+  pickAttachments(): Promise<HwpAttachment[]>
+  /** text of an attached file, in chunks */
+  readAttachment(path: string, offset: number, maxChars: number): Promise<HwpAttachmentRead>
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
   // ---- AI ----
   getAiSettings(): Promise<AiSettings>

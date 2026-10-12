@@ -29,6 +29,7 @@ import { dumpForShape } from './dump-shape'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import { buildStyledDocument } from './styled-document'
+import { registerHwpAttachmentIpc } from './attachments'
 import type { StaticRoot } from './static-server'
 
 const tDlg = createI18n({
@@ -493,6 +494,7 @@ let ipcRegistered = false
 function registerHwpIpc(): void {
   if (ipcRegistered) return
   ipcRegistered = true
+  registerHwpAttachmentIpc()
 
   ipcMain.handle(HWP_CHANNELS.consumePending, (e) => intents.consume(e.sender.id))
 

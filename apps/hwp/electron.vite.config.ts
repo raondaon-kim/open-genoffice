@@ -5,7 +5,12 @@ export default defineConfig({
   main: {
     plugins: [
       externalizeDepsPlugin({
-        exclude: ['@genoffice/i18n', '@genoffice/electron-utils', '@genoffice/doc-styles'],
+        exclude: [
+          '@genoffice/i18n',
+          '@genoffice/electron-utils',
+          '@genoffice/doc-styles',
+          '@genoffice/file-parse',
+        ],
       }),
     ],
   },

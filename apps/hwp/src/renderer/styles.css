@@ -329,7 +329,6 @@
   color: var(--text-secondary);
 }
 
-
 /* ---- shared AI component class names (@genoffice/ui), self-contained ---- */
 
 .ai-composer {
@@ -449,7 +448,6 @@
   font-size: 12px;
 }
 
-
 /* ---- AI starter prompt chips (empty state) ---- */
 .hwp-ai__starter-list {
   display: flex;
@@ -523,4 +521,48 @@
 .hwp-ai__template:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* ---- AI attachments (RFP, reference documents) ---- */
+.hwp-ai__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 10px 0;
+}
+
+.hwp-ai__attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hwp-ai__attachment button,
+.hwp-ai__attach {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.hwp-ai__attach {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+
+.hwp-ai__attach:hover:not(:disabled),
+.hwp-ai__attachment button:hover:not(:disabled) {
+  background: var(--hover);
 }

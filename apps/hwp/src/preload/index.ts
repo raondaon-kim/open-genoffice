@@ -26,6 +26,9 @@ const api: HwpApi = {
   sendSaveResult: (ok) => ipcRenderer.send(HWP_CHANNELS.saveResult, ok),
   getLanguage: () => ipcRenderer.invoke(HWP_CHANNELS.getLanguage),
   getTheme: () => ipcRenderer.invoke(THEME_CHANNELS.getTheme),
+  pickAttachments: () => ipcRenderer.invoke(HWP_CHANNELS.pickAttachments),
+  readAttachment: (path, offset, maxChars) =>
+    ipcRenderer.invoke(HWP_CHANNELS.readAttachment, path, offset, maxChars),
   onThemeChanged: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, theme: UiTheme) => handler(theme)
     ipcRenderer.on(THEME_CHANNELS.themeChanged, listener)
