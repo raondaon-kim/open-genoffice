@@ -35,6 +35,16 @@ The fork's material changes on top of upstream:
     `wiki:<id>` style templates (a Style Skill plus a layout skeleton), so the
     upstream deck pipeline composes the deck in the organization's colors,
     fonts, sizes and title positions.
+- **Public bid proposals**: wiki pages for a Hangul technical proposal
+  (`bid-proposal`) and an A4-landscape PowerPoint proposal
+  (`deck-bid-proposal`); PowerPoint pages may carry deck-type rules, and an A4
+  wiki deck type makes `generate_deck` build A4-landscape slides. The assistants
+  read an attached RFP (제안요청서) and follow its table of contents, writing
+  rules and evaluation items, and leave placeholders instead of inventing facts
+  about the bidder.
+- **Hangul attachments**: `.hwp`/`.hwpx` attachments are read through the
+  bundled rhwp CLI (`export-text`) in every assistant, and the Hangul assistant
+  gains an attach button and `read_attachment`.
 - **LiteLLM provider and organization defaults**: a `litellm` provider
   (OpenAI-compatible base URL plus a per-user virtual key, models from the
   proxy's `/models`). A company build sets `OPEN_GENOFFICE_LITELLM_URL` and
