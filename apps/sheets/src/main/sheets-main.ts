@@ -2372,6 +2372,9 @@ const ATTACHMENT_EXTS = new Set([
   'xlsx',
   'xlsm',
   'xls',
+  // Hangul documents (RFPs, forms): text through the shell's rhwp extractor
+  'hwp',
+  'hwpx',
   ...ATTACHMENT_IMAGE_EXTS,
 ])
 
