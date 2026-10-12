@@ -486,8 +486,8 @@ describe('buildPagePptx on an A4-landscape canvas', () => {
     const { bytes } = await buildPagePptx(spec, { fetchImage: async () => null }, 1280, 905)
     const opened = await openPptx(bytes)
     const { cx, cy } = opened.deck.size
-    // 297 x 210 mm
-    expect(cx / cy).toBeCloseTo(297 / 210, 2)
+    // exactly 297 x 210 mm
+    expect({ cx, cy }).toEqual({ cx: 10692000, cy: 7560000 })
     const band = opened.deck.slides[0]!.elements.find((e) => e.type === 'shape')!
     // the bottom band ends at the bottom edge of the A4 page
     expect(band.transform.offset.y + band.transform.offset.cy).toBeLessThanOrEqual(cy + 2)

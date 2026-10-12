@@ -28,6 +28,8 @@ import { coverCropFractions } from './cover-crop'
 
 export const SPEC_CANVAS_W = 1280
 export const SPEC_CANVAS_H = 720
+/** A4 landscape, 297 x 210 mm in EMU (36000 EMU per mm) */
+const A4_LANDSCAPE = { cx: 10692000, cy: 7560000 }
 
 const MAX_ELEMENTS = 48
 const MAX_IMAGES = 8
@@ -535,8 +537,13 @@ export async function buildPagePptx(
   // a non-16:9 canvas (e.g. an A4-landscape template) sets the page's slide size, so a deck
   // assembled from these pages takes that size too
   if (canvasH !== SPEC_CANVAS_H || canvasW !== SPEC_CANVAS_W) {
-    const cx = opened.deck.size.cx
-    setSlideSize(opened, cx, Math.round((cx * canvasH) / canvasW))
+    if (Math.abs(canvasH / canvasW - A4_LANDSCAPE.cy / A4_LANDSCAPE.cx) < 0.002) {
+      // A4 landscape is a paper size people print and check in Page Setup: use exactly 297 x 210 mm
+      setSlideSize(opened, A4_LANDSCAPE.cx, A4_LANDSCAPE.cy)
+    } else {
+      const cx = opened.deck.size.cx
+      setSlideSize(opened, cx, Math.round((cx * canvasH) / canvasW))
+    }
   }
   const slide = opened.deck.slides[0]!
   const scale = opened.deck.size.cx / canvasW
