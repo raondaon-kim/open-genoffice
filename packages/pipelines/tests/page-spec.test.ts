@@ -476,3 +476,29 @@ describe('buildPagePptx shape flip', () => {
     expect(el?.anchor.originalXml).toContain('flipV="1"')
   })
 })
+
+describe('buildPagePptx on an A4-landscape canvas', () => {
+  it('gives the page an A4 slide size and keeps boxes in proportion', async () => {
+    const spec = {
+      background: '#FFFFFF',
+      elements: [{ type: 'shape', shape: 'rect', x: 0, y: 805, w: 1280, h: 100, fill: '#14213D' }],
+    } as unknown as PageSpec
+    const { bytes } = await buildPagePptx(spec, { fetchImage: async () => null }, 1280, 905)
+    const opened = await openPptx(bytes)
+    const { cx, cy } = opened.deck.size
+    // 297 x 210 mm
+    expect(cx / cy).toBeCloseTo(297 / 210, 2)
+    const band = opened.deck.slides[0]!.elements.find((e) => e.type === 'shape')!
+    // the bottom band ends at the bottom edge of the A4 page
+    expect(band.transform.offset.y + band.transform.offset.cy).toBeLessThanOrEqual(cy + 2)
+    expect(band.transform.offset.y + band.transform.offset.cy).toBeGreaterThan(cy * 0.99)
+  })
+
+  it('accepts a spec that uses the full A4 canvas height', () => {
+    const json = JSON.stringify({
+      elements: [{ type: 'shape', shape: 'rect', x: 0, y: 850, w: 1280, h: 50, fill: '#000000' }],
+    })
+    expect(parsePageSpec(json, 1280, 720).ok).toBe(false)
+    expect(parsePageSpec(json, 1280, 905).ok).toBe(true)
+  })
+})

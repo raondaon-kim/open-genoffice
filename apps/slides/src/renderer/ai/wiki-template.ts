@@ -51,7 +51,8 @@ export function resolveWikiColor(style: PptxStyle, ref: string): string {
 const px = (pt: number): number => Math.round(pt * PX_PER_PT)
 
 function canvasOf(style: PptxStyle): { w: number; h: number } {
-  return { w: CANVAS_W, h: style.slide.ratio === '4:3' ? 960 : 720 }
+  const h = style.slide.ratio === '4:3' ? 960 : style.slide.ratio === 'A4' ? 905 : 720
+  return { w: CANVAS_W, h }
 }
 
 function roleOf(style: PptxStyle, id: string): PptxRole | undefined {

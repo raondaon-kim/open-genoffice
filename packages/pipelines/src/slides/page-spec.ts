@@ -18,6 +18,7 @@ import {
   openPptx,
   promoteSlideBackground,
   savePptx,
+  setSlideSize,
   type Paragraph,
   type TextElement,
   type TextRun,
@@ -528,8 +529,15 @@ export async function buildPagePptx(
   spec: PageSpec,
   deps: BuildPageDeps,
   canvasW = SPEC_CANVAS_W,
+  canvasH = SPEC_CANVAS_H,
 ): Promise<{ bytes: Uint8Array; imageFailures: string[]; imageWarnings: string[] }> {
   const opened = await openPptx(await createBlankPptx())
+  // a non-16:9 canvas (e.g. an A4-landscape template) sets the page's slide size, so a deck
+  // assembled from these pages takes that size too
+  if (canvasH !== SPEC_CANVAS_H || canvasW !== SPEC_CANVAS_W) {
+    const cx = opened.deck.size.cx
+    setSlideSize(opened, cx, Math.round((cx * canvasH) / canvasW))
+  }
   const slide = opened.deck.slides[0]!
   const scale = opened.deck.size.cx / canvasW
   const toEmu = (px: number) => Math.round(px * scale)

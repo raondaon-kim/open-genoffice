@@ -1377,6 +1377,9 @@ export interface SlidesApi {
   /** Local single-page generation: a JSON slide spec (LLM output) built directly into a one-slide pptx; same marker kind as the cloud path */
   localGeneratePage: (op: {
     specJson: string
+    /** generation canvas (1280 wide; 720 for 16:9, 905 for A4 landscape) */
+    canvasW?: number
+    canvasH?: number
   }) => Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }>
   editText: (op: EditTextOp) => Promise<RenderSlide | null>
   /** Change font/size on selected elements wholesale (elements without text ignored; returns null if all ignored) */

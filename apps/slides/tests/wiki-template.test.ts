@@ -71,4 +71,13 @@ describe('wiki deck pages as generate_deck style templates', () => {
       expect(wikiStyleSkill(style, p.description)).not.toMatch(/undefined|NaN/)
     }
   })
+
+  it('uses a 1280 x 905 canvas for an A4-landscape deck type', () => {
+    const { style } = page('deck-business')
+    const a4 = { ...style, slide: { ratio: 'A4' as const } }
+    const skeleton = wikiLayoutSkeleton(a4)
+    expect(skeleton.canvas).toEqual({ w: 1280, h: 905 })
+    const title = skeleton.content!.title!
+    expect(title.y + title.h).toBeLessThanOrEqual(905)
+  })
 })

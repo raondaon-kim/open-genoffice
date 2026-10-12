@@ -1099,7 +1099,11 @@ export function AiPanel({
             continue
           }
           try {
-            const res = await window.slidesApi.localGeneratePage({ specJson: r.text })
+            const res = await window.slidesApi.localGeneratePage({
+              specJson: r.text,
+              canvasW: W,
+              canvasH: H,
+            })
             if (res?.ok && res.marker) return res
             lastErr = res?.error ?? tGlobal('aiErrUnknown')
           } catch (e) {

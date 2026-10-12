@@ -1837,39 +1837,48 @@ export function registerSlidesIpc(): void {
     'slides:local-page-generate',
     async (
       _e,
-      op: { specJson: string },
+      op: { specJson: string; canvasW?: number; canvasH?: number },
     ): Promise<{ ok: boolean; marker?: string; error?: string; imageFailures?: string[] }> => {
-      const parsed = parsePageSpec(String(op?.specJson ?? ''))
+      // the canvas is 1280 wide; the height follows the deck's page shape (720 = 16:9, 905 = A4)
+      const canvasW = 1280
+      const h = Number(op?.canvasH)
+      const canvasH = Number.isInteger(h) && h >= 400 && h <= 1400 ? h : 720
+      const parsed = parsePageSpec(String(op?.specJson ?? ''), canvasW, canvasH)
       if (!parsed.ok) return { ok: false, error: parsed.error }
       try {
         const started = Date.now()
-        const { bytes, imageFailures } = await buildPagePptx(parsed.spec, {
-          fontMetrics: getFontMetrics(),
-          fetchImage: async (url) => {
-            const resp = await fetchRemoteImage(url)
-            if (!resp || !resp.ok) return null
-            const buf = await readBodyCapped(resp, MAX_REMOTE_IMAGE_BYTES)
-            const mime = sniffImageMime(buf) ?? resp.headers.get('content-type') ?? ''
-            const ext = /png/.test(mime)
-              ? 'png'
-              : /gif/.test(mime)
-                ? 'gif'
-                : /webp/.test(mime)
-                  ? 'webp'
-                  : /bmp/.test(mime)
-                    ? 'bmp'
-                    : 'jpg'
-            return { bytes: buf, ext }
+        const { bytes, imageFailures } = await buildPagePptx(
+          parsed.spec,
+          {
+            fontMetrics: getFontMetrics(),
+            fetchImage: async (url) => {
+              const resp = await fetchRemoteImage(url)
+              if (!resp || !resp.ok) return null
+              const buf = await readBodyCapped(resp, MAX_REMOTE_IMAGE_BYTES)
+              const mime = sniffImageMime(buf) ?? resp.headers.get('content-type') ?? ''
+              const ext = /png/.test(mime)
+                ? 'png'
+                : /gif/.test(mime)
+                  ? 'gif'
+                  : /webp/.test(mime)
+                    ? 'webp'
+                    : /bmp/.test(mime)
+                      ? 'bmp'
+                      : 'jpg'
+              return { bytes: buf, ext }
+            },
+            imageDims: (bytes) => {
+              try {
+                const s = nativeImage.createFromBuffer(Buffer.from(bytes)).getSize()
+                return s.width > 0 && s.height > 0 ? s : null
+              } catch {
+                return null
+              }
+            },
           },
-          imageDims: (bytes) => {
-            try {
-              const s = nativeImage.createFromBuffer(Buffer.from(bytes)).getSize()
-              return s.width > 0 && s.height > 0 ? s : null
-            } catch {
-              return null
-            }
-          },
-        })
+          canvasW,
+          canvasH,
+        )
         console.log(
           `[local-slide] page generated: bytes=${bytes.length} imageFails=${imageFailures.length} ms=${Date.now() - started}`,
         )

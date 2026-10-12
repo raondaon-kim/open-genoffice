@@ -177,7 +177,7 @@ const api: SlidesApi = {
     width?: number
     height?: number
   }) => ipcRenderer.invoke('slides:cloud-page-generate', op),
-  localGeneratePage: (op: { specJson: string }) =>
+  localGeneratePage: (op: { specJson: string; canvasW?: number; canvasH?: number }) =>
     ipcRenderer.invoke('slides:local-page-generate', op),
   editText: (op: EditTextOp) => ipcRenderer.invoke('slides:edit-text', op),
   setElementFont: (op: SetElementFontOp) => ipcRenderer.invoke('slides:set-element-font', op),

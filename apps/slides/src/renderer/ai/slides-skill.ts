@@ -1846,7 +1846,7 @@ async function executeTool(
       }
 
       const canvasW = 1280
-      const canvasH = 720
+      let canvasH = 720
       const insertMode: 'replace' | 'append' =
         call.input.insert_mode === 'append' ? 'append' : 'replace'
       const PLAN_BATCH = 12 // Per-batch planning cap (kept slightly conservative against truncation)
@@ -1891,6 +1891,10 @@ async function executeTool(
           const tr = await access.loadStyleTemplate(styleTemplateName)
           if (tr.ok && tr.styleSkill) styleSkill = tr.styleSkill
           if (tr.ok && tr.layout) templateSkeleton = tr.layout
+          if (templateSkeleton?.canvas && templateSkeleton.canvas.w === canvasW) {
+            canvasH = templateSkeleton.canvas.h
+            if (canvasH !== 720) cloudActive = false
+          }
         } catch {
           /* fail-open */
         }

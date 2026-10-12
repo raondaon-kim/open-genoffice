@@ -26,7 +26,8 @@ import {
 export const PPTX_KINDS = ['title', 'subtitle', 'body', 'caption', 'label', 'other'] as const
 export type PptxKind = (typeof PPTX_KINDS)[number]
 export const PPTX_ALIGNS = ['left', 'center', 'right'] as const
-export const PPTX_RATIOS = ['16:9', '4:3'] as const
+/** slide shape: widescreen, standard, or A4 landscape (297 x 210 mm, common for Korean bid proposals) */
+export const PPTX_RATIOS = ['16:9', '4:3', 'A4'] as const
 export const DECOR_SHAPES = ['rect', 'roundRect', 'ellipse'] as const
 
 /** a box as fractions of the slide width/height */
