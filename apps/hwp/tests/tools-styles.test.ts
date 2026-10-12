@@ -111,7 +111,12 @@ describe('document style tools', () => {
     ]
     const result = await stylesTools.execute(
       c,
-      call('create_styled_document', { style: 'seoul-gian', blocks, file_name: '인사교류' }),
+      call('create_styled_document', {
+        style: 'seoul-gian',
+        blocks,
+        file_name: '인사교류',
+        done: true,
+      }),
     )
     expect(result.isError).toBeUndefined()
     expect(api.createStyledDocument).toHaveBeenCalledWith({
@@ -122,6 +127,44 @@ describe('document style tools', () => {
     expect(result.output).toMatch(/2 paragraph/)
     expect(result.output).toMatch(/margins and fonts|여백|page margins/)
     expect(result.output).toMatch(/⌘S/)
+  })
+
+  it('refuses a call without done, so a first stage never becomes a half document', async () => {
+    const { api, ctx: c } = ctx()
+    const result = await stylesTools.execute(
+      c,
+      call('create_styled_document', {
+        style: 'seoul-gian',
+        blocks: [{ role: 'item-2', text: 'x' }],
+      }),
+    )
+    expect(result.isError).toBe(true)
+    expect(result.output).toMatch(/done is required/)
+    expect(api.createStyledDocument).not.toHaveBeenCalled()
+  })
+
+  it('keeps a stage in a draft with done:false and passes the draft id on', async () => {
+    const { api, ctx: c } = ctx({
+      createStyledDocument: vi.fn(async () => ({
+        ok: true as const,
+        staged: true as const,
+        draftId: 'd1',
+        paragraphs: 3,
+      })),
+    })
+    const result = await stylesTools.execute(
+      c,
+      call('create_styled_document', {
+        style: 'seoul-gian',
+        blocks: [{ role: 'item-2', text: 'x' }],
+        draft_id: 'd1',
+        done: false,
+      }),
+    )
+    expect(api.createStyledDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ draftId: 'd1', done: false }),
+    )
+    expect(result.output).toMatch(/draft d1 (3 block/)
   })
 
   it('passes skeleton warnings on to the model', async () => {
@@ -139,6 +182,7 @@ describe('document style tools', () => {
       call('create_styled_document', {
         style: 'seoul-gian',
         blocks: [{ role: 'item-2', text: 'x' }],
+        done: true,
       }),
     )
     expect(result.output).toMatch(/missing required part "org"/)
@@ -166,7 +210,11 @@ describe('document style tools', () => {
     })
     const result = await stylesTools.execute(
       c,
-      call('create_styled_document', { style: 'seoul-gian', blocks: [{ role: 'x', text: 'y' }] }),
+      call('create_styled_document', {
+        style: 'seoul-gian',
+        blocks: [{ role: 'x', text: 'y' }],
+        done: true,
+      }),
     )
     expect(result.isError).toBe(true)
     expect(result.output).toMatch(/unknown role "x"/)

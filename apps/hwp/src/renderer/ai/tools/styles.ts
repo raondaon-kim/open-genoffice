@@ -51,10 +51,10 @@ const tools: AgentToolDef[] = [
         done: {
           type: 'boolean',
           description:
-            'false = keep these blocks in the draft and build nothing yet (more stages follow); true (default) = build and open the document',
+            'Required on every call. false = more stages follow: keep these blocks in the draft and build nothing yet. true = this is the last (or only) stage: build and open the document.',
         },
       },
-      required: ['style', 'blocks'],
+      required: ['style', 'blocks', 'done'],
     },
   },
   {
@@ -134,7 +134,14 @@ export const stylesTools: ToolModule = {
         })
         const fileName = optStrArg(input, 'file_name')?.trim()
         const draftId = optStrArg(input, 'draft_id')?.trim()
-        const done = input.done !== false
+        // done is required: a forgotten flag used to build a half document from the first stage
+        if (typeof input.done !== 'boolean') {
+          throw new ToolError(
+            'done is required: false when more stages (chapters) follow, true for the last or only call',
+            'invalid argument',
+          )
+        }
+        const done = input.done
         const result = await api.createStyledDocument({
           style,
           blocks: checked,
