@@ -24,7 +24,7 @@ const tools: AgentToolDef[] = [
   {
     name: 'create_styled_document',
     description:
-      'Create a NEW document in a known document type and open it in a new tab. blocks is the whole document, in order: each block is {role, text} — role from read_document_style, text one line WITHOUT leading spaces (they are added from the role) and including its own marker such as "1. " or "○ ". Alignment, indentation, sizes and spacing come from the role: never type them. Use an empty text for a blank line. Up to 200 blocks.',
+      'Create a NEW document in a known document type and open it in a new tab. blocks are the document in order: each block is {role, text} — role from read_document_style, text one line WITHOUT leading spaces (they are added from the role) and including its own marker such as "1. " or "○ ". Alignment, indentation, sizes and spacing come from the role: never type them. Use an empty text for a blank line. Up to 200 blocks per call. A LONG document (a proposal, a report of many chapters) is written in stages: first call with the cover and table of contents and done:false, keep the returned draft_id, then one call per chapter with that draft_id and done:false, and the last chapter with draft_id and done:true — only then is the whole document (up to 1500 blocks) built and opened.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -42,6 +42,16 @@ const tools: AgentToolDef[] = [
         file_name: {
           type: 'string',
           description: 'Suggested file name (default: the style title)',
+        },
+        draft_id: {
+          type: 'string',
+          description:
+            'Continue a staged document: the draft_id an earlier done:false call returned',
+        },
+        done: {
+          type: 'boolean',
+          description:
+            'false = keep these blocks in the draft and build nothing yet (more stages follow); true (default) = build and open the document',
         },
       },
       required: ['style', 'blocks'],
@@ -123,13 +133,23 @@ export const stylesTools: ToolModule = {
           return { role: block.role, text: block.text }
         })
         const fileName = optStrArg(input, 'file_name')?.trim()
+        const draftId = optStrArg(input, 'draft_id')?.trim()
+        const done = input.done !== false
         const result = await api.createStyledDocument({
           style,
           blocks: checked,
           ...(fileName ? { fileName } : {}),
+          ...(draftId ? { draftId } : {}),
+          ...(done ? {} : { done: false }),
         })
         if (!result.ok)
           throw new ToolError(`create_styled_document failed: ${result.error}`, 'creation failed')
+        if ('staged' in result) {
+          return {
+            output: `Stage kept in draft ${result.draftId} (${result.paragraphs} block(s) so far). Send the next chapter with draft_id "${result.draftId}" and done:false, or the last one with done:true to build and open the document.`,
+            summary: `draft ${result.draftId}: ${result.paragraphs} block(s)`,
+          }
+        }
         const roles = Object.entries(result.roleCounts)
           .map(([r, n]) => `${r}×${n}`)
           .join(', ')

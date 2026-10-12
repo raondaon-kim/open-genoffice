@@ -13,7 +13,8 @@ import { MAX_EDIT_OPS } from './rhwp-edit-ops'
  * shape. Paragraph i is block i (scaffold without a title keeps blank paragraphs too).
  */
 
-export const MAX_STYLED_BLOCKS = 200
+/** a whole document (a long one is written in stages, see styled-drafts.ts) */
+export const MAX_STYLED_BLOCKS = 1500
 const MAX_BLOCK_CHARS = 2000
 
 export interface StyledBlock {

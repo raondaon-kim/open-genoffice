@@ -30,6 +30,8 @@ import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import { buildStyledDocument } from './styled-document'
 import { registerHwpAttachmentIpc } from './attachments'
+import { StyledDrafts } from './styled-drafts'
+import type { DraftBlock } from './styled-drafts'
 import type { StaticRoot } from './static-server'
 
 const tDlg = createI18n({
@@ -604,22 +606,59 @@ function registerHwpIpc(): void {
       : { ok: false as const, error: `hwp: no style "${id}"` }
   })
 
+  const drafts = new StyledDrafts()
   ipcMain.handle(HWP_CHANNELS.createStyledDocument, async (_e, request: unknown) => {
     const bad = (error: string) => ({ ok: false as const, error })
     if (!runtime.docStylesDir) return bad('hwp: the style wiki is not available in this build')
-    const req = request as { style?: unknown; blocks?: unknown; fileName?: unknown } | null
+    const req = request as {
+      style?: unknown
+      blocks?: unknown
+      fileName?: unknown
+      draftId?: unknown
+      done?: unknown
+    } | null
     if (!req || typeof req.style !== 'string' || !Array.isArray(req.blocks)) {
       return bad('hwp: createStyledDocument needs a style id and blocks')
     }
     const page = loadDocStyles(runtime.docStylesDir).pages.find((p) => p.style.id === req.style)
     if (!page) return bad(`hwp: no style "${req.style}"`)
+    // a stage's blocks are checked when it arrives, so an error points at that stage
+    const roleIds = new Set(page.style.roles.map((r) => r.id))
+    const stage: DraftBlock[] = []
+    for (const [i, b] of (req.blocks as unknown[]).entries()) {
+      const block = b as { role?: unknown; text?: unknown } | null
+      if (typeof block?.role !== 'string' || !roleIds.has(block.role)) {
+        return bad(
+          `block ${i + 1}: unknown role "${String(block?.role)}" — roles are ${[...roleIds].join(', ')}`,
+        )
+      }
+      if (typeof block.text !== 'string') return bad(`block ${i + 1}: text must be a string`)
+      stage.push({ role: block.role, text: block.text })
+    }
+    // staged writing: done:false keeps the blocks in a draft; the call with done (default) builds it
+    const done = req.done !== false
+    const draftId = typeof req.draftId === 'string' && req.draftId ? req.draftId : undefined
+    let blocks = stage
+    if (!done || draftId) {
+      const added = drafts.add(req.style, stage, draftId)
+      if (!added.ok) return bad(added.error)
+      if (!done) {
+        return {
+          ok: true as const,
+          staged: true as const,
+          draftId: added.draftId,
+          paragraphs: added.blocks.length,
+        }
+      }
+      blocks = drafts.take(added.draftId) ?? stage
+    }
     const bin = rhwpBinary()
     if (!bin.ok) return bad(bin.error)
     const outDir = join(app.getPath('userData'), 'ai-created')
     await mkdir(outDir, { recursive: true })
     const workDir = await mkdtemp(join(outDir, '.styled-'))
     try {
-      const built = await buildStyledDocument(page.style, req.blocks as never, {
+      const built = await buildStyledDocument(page.style, blocks, {
         rhwpPath: bin.path,
         workDir,
       })

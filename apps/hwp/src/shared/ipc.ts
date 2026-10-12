@@ -102,6 +102,10 @@ export interface CreateStyledDocumentRequest {
   style: string
   blocks: Array<{ role: string; text: string }>
   fileName?: string
+  /** a long document in stages: continue this draft (from an earlier staged result) */
+  draftId?: string
+  /** false: keep the blocks in the draft and build nothing yet; default true builds and opens */
+  done?: boolean
 }
 
 export type CreateStyledDocumentResult =
@@ -112,6 +116,8 @@ export type CreateStyledDocumentResult =
       roleCounts: Record<string, number>
       warnings: string[]
     }
+  /** a stage kept in a draft (done: false); paragraphs = blocks in the draft so far */
+  | { ok: true; staged: true; draftId: string; paragraphs: number }
   | { ok: false; error: string }
 
 /** Where the renderer should point the rhwp studio iframe (served from the loopback origin). */
