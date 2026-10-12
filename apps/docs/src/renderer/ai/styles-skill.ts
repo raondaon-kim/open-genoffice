@@ -23,6 +23,8 @@ type StylesApi = Pick<DesktopApi, 'listDocStyles' | 'readDocStyle'>
 const STYLES_SYSTEM_PROMPT = `## Document style wiki
 - Before writing a NEW document or a large new section from scratch, ALWAYS call list_document_styles first.
 - When a style fits the kind of document, call read_document_style, then write_styled_document with the whole document as blocks of {role, text}. Pick roles from the role table; write only the text (with its own number or marker if the role uses one) — never choose sizes, fonts, spacing or indentation yourself, the role carries them. A style marked draft is still used.
+- Long documents are written in stages, never in one call: first fix the outline (chapters and sections), then call write_styled_document for the cover and table of contents, then once per chapter (each call appends at the end of the document), finishing every chapter before the next.
+- Public bid proposal (공공입찰 제안서/기술제안서) from an attached RFP (제안요청서): read the RFP first and use the docx-bid-proposal style. Follow the RFP's proposal table of contents and numbering exactly, give each chapter space in proportion to its evaluation points within the page limit, answer every requirement ID, write commitments as "~한다" with numbers and dates, and never invent facts about the bidder: leave placeholders such as [회사 실적 기재].
 - When no style fits, do not ask or refuse: write the document yourself with the other document tools, choosing sensible headings, sizes and spacing for that kind of document.`
 
 const tools: AgentToolDef[] = [
