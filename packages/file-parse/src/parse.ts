@@ -94,6 +94,17 @@ function sniffBinary(bytes: Buffer): BinaryKind {
   return 'unknown'
 }
 
+/**
+ * Hangul documents (.hwp/.hwpx) need the rhwp engine, which only the app shell has (a native
+ * binary). The shell registers an extractor at startup; without one (standalone apps, tests)
+ * Hangul attachments are reported as unsupported.
+ */
+export type HwpTextExtractor = (filePath: string) => Promise<string>
+let hwpTextExtractor: HwpTextExtractor | null = null
+export function setHwpTextExtractor(extractor: HwpTextExtractor | null): void {
+  hwpTextExtractor = extractor
+}
+
 /** parse an attachment into plain text (or flag it as image / unsupported) */
 export async function parseFileToText(filePath: string): Promise<ParsedFile> {
   const ext = extname(filePath).slice(1).toLowerCase()
@@ -131,6 +142,13 @@ export async function parseFileToText(filePath: string): Promise<ParsedFile> {
         error: `Content mismatch: .${ext} file has ${sniffed} magic bytes`,
       }
     }
+    if ((ext === 'hwp' && sniffed !== 'ole2') || (ext === 'hwpx' && sniffed !== 'zip')) {
+      return {
+        ok: false,
+        kind: 'text',
+        error: `Content mismatch: .${ext} file has ${sniffed} magic bytes`,
+      }
+    }
     if ((ext === 'doc' || ext === 'ppt') && sniffed !== 'ole2') {
       return {
         ok: false,
@@ -152,6 +170,16 @@ export async function parseFileToText(filePath: string): Promise<ParsedFile> {
         return { ok: true, kind: 'text', text: await xlsxToText(bytes) }
       case 'pdf':
         return { ok: true, kind: 'text', text: await pdfToText(bytes) }
+      case 'hwp':
+      case 'hwpx':
+        if (!hwpTextExtractor) {
+          return {
+            ok: false,
+            kind: 'unsupported',
+            error: 'Hangul documents need the Hangul module',
+          }
+        }
+        return { ok: true, kind: 'text', text: await hwpTextExtractor(filePath) }
     }
   } catch (e) {
     return { ok: false, kind: 'text', error: e instanceof Error ? e.message : String(e) }

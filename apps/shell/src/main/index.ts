@@ -235,6 +235,8 @@ import {
 } from '../../../markdown/src/main/markdown-main'
 import { configureHwpRuntime, flushHwpSave } from '../../../hwp/src/main/hwp-main'
 import { loadFormFile } from './hwp-form-open'
+import { hwpTextExtractor, runRhwpWith } from './hwp-text'
+import { setHwpTextExtractor } from '@genoffice/file-parse'
 import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
 import {
   configureHtmlRuntime,
@@ -535,6 +537,8 @@ configureHwpRuntime({
     openDocumentPath(path)
   },
 })
+// AI attachments: Hangul documents (an RFP, a form) are read through the bundled rhwp CLI
+setHwpTextExtractor(hwpTextExtractor(runRhwpWith(RHWP_BIN)))
 // privileged-scheme registration is only legal before app ready
 registerPrivilegedSchemes()
 

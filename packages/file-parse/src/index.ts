@@ -1,4 +1,10 @@
-export { parseFileToText, type ParsedFile, type ParsedFileKind } from './parse'
+export {
+  parseFileToText,
+  setHwpTextExtractor,
+  type HwpTextExtractor,
+  type ParsedFile,
+  type ParsedFileKind,
+} from './parse'
 export { docToText } from './doc'
 export { docxToText } from './docx'
 export { pptToText } from './ppt'
