@@ -26,6 +26,7 @@ import { HwpIntentStore } from './hwp-intents'
 import type { NativeBinaryName } from './native-binary-path'
 import { runRhwp } from './rhwp-cli'
 import { dumpForShape } from './dump-shape'
+import { legacyHangulHwp } from './hwp5-legacy'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import { buildStyledDocument } from './styled-document'
@@ -514,8 +515,10 @@ function registerHwpIpc(): void {
       return { ok: false, error: 'hwp: path not granted to this view' }
     }
     try {
-      const bytes = new Uint8Array(request.data)
+      let bytes: Uint8Array = new Uint8Array(request.data)
       if (bytes.byteLength === 0) return { ok: false, error: 'hwp: empty save payload' }
+      // an .hwp is written so older Hangul (2005 and up) opens it too
+      if (/\.hwp$/i.test(path)) bytes = legacyHangulHwp(bytes)
       // Temp file + rename for atomic replace; a mid-write crash won't corrupt the original
       const tmp = `${path}.gensave-${process.pid}.tmp`
       await writeFile(tmp, bytes)

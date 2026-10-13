@@ -164,7 +164,7 @@ describe('document style tools', () => {
     expect(api.createStyledDocument).toHaveBeenCalledWith(
       expect.objectContaining({ draftId: 'd1', done: false }),
     )
-    expect(result.output).toMatch(/draft d1 (3 block/)
+    expect(result.output).toMatch(/draft d1 \(3 block/)
   })
 
   it('passes skeleton warnings on to the model', async () => {

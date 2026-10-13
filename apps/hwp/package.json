@@ -37,7 +37,8 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.1.11",
-    "@genoffice/file-parse": "*"
+    "@genoffice/file-parse": "*",
+    "cfb": "^1.2.2"
   },
   "author": "Serge Doub and Open GenOffice contributors"
 }
