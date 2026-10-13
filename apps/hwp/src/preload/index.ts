@@ -19,7 +19,7 @@ const api: HwpApi = {
   aiEdit: (request) => ipcRenderer.invoke(HWP_CHANNELS.aiEdit, request),
   setDirty: (dirty) => ipcRenderer.send(HWP_CHANNELS.dirtyChanged, dirty),
   onSaveRequest: (handler) => {
-    const listener = () => handler()
+    const listener = (_e: unknown, mode?: unknown) => handler(mode === 'saveAs' ? 'saveAs' : 'save')
     ipcRenderer.on(HWP_CHANNELS.saveRequest, listener)
     return () => ipcRenderer.removeListener(HWP_CHANNELS.saveRequest, listener)
   },

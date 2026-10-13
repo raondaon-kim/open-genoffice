@@ -4,7 +4,7 @@ import type { RhwpEditor } from '@rhwp/editor'
 import { HwpAiPanel } from './ai/AiPanel'
 import { SnapshotStack } from './ai/snapshots'
 import type { HwpAiDeps } from './ai/context'
-import type { HwpApi } from '../shared/ipc'
+import type { HwpApi, HwpSaveMode } from '../shared/ipc'
 import { formCopyNames } from '../shared/form-names'
 
 declare global {
@@ -167,61 +167,68 @@ export function App() {
     return () => clearInterval(timer)
   }, [phase])
 
-  const saveNow = useCallback(async (): Promise<boolean> => {
-    const editor = editorRef.current
-    if (!editor) return false
-    if (savingRef.current) return false
-    savingRef.current = true
-    setStatus('Saving…')
-    try {
-      // Untitled document: ask the user for a destination first (Save As)
-      let path = filePathRef.current
-      if (!path) {
-        const picked = await window.hwpApi.saveAs(
-          formNameRef.current ? formCopyNames(formNameRef.current).saveName : undefined,
-        )
-        if (!picked.ok || !picked.path) {
-          if (!picked.canceled) setStatus(`Save failed: ${picked.error ?? 'unknown error'}`)
-          else setStatus('')
+  const saveNow = useCallback(
+    async (mode: HwpSaveMode = 'save'): Promise<boolean> => {
+      const editor = editorRef.current
+      if (!editor) return false
+      if (savingRef.current) return false
+      savingRef.current = true
+      setStatus('Saving…')
+      try {
+        // Untitled document or Save As: ask the user for a destination first; the file type
+        // picked there decides the format (.hwp also opens in old Hangul, .hwpx in Hangul 2010+)
+        let path = filePathRef.current
+        if (!path || mode === 'saveAs') {
+          const suggested = path
+            ? basename(path)
+            : formNameRef.current
+              ? formCopyNames(formNameRef.current).saveName
+              : undefined
+          const picked = await window.hwpApi.saveAs(suggested)
+          if (!picked.ok || !picked.path) {
+            if (!picked.canceled) setStatus(`Save failed: ${picked.error ?? 'unknown error'}`)
+            else setStatus('')
+            return false
+          }
+          path = picked.path
+          filePathRef.current = path
+          setDocName(basename(path))
+        }
+        // keep the source format: .hwp stays HWP, .hwpx stays HWPX
+        const isHwpx = /\.hwpx$/i.test(path)
+        const bytes = isHwpx ? await editor.exportHwpx() : await editor.exportHwp()
+        const copy = new Uint8Array(bytes)
+        const result = await window.hwpApi.save({ path, data: copy.buffer })
+        if (!result.ok) {
+          setStatus(`Save failed: ${result.error ?? 'unknown error'}`)
           return false
         }
-        path = picked.path
-        filePathRef.current = path
-        setDocName(basename(path))
-      }
-      // keep the source format: .hwp stays HWP, .hwpx stays HWPX
-      const isHwpx = /\.hwpx$/i.test(path)
-      const bytes = isHwpx ? await editor.exportHwpx() : await editor.exportHwp()
-      const copy = new Uint8Array(bytes)
-      const result = await window.hwpApi.save({ path, data: copy.buffer })
-      if (!result.ok) {
-        setStatus(`Save failed: ${result.error ?? 'unknown error'}`)
+        try {
+          await editor.notifySaved(basename(path))
+        } catch {
+          // older studio without notify-saved-v1; the dirty poll re-syncs anyway
+        }
+        setAiDirty(false)
+        setDirty(false)
+        window.hwpApi?.setDirty(false)
+        if (aiPath !== path) setAiPath(path) // (re)bind AI chat to the saved file
+        setStatus('Saved')
+        return true
+      } catch (err) {
+        setStatus(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
         return false
+      } finally {
+        savingRef.current = false
       }
-      try {
-        await editor.notifySaved(basename(path))
-      } catch {
-        // older studio without notify-saved-v1; the dirty poll re-syncs anyway
-      }
-      setAiDirty(false)
-      setDirty(false)
-      window.hwpApi?.setDirty(false)
-      if (aiPath !== path) setAiPath(path) // (re)bind AI chat to the saved file
-      setStatus('Saved')
-      return true
-    } catch (err) {
-      setStatus(`Save failed: ${err instanceof Error ? err.message : String(err)}`)
-      return false
-    } finally {
-      savingRef.current = false
-    }
-  }, [aiPath])
+    },
+    [aiPath],
+  )
 
   // Menu Save / close guard arrive as main → renderer save requests
   useEffect(() => {
     if (phase !== 'ready') return
-    return window.hwpApi.onSaveRequest(() => {
-      void saveNow().then((ok) => window.hwpApi.sendSaveResult(ok))
+    return window.hwpApi.onSaveRequest((mode) => {
+      void saveNow(mode).then((ok) => window.hwpApi.sendSaveResult(ok))
     })
   }, [phase, saveNow])
 

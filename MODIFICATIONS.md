@@ -21,6 +21,10 @@ The fork's material changes on top of upstream:
   `insert_paragraph_like`) and fences document text as data before it reaches
   the model. It uses upstream's shared AI channels and settings-wide model
   choice, upstream's project chat persistence, and the suite's theme tokens.
+  File > Save As (Ctrl+Shift+S) picks the format by file type; every `.hwp` is
+  written so Hangul 2005 opens it too (compressed streams re-packed with a 4 KB
+  window and Hangul's CRC32/size trailer, `apps/hwp/src/main/hwp5-legacy.ts`),
+  while `.hwpx` needs Hangul 2010 or later.
 - **Document-style wiki** (`packages/doc-styles`, pages in
   `apps/hwp/resources/doc-styles`, packaged as `modules/hwp-doc-styles`):
   markdown pages with measured role values for Hangul, Word and PowerPoint

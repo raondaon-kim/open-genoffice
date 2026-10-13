@@ -233,7 +233,7 @@ import {
   setMarkdownDocxExportedHook,
   setMarkdownFileSavedHook,
 } from '../../../markdown/src/main/markdown-main'
-import { configureHwpRuntime, flushHwpSave } from '../../../hwp/src/main/hwp-main'
+import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hwp/src/main/hwp-main'
 import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
@@ -5101,6 +5101,15 @@ function buildHwpMenu(): void {
           click: () => {
             const tab = activeHwpTarget()
             if (tab) void flushHwpSave(tab.webContents)
+          },
+        },
+        {
+          // the file type picked decides the format: .hwp also opens in old Hangul (2005)
+          label: tm('menuSaveAs'),
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click: () => {
+            const tab = activeHwpTarget()
+            if (tab) void requestHwpSaveAs(tab.webContents)
           },
         },
         { type: 'separator' },

@@ -6,7 +6,7 @@ import type { WebContents } from 'electron'
 import { installNavigationGuard, safeExternalUrl } from '@genoffice/electron-utils'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { HWP_CHANNELS } from '../shared/ipc'
-import type { SaveHwpRequest, SaveHwpResult, StudioUrlResult } from '../shared/ipc'
+import type { HwpSaveMode, SaveHwpRequest, SaveHwpResult, StudioUrlResult } from '../shared/ipc'
 import { exportDocStyles, loadDocStyles } from './doc-styles'
 import { createHwpFromMarkdown } from './hwpforge-client'
 import { resolveNativeBinary } from './native-binary-path'
@@ -45,6 +45,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'HWP 文档',
+    filterHwpLegacy: '韩文文档 – 兼容韩文 2005 及更高版本',
+    filterHwpx: 'HWPX 文档 – 韩文 2010 及更高版本',
     btnSave: '保存',
     btnDontSave: '不保存',
     btnCancel: '取消',
@@ -58,6 +60,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Hangul Documents',
+    filterHwpLegacy: 'Hangul Document – opens in Hangul 2005 and later',
+    filterHwpx: 'HWPX Document – Hangul 2010 and later',
     btnSave: 'Save',
     btnDontSave: "Don't Save",
     btnCancel: 'Cancel',
@@ -71,6 +75,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Hủy',
     exportStylesConflict: 'Một số tệp đã tồn tại. Ghi đè chúng?',
     filterHwp: 'Tài liệu Hangul',
+    filterHwpLegacy: 'Tài liệu Hangul – mở được trên Hangul 2005 trở lên',
+    filterHwpx: 'Tài liệu HWPX – Hangul 2010 trở lên',
     btnSave: 'Lưu',
     btnDontSave: 'Không lưu',
     btnCancel: 'Hủy',
@@ -84,6 +90,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Zrušit',
     exportStylesConflict: 'Některé soubory již existují. Přepsat je?',
     filterHwp: 'Dokumenty Hangul',
+    filterHwpLegacy: 'Dokument Hangul – otevře Hangul 2005 a novější',
+    filterHwpx: 'Dokument HWPX – Hangul 2010 a novější',
     btnSave: 'Uložit',
     btnDontSave: 'Neukládat',
     btnCancel: 'Zrušit',
@@ -97,6 +105,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: '한글 ドキュメント',
+    filterHwpLegacy: 'ハングル文書 – ハングル 2005 以降で開けます',
+    filterHwpx: 'HWPX 文書 – ハングル 2010 以降',
     btnSave: '保存',
     btnDontSave: '保存しない',
     btnCancel: 'キャンセル',
@@ -110,6 +120,8 @@ const tDlg = createI18n({
     exportStylesCancel: '취소',
     exportStylesConflict: '이미 있는 파일이 있습니다. 덮어쓸까요?',
     filterHwp: '한글 문서',
+    filterHwpLegacy: '한글 문서 – 한글 2005 이상에서 열림',
+    filterHwpx: 'HWPX 문서 – 한글 2010 이상',
     btnSave: '저장',
     btnDontSave: '저장 안 함',
     btnCancel: '취소',
@@ -123,6 +135,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Documents Hangul',
+    filterHwpLegacy: 'Document Hangul – s’ouvre dans Hangul 2005 et versions ultérieures',
+    filterHwpx: 'Document HWPX – Hangul 2010 et versions ultérieures',
     btnSave: 'Enregistrer',
     btnDontSave: 'Ne pas enregistrer',
     btnCancel: 'Annuler',
@@ -136,6 +150,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Hangul-Dokumente',
+    filterHwpLegacy: 'Hangul-Dokument – öffnet in Hangul 2005 und neuer',
+    filterHwpx: 'HWPX-Dokument – Hangul 2010 und neuer',
     btnSave: 'Speichern',
     btnDontSave: 'Nicht speichern',
     btnCancel: 'Abbrechen',
@@ -149,6 +165,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Documentos Hangul',
+    filterHwpLegacy: 'Documento Hangul – se abre en Hangul 2005 y posteriores',
+    filterHwpx: 'Documento HWPX – Hangul 2010 y posteriores',
     btnSave: 'Guardar',
     btnDontSave: 'No guardar',
     btnCancel: 'Cancelar',
@@ -162,6 +180,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'เอกสาร Hangul',
+    filterHwpLegacy: 'เอกสาร Hangul – เปิดได้ใน Hangul 2005 ขึ้นไป',
+    filterHwpx: 'เอกสาร HWPX – Hangul 2010 ขึ้นไป',
     btnSave: 'บันทึก',
     btnDontSave: 'ไม่บันทึก',
     btnCancel: 'ยกเลิก',
@@ -175,6 +195,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Dokumen Hangul',
+    filterHwpLegacy: 'Dokumen Hangul – terbuka di Hangul 2005 ke atas',
+    filterHwpx: 'Dokumen HWPX – Hangul 2010 ke atas',
     btnSave: 'Simpan',
     btnDontSave: 'Jangan Simpan',
     btnCancel: 'Batal',
@@ -188,6 +210,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Документы Hangul',
+    filterHwpLegacy: 'Документ Hangul – открывается в Hangul 2005 и новее',
+    filterHwpx: 'Документ HWPX – Hangul 2010 и новее',
     btnSave: 'Сохранить',
     btnDontSave: 'Не сохранять',
     btnCancel: 'Отмена',
@@ -201,6 +225,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'مستندات Hangul',
+    filterHwpLegacy: 'مستند Hangul – يفتح في Hangul 2005 وما بعده',
+    filterHwpx: 'مستند HWPX – Hangul 2010 وما بعده',
     btnSave: 'حفظ',
     btnDontSave: 'عدم الحفظ',
     btnCancel: 'إلغاء',
@@ -214,6 +240,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Documentos Hangul',
+    filterHwpLegacy: 'Documento Hangul – abre no Hangul 2005 e posteriores',
+    filterHwpx: 'Documento HWPX – Hangul 2010 e posteriores',
     btnSave: 'Salvar',
     btnDontSave: 'Não Salvar',
     btnCancel: 'Cancelar',
@@ -227,6 +255,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Documenti Hangul',
+    filterHwpLegacy: 'Documento Hangul – si apre in Hangul 2005 e successivi',
+    filterHwpx: 'Documento HWPX – Hangul 2010 e successivi',
     btnSave: 'Salva',
     btnDontSave: 'Non salvare',
     btnCancel: 'Annulla',
@@ -240,6 +270,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Dokumenty Hangul',
+    filterHwpLegacy: 'Dokument Hangul – otwiera się w Hangul 2005 i nowszych',
+    filterHwpx: 'Dokument HWPX – Hangul 2010 i nowsze',
     btnSave: 'Zapisz',
     btnDontSave: 'Nie zapisuj',
     btnCancel: 'Anuluj',
@@ -253,6 +285,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Hangul-documenten',
+    filterHwpLegacy: 'Hangul-document – opent in Hangul 2005 en later',
+    filterHwpx: 'HWPX-document – Hangul 2010 en later',
     btnSave: 'Opslaan',
     btnDontSave: 'Niet opslaan',
     btnCancel: 'Annuleren',
@@ -266,6 +300,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Dokumen Hangul',
+    filterHwpLegacy: 'Dokumen Hangul – dibuka dalam Hangul 2005 dan ke atas',
+    filterHwpx: 'Dokumen HWPX – Hangul 2010 dan ke atas',
     btnSave: 'Simpan',
     btnDontSave: 'Jangan Simpan',
     btnCancel: 'Batal',
@@ -279,6 +315,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'מסמכי Hangul',
+    filterHwpLegacy: 'מסמך Hangul – נפתח ב-Hangul 2005 ואילך',
+    filterHwpx: 'מסמך HWPX – Hangul 2010 ואילך',
     btnSave: 'שמירה',
     btnDontSave: 'אל תשמור',
     btnCancel: 'ביטול',
@@ -292,6 +330,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'Hangul दस्तावेज़',
+    filterHwpLegacy: 'Hangul दस्तावेज़ – Hangul 2005 और बाद में खुलता है',
+    filterHwpx: 'HWPX दस्तावेज़ – Hangul 2010 और बाद',
     btnSave: 'सहेजें',
     btnDontSave: 'न सहेजें',
     btnCancel: 'रद्द करें',
@@ -305,6 +345,8 @@ const tDlg = createI18n({
     exportStylesCancel: 'Cancel',
     exportStylesConflict: 'Some of these files already exist. Overwrite them?',
     filterHwp: 'HWP 文件',
+    filterHwpLegacy: '韓文文件 – 相容韓文 2005 及更新版本',
+    filterHwpx: 'HWPX 文件 – 韓文 2010 及更新版本',
     btnSave: '儲存',
     btnDontSave: '不儲存',
     btnCancel: '取消',
@@ -323,6 +365,8 @@ type DlgKey =
   | 'exportStylesCancel'
   | 'exportStylesConflict'
   | 'filterHwp'
+  | 'filterHwpLegacy'
+  | 'filterHwpx'
 const tm = (key: DlgKey) => tDlg(getUiLang(), key)
 
 interface RuntimePaths {
@@ -407,7 +451,7 @@ export async function requestHwpClose(
   return await requestRendererSave(contents)
 }
 
-function requestRendererSave(contents: WebContents): Promise<boolean> {
+function requestRendererSave(contents: WebContents, mode: HwpSaveMode = 'save'): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const timer = setTimeout(() => {
       saveWaiters.delete(contents.id)
@@ -417,7 +461,7 @@ function requestRendererSave(contents: WebContents): Promise<boolean> {
       clearTimeout(timer)
       resolve(ok)
     })
-    contents.send(HWP_CHANNELS.saveRequest)
+    contents.send(HWP_CHANNELS.saveRequest, mode)
   })
 }
 
@@ -426,6 +470,12 @@ export function flushHwpSave(contents: WebContents): Promise<boolean> {
   if (contents.isDestroyed()) return Promise.resolve(true)
   if (!dirtyByWc.has(contents.id)) return Promise.resolve(true)
   return requestRendererSave(contents)
+}
+
+/** Menu Save As: the renderer asks for a destination and writes the document there */
+export function requestHwpSaveAs(contents: WebContents): Promise<boolean> {
+  if (contents.isDestroyed()) return Promise.resolve(false)
+  return requestRendererSave(contents, 'saveAs')
 }
 
 /** exportHwpx bytes above this are refused — IPC copy + CLI parse would stall the tab */
@@ -540,11 +590,15 @@ function registerHwpIpc(): void {
       defaultName: unknown,
     ): Promise<SaveHwpResult & { path?: string; canceled?: boolean }> => {
       const parent = BrowserWindow.fromWebContents(e.sender)
+      // a form copy proposes "<form>_작성.<ext>"; only a bare file name is accepted
+      const defaultPath = safeDefaultSaveName(defaultName)
+      // the file type picked decides the format; the suggested name's type comes first
+      const hwp = { name: tm('filterHwpLegacy'), extensions: ['hwp'] }
+      const hwpx = { name: tm('filterHwpx'), extensions: ['hwpx'] }
       const options = {
         title: tm('saveAsTitle'),
-        // a form copy proposes "<form>_작성.<ext>"; only a bare file name is accepted
-        defaultPath: safeDefaultSaveName(defaultName),
-        filters: [{ name: tm('filterHwp'), extensions: ['hwp', 'hwpx'] }],
+        defaultPath,
+        filters: /\.hwpx$/i.test(defaultPath) ? [hwpx, hwp] : [hwp, hwpx],
       }
       const result =
         parent && !parent.isDestroyed()

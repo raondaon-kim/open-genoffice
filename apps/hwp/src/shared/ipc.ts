@@ -151,12 +151,15 @@ export interface ProjectChatMessage {
   tools?: ProjectToolActivity[]
 }
 
+/** what a main → renderer save request asks for: save in place, or pick a new file first */
+export type HwpSaveMode = 'save' | 'saveAs'
+
 export interface HwpApi {
   /** tab-start intent queued at view creation; consumed once after mount */
   consumePending(): Promise<HwpOpenIntent | null>
   readFile(path: string): Promise<ArrayBuffer>
   save(request: SaveHwpRequest): Promise<SaveHwpResult>
-  /** ask main for a destination path for an untitled document (Save As); grants the returned path for this view */
+  /** ask main for a destination path (Save As, or the first save of an untitled document); grants the returned path for this view */
   saveAs(defaultName?: string): Promise<SaveHwpResult & { path?: string; canceled?: boolean }>
   /**
    * Compile Markdown (GFM tables included) into a NEW .hwpx document via the
@@ -185,8 +188,8 @@ export interface HwpApi {
   aiEdit(request: AiEditRequest): Promise<AiEditResult>
   /** mirror the editor's dirty flag into the main process (drives close guards) */
   setDirty(dirty: boolean): void
-  /** main → renderer: write pending edits to disk (menu Save / close guard) */
-  onSaveRequest(handler: () => void): () => void
+  /** main → renderer: write pending edits to disk (menu Save / close guard), or Save As */
+  onSaveRequest(handler: (mode: HwpSaveMode) => void): () => void
   sendSaveResult(ok: boolean): void
   getLanguage(): Promise<Lang>
   getTheme(): Promise<UiTheme>
