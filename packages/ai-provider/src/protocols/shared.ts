@@ -244,6 +244,8 @@ export function throwIfToolCountOverBudget(count: number, provider: string): voi
 }
 
 export interface StreamCallbacks {
+  /** 'off' = ask the vendor to skip thinking for this request (see AiStreamRequest.thinking) */
+  thinking?: 'off'
   onDelta: (text: string) => void
   onToolCall: (call: AgentToolCall) => void
   /** raw model reasoning deltas (reasoning_content); stored so interleaved-thinking models get it echoed back */

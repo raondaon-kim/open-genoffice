@@ -193,6 +193,12 @@ export interface AiStreamRequest {
   messages: AgentMessage[]
   tools?: AgentToolDef[]
   maxTokens?: number
+  /**
+   * 'off' = no model thinking for this request where the vendor lets a request turn it off
+   * (DeepSeek); a layout or formatting step whose content is already decided does not need it,
+   * and a thinking model can spend the whole output budget on reasoning. Ignored elsewhere.
+   */
+  thinking?: 'off'
 }
 
 export interface AiStreamChunk {

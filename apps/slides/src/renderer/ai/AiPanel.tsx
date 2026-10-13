@@ -805,6 +805,7 @@ export function AiPanel({
       timeoutMs: number,
       signal?: AbortSignal,
       maxTokens?: number,
+      thinking?: 'off',
     ): Promise<LlmResult> =>
       new Promise((resolve) => {
         if (signal?.aborted) {
@@ -875,6 +876,7 @@ export function AiPanel({
             system,
             messages: [{ role: 'user', text: user }],
             ...(maxTokens ? { maxTokens } : {}),
+            ...(thinking ? { thinking } : {}),
           })
           .catch((e) =>
             finish({
@@ -892,6 +894,7 @@ export function AiPanel({
       useGenModel = true,
       signal?: AbortSignal,
       maxTokens?: number,
+      thinking?: 'off',
     ): Promise<LlmResult> => {
       const first = await runLlmAttempt(
         useGenModel ? settingsForGen() : settingsRef.current,
@@ -900,6 +903,7 @@ export function AiPanel({
         timeoutMs,
         signal,
         maxTokens,
+        thinking,
       )
       if (first.ok || !useGenModel || signal?.aborted) return first
       // Only "request errors" fall back to the user's model for a retry; timeouts/empty output don't switch models (mostly network/output problems, switching won't help)
@@ -907,7 +911,7 @@ export function AiPanel({
       const cur = settingsRef.current
       if (cur.provider !== 'anthropic') return first // The gen-model override only applies with anthropic
       if (cur.providers.anthropic?.model === SLIDES_GEN_MODEL) return first
-      return runLlmAttempt(cur, system, user, timeoutMs, signal, maxTokens)
+      return runLlmAttempt(cur, system, user, timeoutMs, signal, maxTokens, thinking)
     }
 
     const access: DeckAccess = {
@@ -1093,9 +1097,16 @@ export function AiPanel({
               ? userMsg
               : `${userMsg}\n\nYour previous output was rejected: ${lastErr}. Output the corrected JSON object only.`
           // Text-heavy spec JSON can exceed the default 8192 tokens; single-page requests get a higher cap
-          const r = await runLlmOnce(sys, msg, 120000, true, args.signal, 16384)
+          const startedAt = Date.now()
+          // the outline and style are decided: laying out one page needs no model thinking, and a
+          // thinking model spent the whole output budget on reasoning (empty or cut-off specs);
+          // the room and time also cover models that cannot turn thinking off
+          const r = await runLlmOnce(sys, msg, 240000, true, args.signal, 32768, 'off')
           if (!r.ok || !r.text) {
             lastErr = r.error ?? tGlobal('aiErrEmptyOutput')
+            console.warn(
+              `[local-page] page ${args.pageIndex} attempt ${attempt + 1}: no output after ${Date.now() - startedAt} ms (${r.errKind ?? 'error'}): ${lastErr.slice(0, 200)}`,
+            )
             continue
           }
           try {
@@ -1106,6 +1117,9 @@ export function AiPanel({
             })
             if (res?.ok && res.marker) return res
             lastErr = res?.error ?? tGlobal('aiErrUnknown')
+            console.warn(
+              `[local-page] page ${args.pageIndex} attempt ${attempt + 1}: spec rejected after ${Date.now() - startedAt} ms (${r.text.length} chars): ${lastErr.slice(0, 200)}`,
+            )
           } catch (e) {
             lastErr = e instanceof Error ? e.message : String(e)
           }

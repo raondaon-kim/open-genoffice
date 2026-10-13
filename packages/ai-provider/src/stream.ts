@@ -39,12 +39,22 @@ export async function streamForProvider(
         return streamGemini(config, system, messages, tools, cap, cb, baseUrl, {
           omitTemperature: endpoint.omitTemperature,
         })
-      case 'openai-compatible':
+      case 'openai-compatible': {
+        // DeepSeek takes a per-request switch; a proxy that does not know it ignores it
+        const thinkingOff =
+          cb.thinking === 'off' && /deep-?seek/i.test(config.model)
+            ? { thinking: { type: 'disabled' } }
+            : undefined
+        const bodyExtras =
+          endpoint.bodyExtras || thinkingOff
+            ? { ...endpoint.bodyExtras, ...thinkingOff }
+            : undefined
         return streamOpenAiCompatible(baseUrl, config, system, messages, tools, cap, cb, {
           omitTemperature: endpoint.omitTemperature,
           useMaxCompletionTokens: endpoint.useMaxCompletionTokens,
-          bodyExtras: endpoint.bodyExtras,
+          bodyExtras,
         })
+      }
     }
   })
 }
