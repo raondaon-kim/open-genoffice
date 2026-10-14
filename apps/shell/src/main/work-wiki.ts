@@ -1,4 +1,5 @@
-import { join } from 'node:path'
+import { createHash } from 'node:crypto'
+import { join, resolve } from 'node:path'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { streamForProvider } from '@genoffice/ai-provider'
 import { readAiSettingsFile } from '@genoffice/ai-search'
@@ -71,14 +72,26 @@ async function extractText(path: string): Promise<string | null> {
   }
 }
 
-function restart(): void {
-  engine?.stop()
+/** per-user engine state for a wiki root, kept out of the (possibly shared) wiki folder */
+function stateDirFor(root: string): string {
+  const key = createHash('sha256')
+    .update(resolve(root).replace(/\\/g, '/').toLowerCase())
+    .digest('hex')
+    .slice(0, 16)
+  return join(paths!.userData, 'work-wiki', key)
+}
+
+/** settings changed: the old engine finishes its running job before the next one starts */
+async function restart(): Promise<void> {
+  const old = engine
   engine = null
+  await old?.stopAndWait()
   const s = readWorkWikiSettings()
   if (!s.enabled) return
   const debounce = Number(process.env.GENOFFICE_WORK_WIKI_DEBOUNCE_MS)
   const next = new WorkWikiEngine({
     root: s.folder,
+    stateDir: stateDirFor(s.folder),
     exclude: s.exclude,
     complete: createWikiComplete(join(paths!.userData, 'ai-settings.json')),
     extractText,
@@ -94,7 +107,7 @@ export function startWorkWiki(opts: {
   appSettingsPath: string
 }): void {
   paths = opts
-  restart()
+  void restart()
 }
 
 /** every saved document reaches the wiki through here; never throws */
@@ -124,13 +137,13 @@ export function registerWorkWikiIpc(): void {
     return r
   })
   ipcMain.handle(HOME_CHANNELS.getWorkWikiSettings, () => readWorkWikiSettings())
-  ipcMain.handle(HOME_CHANNELS.setWorkWikiSettings, (_e, patch: unknown) => {
+  ipcMain.handle(HOME_CHANNELS.setWorkWikiSettings, async (_e, patch: unknown) => {
     const next = normalizeWorkWikiSettings(
       { ...readWorkWikiSettings(), ...(patch && typeof patch === 'object' ? patch : {}) },
       defaultFolder(),
     )
     writeAppSetting(paths!.appSettingsPath, 'workWiki', next)
-    restart()
+    await restart()
     return next
   })
   ipcMain.handle(HOME_CHANNELS.pickWorkWikiFolder, async (e) => {

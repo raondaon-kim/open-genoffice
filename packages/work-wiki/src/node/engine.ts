@@ -14,6 +14,8 @@ import { WikiStore } from './store'
 
 export interface EngineOptions {
   root: string
+  /** engine state (registry, snapshots, queue): per user, outside the wiki folder (default <root>/.genoffice-wiki) */
+  stateDir?: string
   complete: WikiComplete
   /** plain text of a saved document, or null when it cannot be read (encrypted, corrupt) */
   extractText: (path: string) => Promise<string | null>
@@ -64,7 +66,7 @@ export class WorkWikiEngine {
   /** prepare the folder and resume pending jobs; false (and disabled) when the folder is unusable */
   start(): boolean {
     try {
-      this.store = new WikiStore(this.opts.root, this.opts.now)
+      this.store = new WikiStore(this.opts.root, this.opts.now, this.opts.stateDir)
       this.store.bootstrap()
       this.registry = new DocumentRegistry(this.store.stateDir)
       this.isEnabled = true
@@ -74,17 +76,39 @@ export class WorkWikiEngine {
       this.opts.log?.(`work wiki disabled: ${err instanceof Error ? err.message : String(err)}`)
       return false
     }
-    for (const job of this.loadQueue()) this.schedule(job)
+    try {
+      // a folder excluded since the job was queued is not learned
+      for (const job of this.loadQueue()) if (this.accepts(job.path, job.kind)) this.schedule(job)
+    } catch (err) {
+      this.disable(err)
+      return false
+    }
     if (this.opts.watch !== false) this.watchSources()
     this.refreshSearch()
     return true
   }
 
+  /** no new job starts after this; a running job finishes (stopAndWait waits for it) */
   stop(): void {
+    this.isEnabled = false
     for (const t of this.timers.values()) clearTimeout(t)
     this.timers.clear()
     this.watcher?.close()
     this.watcher = null
+  }
+
+  async stopAndWait(): Promise<void> {
+    this.stop()
+    while (this.running) await this.running.catch(() => {})
+  }
+
+  /** the wiki folder or its state went away (a dropped share, a deleted folder): stop for this session */
+  private disable(reason: unknown): void {
+    if (!this.isEnabled) return
+    this.opts.log?.(
+      `work wiki disabled: ${reason instanceof Error ? reason.message : String(reason)}`,
+    )
+    this.stop()
   }
 
   private queueFile(): string {
@@ -128,25 +152,35 @@ export class WorkWikiEngine {
     clearTimeout(this.timers.get(key))
     this.timers.set(
       key,
-      setTimeout(() => void this.runDue(), Math.max(0, job.dueAt - Date.now())),
+      setTimeout(
+        () => {
+          this.timers.delete(key)
+          void this.runDue()
+        },
+        Math.max(0, job.dueAt - Date.now()),
+      ),
     )
   }
 
+  /** a document was written; never throws (a save is never blocked by the wiki) */
   onDocumentSaved(path: string): void {
     if (!this.isEnabled || !this.accepts(path, 'document')) return
     try {
       this.schedule({ path, dueAt: Date.now() + this.debounceMs, kind: 'document' })
     } catch (err) {
-      this.opts.log?.(`work wiki queue: ${String(err)}`)
+      this.jobs.delete(norm(path))
+      this.disable(err)
     }
   }
 
-  /** run every due job, one at a time; concurrent callers wait for the same run */
+  /** run every due job, one at a time; concurrent callers wait for the same run; never throws */
   async runDue(): Promise<void> {
     if (!this.isEnabled) return
-    while (this.running) await this.running
+    while (this.running) await this.running.catch(() => {})
+    if (!this.isEnabled) return
     this.running = (async () => {
       for (;;) {
+        if (!this.isEnabled) break
         const due = [...this.jobs.values()]
           .filter((j) => j.dueAt <= Date.now())
           .sort((a, b) => a.dueAt - b.dueAt)[0]
@@ -158,6 +192,9 @@ export class WorkWikiEngine {
     })()
     try {
       await this.running
+    } catch (err) {
+      // only file-system failures escape runJob: the folder is gone or unwritable
+      this.disable(err)
     } finally {
       this.running = null
     }
@@ -167,6 +204,9 @@ export class WorkWikiEngine {
     const store = this.store!
     const registry = this.registry!
     const title = basename(job.path).replace(/\.[^.]+$/, '')
+    if (!this.accepts(job.path, job.kind)) return
+    if (!existsSync(this.opts.root))
+      throw new Error(`wiki folder is not available: ${this.opts.root}`)
     try {
       const text =
         job.kind === 'note' ? readFileSync(job.path, 'utf8') : await this.opts.extractText(job.path)
@@ -192,8 +232,9 @@ export class WorkWikiEngine {
       registry.commit(job.path, text, result.work)
       this.refreshSearch()
     } catch (err) {
-      if (attempt < 2) return this.runJob(job, attempt + 1)
+      if (attempt < 2 && this.isEnabled) return this.runJob(job, attempt + 1)
       const msg = err instanceof Error ? err.message : String(err)
+      // throws when the folder is gone: runDue turns that into disable()
       store.appendLog(`실패: ${title} — ${msg}`.slice(0, 300))
     }
   }
@@ -207,13 +248,18 @@ export class WorkWikiEngine {
         // notes are queued by remember()
         if (norm(path).startsWith(`${norm(store.notesDir)}/`)) return
         if (existsSync(path) && this.accepts(path, 'source')) {
-          this.schedule({
-            path,
-            dueAt: Date.now() + (this.opts.sourceSettleMs ?? SOURCE_SETTLE_MS),
-            kind: 'source',
-          })
+          try {
+            this.schedule({
+              path,
+              dueAt: Date.now() + (this.opts.sourceSettleMs ?? SOURCE_SETTLE_MS),
+              kind: 'source',
+            })
+          } catch (err) {
+            this.disable(err)
+          }
         }
       })
+      this.watcher.on('error', (err) => this.disable(err))
     } catch (err) {
       this.opts.log?.(`work wiki watch: ${String(err)}`)
     }
@@ -224,7 +270,13 @@ export class WorkWikiEngine {
   }
 
   catalog(): string {
-    return this.isEnabled && this.store ? buildCatalog(this.store.listPages()) : ''
+    if (!this.isEnabled || !this.store) return ''
+    try {
+      return buildCatalog(this.store.listPages())
+    } catch (err) {
+      this.disable(err)
+      return ''
+    }
   }
 
   search(query: string): WikiHit[] {
@@ -233,7 +285,13 @@ export class WorkWikiEngine {
 
   read(slug: string): { ok: true; page: string } | { ok: false; error: string } {
     if (!this.isEnabled || !this.store) return { ok: false, error: WIKI_UNAVAILABLE }
-    const page = this.store.readPage(slug)
+    let page
+    try {
+      page = this.store.readPage(slug)
+    } catch (err) {
+      this.disable(err)
+      return { ok: false, error: WIKI_UNAVAILABLE }
+    }
     return page
       ? { ok: true, page: fenceWikiText(serializePage(page)) }
       : { ok: false, error: `no wiki page: ${slug}` }
@@ -250,8 +308,13 @@ export class WorkWikiEngine {
     const d = new Date()
     const path = join(this.store.notesDir, `${todayIso(d)}-${String(d.getTime()).slice(-6)}.md`)
     const head = work ? `업무: ${maskSensitive(work)}\n` : ''
-    writeFileSync(path, `${head}${clean.map((p) => `- ${p}`).join('\n')}\n`, 'utf8')
-    this.schedule({ path, dueAt: Date.now(), kind: 'note' })
+    try {
+      writeFileSync(path, `${head}${clean.map((p) => `- ${p}`).join('\n')}\n`, 'utf8')
+      this.schedule({ path, dueAt: Date.now(), kind: 'note' })
+    } catch (err) {
+      this.disable(err)
+      return { ok: false, error: WIKI_UNAVAILABLE }
+    }
     return { ok: true }
   }
 }

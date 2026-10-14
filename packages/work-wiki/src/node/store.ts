@@ -45,12 +45,13 @@ export class WikiStore {
   readonly stateDir: string
   private readonly now: () => Date
 
-  constructor(root: string, now: () => Date = () => new Date()) {
+  /** stateDir: engine state (registry, snapshots, queue); keep it outside a shared wiki folder */
+  constructor(root: string, now: () => Date = () => new Date(), stateDir?: string) {
     this.root = root
     this.wikiDir = join(root, 'wiki')
     this.rawDir = join(root, 'raw', 'sources')
     this.notesDir = join(this.rawDir, 'genoffice')
-    this.stateDir = join(root, '.genoffice-wiki')
+    this.stateDir = stateDir ?? join(root, '.genoffice-wiki')
     this.now = now
   }
 
@@ -70,6 +71,7 @@ export class WikiStore {
     ]
     for (const [path, text] of seed) if (!existsSync(path)) writeFileSync(path, text, 'utf8')
     // a read-only share fails here, not in the middle of a learn job
+    this.atomicWrite(join(this.wikiDir, '.probe'), String(Date.now()))
     this.atomicWrite(join(this.stateDir, '.probe'), String(Date.now()))
   }
 
