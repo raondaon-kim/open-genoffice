@@ -26,6 +26,7 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  WorkWikiSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -109,6 +110,15 @@ const homeApi: HomeApi = {
     return result && typeof result === 'object' && Array.isArray((result as FileSearchRerank).order)
       ? (result as FileSearchRerank)
       : null
+  },
+  async getWorkWikiSettings() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getWorkWikiSettings)) as WorkWikiSettings
+  },
+  async setWorkWikiSettings(patch) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.setWorkWikiSettings, patch)) as WorkWikiSettings
+  },
+  async pickWorkWikiFolder() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.pickWorkWikiFolder)) as string | null
   },
   async getFileSearchSettings() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings

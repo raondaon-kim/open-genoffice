@@ -139,6 +139,7 @@ import {
   setDocsHostWindowHook,
   setDocsShellWindow,
   setDocsFileSavedHook,
+  setDocsDocumentSavedHook,
   setDocsFileOpenedHook,
   setSessionPathResolver,
   defaultSaveDir,
@@ -198,6 +199,7 @@ import {
   setSlidesCloseTabHook,
   setSlidesExtraFileMenuItems,
   setSlidesOpenedHook,
+  setSlidesDocumentSavedHook,
   setSlidesHostWindowHook,
   setSlidesShellWindow,
   setSlidesShowBleed,
@@ -238,6 +240,7 @@ import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
 import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
+import { registerWorkWikiIpc, startWorkWiki, workWikiDocumentSaved } from './work-wiki'
 import {
   configureHtmlRuntime,
   exportHtmlHeadless,
@@ -532,6 +535,8 @@ configureHwpRuntime({
     detachedSetFileFor(webContentsId, path)
     recordRecentFile(path)
     applyPendingDir(webContentsId, path)
+    // hwp calls onSaved after every write, so every Hangul save feeds the work wiki
+    workWikiDocumentSaved(path)
   },
   onCreateDocument: (path) => {
     openDocumentPath(path)
@@ -3387,6 +3392,9 @@ function createShellWindow(): void {
     applyPendingDir(wc.id, path)
   })
   // docs' save-as / silent first save lands on a new path → sync the tab title too
+  // every docx / pptx save feeds the work wiki
+  setDocsDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setSlidesDocumentSavedHook((path) => workWikiDocumentSaved(path))
   setDocsFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
@@ -5866,6 +5874,7 @@ app.on('second-instance', (_event, argv, _cwd, additionalData) => {
 installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
+registerWorkWikiIpc()
 registerProjectIpc()
 registerDocsIpc()
 registerHomeIpc()
@@ -5931,6 +5940,11 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  startWorkWiki({
+    userData: app.getPath('userData'),
+    documents: app.getPath('documents'),
+    appSettingsPath: APP_SETTINGS_PATH(),
+  })
   // first scan waits for the windows to come up; later ones follow folder changes
   setTimeout(() => ensureFileIndexer()?.refresh(), 4000)
   installRendererProtocol({

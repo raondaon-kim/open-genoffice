@@ -4076,6 +4076,19 @@ function getProjectStore(): ProjectStore {
   return projectStore
 }
 
+/** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setDocsDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
+}
+
 /**
  * Fired when a save lands on a new path (save-as / first silent save). The shell
  * uses it to sync the tab title/path, record recents and apply a pending project —
@@ -4523,6 +4536,7 @@ export function registerDocsIpc(): void {
         )
         clearRecoveryCopy(filePath)
         pushRecent(filePath)
+        notifyDocumentSaved(filePath)
         return {
           ok: true,
           passwordIntentPending,
@@ -4729,6 +4743,7 @@ export function registerDocsIpc(): void {
           result.filePath,
         )
         pushRecent(result.filePath)
+        notifyDocumentSaved(result.filePath)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
         const savedPath = notifyFileSaved(event.sender, result.filePath)
@@ -4774,6 +4789,7 @@ export function registerDocsIpc(): void {
       }
       const passwordIntentPending = commitDocPasswordSave(event.sender.id, passwordState, filePath)
       pushRecent(filePath)
+      notifyDocumentSaved(filePath)
       const savedPath = notifyFileSaved(event.sender, filePath)
       return {
         ok: true,
@@ -4844,6 +4860,7 @@ export function registerDocsIpc(): void {
           filePath,
         )
         pushRecent(filePath)
+        notifyDocumentSaved(filePath)
         rememberOpenDoc(event.sender.id, filePath)
         notifyFileSaved(event.sender, filePath)
         return {

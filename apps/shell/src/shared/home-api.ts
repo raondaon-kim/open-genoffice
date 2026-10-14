@@ -134,6 +134,13 @@ export interface FileSearchHit extends RecentEntry {
 export type DecisionEndpoint =
   'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
 
+/** work wiki options persisted in app-settings.json under `workWiki` */
+export interface WorkWikiSettings {
+  enabled: boolean
+  folder: string
+  exclude: string[]
+}
+
 /** home search options persisted in app-settings.json under `fileSearch` */
 export interface FileSearchSettings {
   /** send the top local hits to a decision model for reranking; default off */
@@ -192,6 +199,11 @@ export interface HomeApi {
   setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
   /** one two-document judgement against the (possibly unsaved) settings */
   testFileSearchRerank(settings: FileSearchSettings): Promise<{ ok: boolean; error?: string }>
+  /** work wiki: on/off, folder and excluded folders (app-settings.json `workWiki`) */
+  getWorkWikiSettings(): Promise<WorkWikiSettings>
+  setWorkWikiSettings(patch: Partial<WorkWikiSettings>): Promise<WorkWikiSettings>
+  /** folder picker for the work wiki; null when canceled */
+  pickWorkWikiFolder(): Promise<string | null>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -507,6 +519,9 @@ export const HOME_CHANNELS = {
   getFileSearchSettings: 'home:get-file-search-settings',
   setFileSearchSettings: 'home:set-file-search-settings',
   testFileSearchRerank: 'home:test-file-search-rerank',
+  getWorkWikiSettings: 'home:get-work-wiki-settings',
+  setWorkWikiSettings: 'home:set-work-wiki-settings',
+  pickWorkWikiFolder: 'home:pick-work-wiki-folder',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
