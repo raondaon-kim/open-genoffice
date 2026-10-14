@@ -39,6 +39,19 @@ The fork's material changes on top of upstream:
     `wiki:<id>` style templates (a Style Skill plus a layout skeleton), so the
     upstream deck pipeline composes the deck in the organization's colors,
     fonts, sizes and title positions.
+- **Work wiki** (`packages/work-wiki`):
+  - **What is kept:** every saved Hangul, Word and PowerPoint document, files dropped into
+    `raw/sources/`, and durable points from chat are learned into a small wiki of works (업무),
+    working methods (작업 방식) and clients (기관).
+  - **Folder:** the LLM Wiki folder format, `Documents\GenOffice 업무위키` by default. It follows
+    the LLM Wiki pattern only; no LLM Wiki code is used.
+  - **How it learns:**
+    - The first save sends an outline digest; later saves send only the changed paragraphs.
+    - A plan call and 1–3 merge calls (thinking off) keep the pages under their caps.
+    - Code maintains the work page's related-documents list.
+  - **How the assistants use it:** they get the catalog each turn, plus `wiki_search`, `wiki_read`
+    and `wiki_remember`. Wiki text is fenced as data.
+  - **Settings:** on/off and the folder, in Settings → AI media.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
   (`deck-bid-proposal`); PowerPoint pages may carry deck-type rules, and an A4
