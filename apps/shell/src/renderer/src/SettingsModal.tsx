@@ -30,6 +30,7 @@ import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import { ProviderLogo } from './provider-logos'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
+import { WorkWikiSettingsBlock } from './WorkWikiSettings'
 import './settings.css'
 
 // ── Settings modal (opened from the account menu) ─────────
@@ -1219,6 +1220,7 @@ function AiMediaPane({
           )}
         </section>
       )}
+      <WorkWikiSettingsBlock t={t} />
       {mediaBlock('image')}
       {mediaBlock('analysis')}
       {mediaBlock('video')}
