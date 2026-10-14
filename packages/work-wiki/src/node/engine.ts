@@ -293,7 +293,8 @@ export class WorkWikiEngine {
       return { ok: false, error: WIKI_UNAVAILABLE }
     }
     return page
-      ? { ok: true, page: fenceWikiText(serializePage(page)) }
+      ? // the source list is for the wiki itself; the assistant does not need it
+        { ok: true, page: fenceWikiText(serializePage(page).replace(/^sources: .*\n/m, '')) }
       : { ok: false, error: `no wiki page: ${slug}` }
   }
 

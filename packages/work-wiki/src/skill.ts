@@ -1,5 +1,5 @@
 import type { AgentSkill, AgentToolCall, ToolExecution } from '@genoffice/agent-core'
-import { WIKI_FENCE_RULE } from './fence'
+import { fenceWikiText, WIKI_FENCE_RULE } from './fence'
 import { WIKI_UNAVAILABLE } from './types'
 import type { WorkWikiApi } from './types'
 
@@ -82,7 +82,7 @@ export function createWorkWikiSkill(
     // buildContext is synchronous: it serves the cached catalog and refreshes it in the background
     buildContext: () => {
       if (Date.now() - lastRefresh > CATALOG_TTL_MS) void refresh()
-      return catalog ? `### 업무 위키 목차\n${catalog}` : ''
+      return catalog ? `### 업무 위키 목차\n${fenceWikiText(catalog)}` : ''
     },
     executeTool: async (call: AgentToolCall): Promise<ToolExecution> => {
       const api = getApi()
@@ -94,7 +94,9 @@ export function createWorkWikiSkill(
           const hits = await api.search(query)
           return {
             output: hits.length
-              ? hits.map((h) => `- ${h.slug} [${h.type}] ${h.title} — ${h.summary}`).join('\n')
+              ? fenceWikiText(
+                  hits.map((h) => `- ${h.slug} [${h.type}] ${h.title} — ${h.summary}`).join('\n'),
+                )
               : 'no matching pages',
             summary: `업무 위키 검색: ${query}`,
           }

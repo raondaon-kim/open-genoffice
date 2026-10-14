@@ -31,6 +31,10 @@ const SCHEMA = `# 페이지 규칙
 - 본문 링크는 [[slug]]
 `
 
+/** page names are file names: letters, digits and hyphens only, so no name leaves its folder */
+const SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]{0,79}$/u
+export const isValidSlug = (slug: string): boolean => SLUG.test(slug)
+
 const TYPE_HEADINGS: Record<WikiPageType, string> = {
   work: '업무',
   method: '작업 방식',
@@ -86,6 +90,7 @@ export class WikiStore {
   }
 
   readPage(slug: string): WikiPage | null {
+    if (!isValidSlug(slug)) return null
     for (const type of Object.keys(PAGE_FOLDERS) as WikiPageType[]) {
       const path = this.pagePath(type, slug)
       if (existsSync(path)) return parsePage(readFileSync(path, 'utf8'), slug)
@@ -94,6 +99,7 @@ export class WikiStore {
   }
 
   writePage(page: WikiPage): void {
+    if (!isValidSlug(page.slug)) throw new Error(`invalid wiki page name: ${page.slug}`)
     const masked: WikiPage = {
       ...page,
       body: maskSensitive(page.body),

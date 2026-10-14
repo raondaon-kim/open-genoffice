@@ -86,7 +86,11 @@ export class WikiSearch {
 const LABEL = { work: '업무', method: '작업 방식', client: '기관' } as const
 
 /** one line per page — work first (newest first), then methods, then clients — within capChars */
-export function buildCatalog(pages: WikiPage[], capChars = 3000): string {
+export function buildCatalog(
+  pages: WikiPage[],
+  capChars = 3000,
+  opts: { aliases?: boolean } = {},
+): string {
   const order = (t: WikiPage['type']) => (t === 'work' ? 0 : t === 'method' ? 1 : 2)
   const sorted = [...pages].sort((a, b) =>
     order(a.type) !== order(b.type)
@@ -95,7 +99,8 @@ export function buildCatalog(pages: WikiPage[], capChars = 3000): string {
   )
   let out = ''
   for (const p of sorted) {
-    const line = `- [${LABEL[p.type]}] ${p.title} — ${p.summary} (${p.slug})\n`
+    const alias = opts.aliases && p.aliases.length ? ` (aliases: ${p.aliases.join(', ')})` : ''
+    const line = `- [${LABEL[p.type]}] ${p.title}${alias} — ${p.summary} (${p.slug})\n`
     if (out.length + line.length > capChars) break
     out += line
   }
