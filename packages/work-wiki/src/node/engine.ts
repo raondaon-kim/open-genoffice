@@ -180,8 +180,8 @@ export class WorkWikiEngine {
         job.kind === 'note'
           ? text.slice(0, 4000)
           : change.kind === 'revision'
-            ? buildRevisionDigest(change.added, change.removed)
-            : buildFirstDigest(change.paragraphs)
+            ? buildRevisionDigest(change.hunks)
+            : buildFirstDigest(text)
       const result = await learn(store, this.opts.complete, {
         kind: job.kind === 'note' ? 'note' : change.kind === 'revision' ? 'revision' : 'first',
         title,

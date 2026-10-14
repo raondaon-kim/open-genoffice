@@ -26,8 +26,8 @@ describe('document registry', () => {
     const change = reg.compare('D:/a.hwp', revised)
     expect(change.kind).toBe('revision')
     if (change.kind === 'revision') {
-      expect(change.added.join('\n')).toContain('3단계')
-      expect(change.removed.join('\n')).toContain('전략 내용이다')
+      expect(change.hunks.flatMap((h) => h.added).join('\n')).toContain('3단계')
+      expect(change.hunks.flatMap((h) => h.removed).join('\n')).toContain('전략 내용이다')
     }
     expect(reg.workOf('D:/a.hwp')).toBe('koica-health')
   })
@@ -39,18 +39,18 @@ describe('document registry', () => {
   })
 
   it('first digest keeps headings and the first lines of each section, within the cap', () => {
-    const full = buildFirstDigest(splitParagraphs(doc))
+    const full = buildFirstDigest(doc)
     expect(full).toContain('Ⅰ. 사업 이해')
     expect(full).toContain('Ⅱ. 추진 전략')
-    expect(buildFirstDigest(splitParagraphs(doc), 60).length).toBeLessThanOrEqual(60)
+    expect(buildFirstDigest(doc, 60).length).toBeLessThanOrEqual(60)
   })
 
   it('revision digest labels added and removed text within the cap', () => {
-    const d = buildRevisionDigest(['새 문단'], ['옛 문단'], 1000)
+    const d = buildRevisionDigest([{ added: ['새 문단'], removed: ['옛 문단'] }], 1000)
     expect(d).toContain('[추가] 새 문단')
     expect(d).toContain('[삭제] 옛 문단')
     expect(
-      buildRevisionDigest(['가'.repeat(500)], ['나'.repeat(500)], 700).length,
+      buildRevisionDigest([{ added: ['가'.repeat(500)], removed: ['나'.repeat(500)] }], 700).length,
     ).toBeLessThanOrEqual(700)
   })
 })
