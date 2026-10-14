@@ -84,8 +84,8 @@ value. When a page would exceed its cap, the merge step condenses it (older deta
   it to the work-wiki engine. (Today only first saves and save-as notify the shell.)
 - Formats: `.hwp`, `.hwpx`, `.docx`, `.pptx`. Files inside the wiki root, temp files and excluded
   folders are ignored.
-- Debounce: a job runs 2 minutes after the last save of that path, or when its tab closes, on the
-  latest version only.
+- Debounce: a job runs 2 minutes after the last save of that path, on the latest version only.
+  Pending jobs are kept in `queue.json` and run after a restart.
 - Text comes from the saved file in main (`file-parse` for docx/pptx, the bundled rhwp
   `export-text` for hwp/hwpx), split into paragraphs.
 
@@ -166,13 +166,13 @@ of creating a duplicate.
   2. Follow the method.
   3. Name the wiki pages used.
   4. Information not in the wiki stays a placeholder, as today.
-- Wiki text reaches the model fenced as data. hwp's nonce fence (`provenance.ts`) moves to a shared
-  package and is used by all three apps.
+- Wiki text reaches the model fenced as data, with a nonce fence in hwp's format that the
+  work-wiki package provides for all three apps.
 
 ## Settings
 
-A small block in Settings → AI media (stored with the AI settings, sanitized by
-`ai-settings-guard`):
+A small block in Settings → AI media (stored in `app-settings.json` under `workWiki`, so the AI
+settings payload and its guard stay untouched):
 
 - 업무 위키 on/off (default on);
 - folder (default `Documents\GenOffice 업무위키`);
