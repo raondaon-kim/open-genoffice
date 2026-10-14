@@ -140,6 +140,15 @@ describe('learn', () => {
     expect(body.match(/## 관련 문서/g)).toHaveLength(1)
   })
 
+  it('every page gets a one-line summary for the catalog, even when the plan gives none', async () => {
+    const store = newStore()
+    await learn(store, fakeModel(), { kind: 'first', title: 't', path: 'D:/t.hwp', digest: 'x' })
+    for (const p of store.listPages()) expect(p.summary.trim()).not.toBe('')
+    expect(store.listPages().find((p) => p.type === 'method')!.summary).toBe(
+      '평가항목 순서로 목차 구성',
+    )
+  })
+
   it('throws on a plan that is not usable', async () => {
     const store = newStore()
     await expect(

@@ -42,8 +42,8 @@ Reply with one JSON object only:
 {"work":{"slug":existing slug or null,"title":"...","aliases":[...],"summary":"one line"},
  "document":"one-line summary of this document for the work's related-documents list",
  "workPoints":["what the job is, status, decisions — short"],
- "methods":[{"slug":existing or null,"title":"e.g. 제안서 작성 방식","points":["structure/order, emphasis, wording rules; for a revision: what was changed and in which direction"]}],
- "client":{"slug":existing or null,"title":"...","aliases":[...],"points":["preferences"]} or null,
+ "methods":[{"slug":existing or null,"title":"e.g. 제안서 작성 방식","summary":"one line","points":["structure/order, emphasis, wording rules; for a revision: what was changed and in which direction"]}],
+ "client":{"slug":existing or null,"title":"...","aliases":[...],"summary":"one line","points":["preferences"]} or null,
  "conflicts":["facts that contradict the current pages"]}
 Use an existing slug from the catalog whenever the work, method or client is already there (match titles and aliases). At most 2 methods. Write titles, points and summaries in Korean.`
 
@@ -223,6 +223,8 @@ export async function learn(
     page.updated = today
     page.aliases = [...new Set([...page.aliases, ...t.aliases])]
     if (t.summary) page.summary = t.summary
+    // the catalog shows one line per page: fall back to the first point
+    if (!page.summary.trim()) page.summary = (t.points[0] ?? page.title).slice(0, 120)
     if (input.kind !== 'note') page.sources = [...new Set([...page.sources, input.path])]
     store.writePage(page)
     touched.push(page.slug)
