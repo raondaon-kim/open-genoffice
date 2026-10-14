@@ -8,3 +8,5 @@ export {
   splitParagraphs,
 } from './node/registry'
 export type { Change } from './node/registry'
+export { extractJson, learn } from './node/learn'
+export type { LearnInput, LearnResult, WikiComplete } from './node/learn'
