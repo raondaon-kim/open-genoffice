@@ -55,6 +55,41 @@ export function WorkWikiSettingsBlock({ t }: { t: TFunc }) {
           </button>
         </div>
       )}
+      {settings.enabled && (
+        <div className="set-field">
+          <div className="set-field-text">
+            <div className="set-field-stack">
+              <div className="set-field-label">{t('setWorkWikiExclude')}</div>
+              <div className="set-field-desc">{t('setWorkWikiExcludeDesc')}</div>
+              {settings.exclude.map((folder) => (
+                <div key={folder} className="set-field-desc">
+                  {folder}{' '}
+                  <button
+                    className="set-btn"
+                    aria-label={t('setWorkWikiExcludeRemove')}
+                    onClick={() =>
+                      void save({ exclude: settings.exclude.filter((f) => f !== folder) })
+                    }
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <button
+            className="set-btn"
+            onClick={async () => {
+              const folder = await window.aiOffice.pickWorkWikiFolder?.()
+              if (folder && !settings.exclude.includes(folder)) {
+                await save({ exclude: [...settings.exclude, folder] })
+              }
+            }}
+          >
+            {t('setWorkWikiExcludeAdd')}
+          </button>
+        </div>
+      )}
     </section>
   )
 }
