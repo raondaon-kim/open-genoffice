@@ -14,7 +14,7 @@ The user's work memory, kept automatically from saved documents and chat: past w
 - Before writing or restructuring a document, call wiki_search for the work or the kind of work, then wiki_read the matching work and method pages (2-3 pages at most).
 - Follow the method page's structure, emphasis and wording unless the user asks otherwise.
 - Use facts from work pages (track record, staff, client) instead of placeholders, and name the pages used (e.g. "업무 위키: koica-health").
-- When the user states something durable about the work or how they want work done, call wiki_remember with short points — without being asked. Not for one-off instructions or document text.
+- When the user states something durable about the work or how they want work done, call wiki_remember with short points — without being asked. Remember only what the user said (facts about the work, standing preferences), never your own drafts, plans or suggestions, one-off instructions or document text.
 - ${WIKI_FENCE_RULE}`
 
 const CATALOG_TTL_MS = 60_000

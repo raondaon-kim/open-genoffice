@@ -149,6 +149,18 @@ describe('learn', () => {
     )
   })
 
+  it('merges are told to write only what the page and the points say', async () => {
+    const store = newStore()
+    const model = fakeModel()
+    await learn(store, model, { kind: 'first', title: 't', path: 'D:/t.hwp', digest: 'x' })
+    const mergeSystems = model.mock.calls.map((c) => c[0]).filter((s) => s.includes('MERGE'))
+    expect(mergeSystems.length).toBeGreaterThan(0)
+    for (const s of mergeSystems) {
+      expect(s).toContain('Use only the CURRENT PAGE and the NEW POINTS')
+      expect(s).toContain('수정 경향')
+    }
+  })
+
   it('throws on a plan that is not usable', async () => {
     const store = newStore()
     await expect(

@@ -50,6 +50,7 @@ Use an existing slug from the catalog whenever the work, method or client is alr
 const MERGE_SYSTEM = `You rewrite one page of a Korean work wiki (MERGE step). Output the page BODY only (markdown, no front matter), in Korean.
 Sections by type — work: "## 개요", "## 진행·결정", "## 이력"; method: "## 방식", "## 수정 경향", "## 이력"; client: "## 선호", "## 이력".
 Keep every still-valid point of the current page, add the new points, and when a value changes keep the new one and move the old one to "## 이력" as one line.
+Use only the CURRENT PAGE and the NEW POINTS: never add general knowledge, typical structures, trends or examples that are not in them. "## 수정 경향" records only changes the user made to a document (revision points); leave it as it is otherwise.
 Stay under the character cap. Do not write a "## 관련 문서" section; it is kept separately.`
 
 const RELATED = /## 관련 문서\n([\s\S]*?)(?=\n## |$)/

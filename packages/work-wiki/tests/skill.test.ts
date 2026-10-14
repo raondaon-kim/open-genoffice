@@ -20,6 +20,11 @@ describe('work wiki skill', () => {
     expect(skill.tools.map((t) => t.name)).toEqual(['wiki_search', 'wiki_read', 'wiki_remember'])
   })
 
+  it('remembers only what the user said, never its own drafts', () => {
+    const skill = createWorkWikiSkill(() => undefined)
+    expect(skill.systemPrompt).toContain('only what the user said')
+  })
+
   it('runs the three tools against the api', async () => {
     const a = api()
     const skill = createWorkWikiSkill(() => a)
