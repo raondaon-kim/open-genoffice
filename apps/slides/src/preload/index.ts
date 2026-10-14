@@ -1,4 +1,5 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
+import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { RenderSlide } from '@genoffice/pptx-render'
@@ -471,6 +472,11 @@ const api: SlidesApi = {
 }
 
 contextBridge.exposeInMainWorld('slidesApi', api)
+// the work wiki (shell-registered wiki:* channels) for the assistant
+contextBridge.exposeInMainWorld(
+  'workWiki',
+  createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
+)
 
 // Chat attachment bridge: method names/signatures match the window.desktop attachment subset in docs, so the renderer's files-skill is copied over wholesale
 const filesApi: DesktopFilesApi = {

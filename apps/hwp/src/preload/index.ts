@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 import { AI_CHANNELS, HWP_CHANNELS, PROJECT_CHANNELS, THEME_CHANNELS } from '../shared/ipc'
 import type { HwpApi, UiTheme } from '../shared/ipc'
 
@@ -50,3 +51,8 @@ const api: HwpApi = {
 }
 
 contextBridge.exposeInMainWorld('hwpApi', api)
+// the work wiki (shell-registered wiki:* channels) for the assistant
+contextBridge.exposeInMainWorld(
+  'workWiki',
+  createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
+)

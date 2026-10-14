@@ -14,6 +14,7 @@ import {
   type AgentImage,
   type ToolDisplay,
 } from '@genoffice/agent-core'
+import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import {
   cloudToolsEnabled,
@@ -1412,6 +1413,7 @@ export function AiPanel({
       skill: composeSkills('slides+files', '', [
         createSlidesSkill(access),
         createFilesSkill(availableAttachments, (path) => readAttachmentPathsRef.current.add(path)),
+        createWorkWikiSkill(() => window.workWiki),
       ]),
       events: {
         onText: (text) => {

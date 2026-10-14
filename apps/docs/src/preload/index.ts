@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 import type { IpcRendererEvent } from 'electron'
 import { VIEW_IMAGE_CHANNEL } from '../shared/ipc'
 import type { AiPanelPrefs } from '@genoffice/ui'
@@ -252,6 +253,11 @@ const projectApi: ProjectApi = {
 }
 
 contextBridge.exposeInMainWorld('desktop', api)
+// the work wiki (shell-registered wiki:* channels) for the assistant
+contextBridge.exposeInMainWorld(
+  'workWiki',
+  createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
+)
 contextBridge.exposeInMainWorld('projectApi', projectApi)
 
 // open documents dragged from the OS onto this tab as a new shell tab

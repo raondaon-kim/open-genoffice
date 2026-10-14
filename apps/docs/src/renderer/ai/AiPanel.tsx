@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
+import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import { imageGenerationAvailable, mediaAnalysisAvailable } from '@genoffice/ai-provider/browser'
 import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
@@ -778,6 +779,7 @@ export function AiPanel({
           () => window.desktop,
         ),
         createFilesSkill(availableAttachments),
+        createWorkWikiSkill(() => window.workWiki),
       ]),
       captureSnapshot: () => editorRef.current.getJSON() as PmNode,
       events: {
