@@ -8,6 +8,7 @@ import type { CodexLoginOptions, LoginChild } from '../src/main/codex-login'
 
 class FakeLogin extends EventEmitter implements LoginChild {
   stdout = new EventEmitter()
+  stderr = new EventEmitter()
   killed = false
   kill() {
     this.killed = true
@@ -114,5 +115,49 @@ describe('CodexLogin', () => {
     await new Promise((r) => setTimeout(r, 30))
     expect(login.status().state).toBe('done')
     expect(children[0]!.killed).toBe(true)
+  })
+
+  it('waits a moment after a clean exit: the account file is read about a second later', async () => {
+    const { login, children, signIn } = make({ exitGraceMs: 300 })
+    await login.start()
+    children[0]!.emit('exit', 0)
+    setTimeout(signIn, 60)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(login.status().state).toBe('done')
+  })
+
+  it('fails after the grace period when a clean exit never shows an account', async () => {
+    const { login, children } = make({ exitGraceMs: 60 })
+    await login.start()
+    children[0]!.emit('exit', 0)
+    await new Promise((r) => setTimeout(r, 150))
+    expect(login.status()).toMatchObject({ state: 'failed' })
+    expect(login.status().reason).toMatch(/0/)
+  })
+
+  it('a spawn error event is a failed state, not an uncaught exception', async () => {
+    const { login, children } = make()
+    await login.start()
+    children[0]!.emit('error', new Error('EPERM'))
+    expect(login.status()).toMatchObject({ state: 'failed', reason: 'EPERM' })
+  })
+
+  it('signs in with the executable the status was read from', async () => {
+    const exePath = vi.fn(async (cliPath?: string) => cliPath ?? 'bundled')
+    const readAccount = vi.fn(async () => ({ state: 'needs-login' as const }))
+    const { login } = make({ exePath, readAccount })
+    await login.start('C:/mine/codex.exe')
+    await new Promise((r) => setTimeout(r, 20))
+    expect(exePath).toHaveBeenCalledWith('C:/mine/codex.exe')
+    expect(readAccount).toHaveBeenCalledWith('C:/mine/codex.exe')
+    login.cancel()
+  })
+
+  it('reports a sign-in address printed on stderr', async () => {
+    const { login, children } = make()
+    await login.start()
+    children[0]!.stderr.emit('data', Buffer.from('navigate to https://auth.test/device?x=2 now'))
+    expect(login.status().url).toBe('https://auth.test/device?x=2')
+    login.cancel()
   })
 })

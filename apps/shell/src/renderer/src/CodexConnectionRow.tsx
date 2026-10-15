@@ -83,7 +83,7 @@ export function CodexConnectionRow({
           <button
             className="set-btn primary"
             onClick={() =>
-              void window.aiOffice.startCodexLogin?.().then((l) => {
+              void window.aiOffice.startCodexLogin?.(cliPath || undefined).then((l) => {
                 if (l) setLogin(l)
               })
             }

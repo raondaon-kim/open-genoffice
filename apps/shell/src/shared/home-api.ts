@@ -398,7 +398,7 @@ export interface HomeApi {
   /** Codex: who is signed in (the bundled or configured executable) */
   getCodexStatus(cliPath?: string): Promise<CodexStatusView>
   /** start the browser sign-in (`codex login`); a running one is reused */
-  startCodexLogin(): Promise<CodexLoginView>
+  startCodexLogin(cliPath?: string): Promise<CodexLoginView>
   getCodexLogin(): Promise<CodexLoginView>
   cancelCodexLogin(): Promise<void>
   /** live Codex model catalog discovered through the current or overridden app-server */

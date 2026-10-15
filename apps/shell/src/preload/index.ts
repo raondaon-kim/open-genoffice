@@ -132,8 +132,8 @@ const homeApi: HomeApi = {
   async getCodexStatus(cliPath) {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexStatus, cliPath)) as CodexStatusView
   },
-  async startCodexLogin() {
-    return (await ipcRenderer.invoke(HOME_CHANNELS.startCodexLogin)) as CodexLoginView
+  async startCodexLogin(cliPath) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.startCodexLogin, cliPath)) as CodexLoginView
   },
   async getCodexLogin() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexLogin)) as CodexLoginView

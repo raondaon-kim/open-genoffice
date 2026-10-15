@@ -31,16 +31,17 @@ export function registerCodexIpc(): void {
   const resources = app.isPackaged ? process.resourcesPath : undefined
   configureBundledCodex(bundledCodexExe(resources, join(app.getAppPath(), 'build')))
   login = new CodexLogin({
-    exePath: () => resolveCodexCliPath(),
+    exePath: (cliPath) => resolveCodexCliPath(cliPath),
     spawn: (exe, args) =>
       spawn(exe, args, { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, env: loginEnv() }),
-    readAccount: () => readCodexAccount(),
+    readAccount: (cliPath) => readCodexAccount(cliPath),
   })
   ipcMain.handle(HOME_CHANNELS.getCodexStatus, (_e, cliPath: unknown) =>
     codexStatus(validCliPath(cliPath) ? cliPath.trim() : undefined),
   )
-  ipcMain.handle(HOME_CHANNELS.startCodexLogin, async () => {
-    await login!.start()
+  // the sign-in uses the executable the status was read from (the user's path when set)
+  ipcMain.handle(HOME_CHANNELS.startCodexLogin, async (_e, cliPath: unknown) => {
+    await login!.start(validCliPath(cliPath) ? cliPath.trim() : undefined)
     return login!.status()
   })
   ipcMain.handle(HOME_CHANNELS.getCodexLogin, () => login!.status())

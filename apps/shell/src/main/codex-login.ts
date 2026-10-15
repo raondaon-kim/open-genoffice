@@ -11,9 +11,15 @@ export function bundledCodexExe(resourcesPath: string | undefined, devDir: strin
   return candidates.find((p) => existsSync(p)) ?? null
 }
 
+interface DataStream {
+  on(event: 'data', cb: (chunk: Buffer) => void): unknown
+}
+
 export interface LoginChild {
-  stdout: { on(event: 'data', cb: (chunk: Buffer) => void): unknown }
+  stdout: DataStream
+  stderr?: DataStream | null
   on(event: 'exit', cb: (code: number | null) => void): unknown
+  on(event: 'error', cb: (err: Error) => void): unknown
   kill(): boolean
 }
 
@@ -24,11 +30,14 @@ export interface CodexLoginStatus {
 }
 
 export interface CodexLoginOptions {
-  exePath: () => Promise<string>
+  /** the executable for this sign-in: the user's path when given, else the usual lookup */
+  exePath: (cliPath?: string) => Promise<string>
   spawn: (exe: string, args: string[]) => LoginChild
-  readAccount: () => Promise<CodexAccountState>
+  readAccount: (cliPath?: string) => Promise<CodexAccountState>
   pollMs?: number
   timeoutMs?: number
+  /** after a clean exit the account shows up about a second later; wait this long for it */
+  exitGraceMs?: number
 }
 
 const URL_PATTERN = /https?:\/\/[^\s"'<>]+/
@@ -37,8 +46,9 @@ const URL_PATTERN = /https?:\/\/[^\s"'<>]+/
 export class CodexLogin {
   private child: LoginChild | null = null
   private current: CodexLoginStatus = { state: 'idle' }
-  private timer: ReturnType<typeof setInterval> | null = null
-  private deadline: ReturnType<typeof setTimeout> | null = null
+  private timers: Array<ReturnType<typeof setTimeout>> = []
+  private poller: ReturnType<typeof setInterval> | null = null
+  private cliPath: string | undefined
 
   constructor(private readonly o: CodexLoginOptions) {}
 
@@ -46,52 +56,76 @@ export class CodexLogin {
     return { ...this.current }
   }
 
-  /** start a sign-in; a second call while one runs does nothing; never throws */
-  async start(): Promise<void> {
+  /** start a sign-in with the given executable; a second call while one runs does nothing; never throws */
+  async start(cliPath?: string): Promise<void> {
     if (this.current.state === 'waiting') return
     this.current = { state: 'waiting' }
+    this.cliPath = cliPath
     try {
-      const exe = await this.o.exePath()
+      const exe = await this.o.exePath(cliPath)
       const child = this.o.spawn(exe, ['login'])
       this.child = child
-      child.stdout.on('data', (chunk) => {
+      const scan = (chunk: Buffer) => {
         const m = URL_PATTERN.exec(String(chunk))
-        if (m && this.current.state === 'waiting') this.current = { ...this.current, url: m[0] }
+        if (m && this.current.state === 'waiting' && !this.current.url) {
+          this.current = { ...this.current, url: m[0] }
+        }
+      }
+      child.stdout.on('data', scan)
+      child.stderr?.on('data', scan)
+      // spawn reports a failure to start (permissions, a damaged file) as an event, not a throw
+      child.on('error', (err) => {
+        if (this.child !== child) return
+        this.finish({ state: 'failed', reason: err.message })
       })
       child.on('exit', (code) => {
         if (this.child !== child) return
         this.child = null
-        // an exit while still waiting is a failure unless the account is already there
-        void this.o
-          .readAccount()
-          .catch(() => null)
-          .then((a) => {
-            if (this.current.state !== 'waiting') return
-            if (a?.state === 'connected') this.finish({ state: 'done' })
-            else this.finish({ state: 'failed', reason: `codex login exited (${code ?? 'none'})` })
-          })
+        if (code === 0) {
+          // the app-server reads the new account file only a moment later; keep polling first
+          this.timers.push(
+            setTimeout(() => void this.settleAfterExit(code), this.o.exitGraceMs ?? 8000),
+          )
+          return
+        }
+        void this.settleAfterExit(code)
       })
-      this.timer = setInterval(() => void this.poll(), this.o.pollMs ?? 1500)
-      this.deadline = setTimeout(
-        () => this.finish({ state: 'failed', reason: 'sign-in timed out' }),
-        this.o.timeoutMs ?? 5 * 60_000,
+      this.poller = setInterval(() => void this.poll(), this.o.pollMs ?? 1500)
+      this.timers.push(
+        setTimeout(
+          () => this.finish({ state: 'failed', reason: 'sign-in timed out' }),
+          this.o.timeoutMs ?? 5 * 60_000,
+        ),
       )
     } catch (err) {
       this.finish({ state: 'failed', reason: err instanceof Error ? err.message : String(err) })
     }
   }
 
+  private async read(): Promise<CodexAccountState | null> {
+    return this.o.readAccount(this.cliPath).catch(() => null)
+  }
+
   private async poll(): Promise<void> {
     if (this.current.state !== 'waiting') return
-    const a = await this.o.readAccount().catch(() => null)
+    const a = await this.read()
     if (a?.state === 'connected' && this.current.state === 'waiting') this.finish({ state: 'done' })
   }
 
+  /** the login child is gone: signed in, or a failure with its exit code */
+  private async settleAfterExit(code: number | null): Promise<void> {
+    if (this.current.state !== 'waiting') return
+    const a = await this.read()
+    if (this.current.state !== 'waiting') return
+    if (a?.state === 'connected') this.finish({ state: 'done' })
+    else this.finish({ state: 'failed', reason: `codex login exited (${code ?? 'none'})` })
+  }
+
   private finish(next: CodexLoginStatus): void {
-    if (this.timer) clearInterval(this.timer)
-    if (this.deadline) clearTimeout(this.deadline)
-    this.timer = null
-    this.deadline = null
+    for (const t of this.timers) clearTimeout(t)
+    this.timers = []
+    if (this.poller) clearInterval(this.poller)
+    this.poller = null
     const child = this.child
     this.child = null
     this.current = next
