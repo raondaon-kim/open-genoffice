@@ -121,6 +121,12 @@ const homeApi: HomeApi = {
   async pickWorkWikiFolder() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.pickWorkWikiFolder)) as string | null
   },
+  async getOrgAiDefaults() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getOrgAiDefaults)) as {
+      baseUrl: string
+      model: string
+    } | null
+  },
   async getLlmWikiStatus() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getLlmWikiStatus)) as LlmWikiStatusView
   },

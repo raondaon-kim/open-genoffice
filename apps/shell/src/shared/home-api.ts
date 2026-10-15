@@ -379,6 +379,8 @@ export interface HomeApi {
   setAiSettings(settings: AiSettings): Promise<void>
   /** provider catalog with each fixed endpoint's default base URL (empty for genspark/custom) */
   getAiProviders(): AiCatalogEntry[]
+  /** the company build's LiteLLM address and model (null for a build without them) */
+  getOrgAiDefaults(): Promise<{ baseUrl: string; model: string } | null>
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
   /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
@@ -530,6 +532,7 @@ export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
   rerankSearch: 'home:rerank-search',
+  getOrgAiDefaults: 'home:get-org-ai-defaults',
   getFileSearchSettings: 'home:get-file-search-settings',
   setFileSearchSettings: 'home:set-file-search-settings',
   testFileSearchRerank: 'home:test-file-search-rerank',

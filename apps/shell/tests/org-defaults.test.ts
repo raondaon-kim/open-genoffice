@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   firstRunAiSettings,
   isUpstreamAiSettings,
+  orgDefaultsView,
   parseOrgDefaults,
   readOrgDefaults,
 } from '../src/main/org-defaults'
@@ -58,5 +59,20 @@ describe('organization AI defaults', () => {
     expect(firstRunAiSettings(fork, defaults)?.provider).toBe('litellm')
     // an unreadable file parses to null and is replaced too
     expect(firstRunAiSettings(null, defaults)?.provider).toBe('litellm')
+  })
+})
+
+describe('orgDefaultsView', () => {
+  it('shows the renderer the address and model only', () => {
+    expect(
+      orgDefaultsView({
+        provider: 'litellm',
+        baseUrl: 'http://proxy.test:4000/v1',
+        model: 'deepseek-flash',
+      }),
+    ).toEqual({ baseUrl: 'http://proxy.test:4000/v1', model: 'deepseek-flash' })
+  })
+  it('is null for a build without defaults', () => {
+    expect(orgDefaultsView(null)).toBeNull()
   })
 })

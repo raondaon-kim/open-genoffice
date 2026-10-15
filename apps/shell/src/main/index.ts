@@ -239,7 +239,7 @@ import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hw
 import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
-import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
+import { firstRunAiSettings, orgDefaultsView, readOrgDefaults } from './org-defaults'
 import {
   addWikiMaterialFromDialog,
   openLlmWiki,
@@ -392,10 +392,10 @@ if (!app.isPackaged)
 // its resources; an unpacked run can point OPEN_GENOFFICE_ORG_DEFAULTS at one. Only a first run
 // is seeded — existing AI settings are the user's. Settings left by the pre-upstream fork (a
 // format upstream cannot read) are kept as ai-settings.pre-upstream.json and replaced.
+const orgDefaultsPath = app.isPackaged
+  ? join(process.resourcesPath, 'org-defaults.json')
+  : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
 {
-  const orgDefaultsPath = app.isPackaged
-    ? join(process.resourcesPath, 'org-defaults.json')
-    : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
   const aiSettingsPath = join(app.getPath('userData'), 'ai-settings.json')
   let existing: unknown
   if (existsSync(aiSettingsPath)) {
@@ -5936,6 +5936,10 @@ installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
 registerWorkWikiIpc()
+// Settings reads the build's LiteLLM address and model (never a key) to prefill the LiteLLM card
+ipcMain.handle(HOME_CHANNELS.getOrgAiDefaults, () =>
+  orgDefaultsView(orgDefaultsPath ? readOrgDefaults(orgDefaultsPath) : null),
+)
 registerProjectIpc()
 registerDocsIpc()
 registerHomeIpc()
