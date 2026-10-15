@@ -26,6 +26,8 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  CodexLoginView,
+  CodexStatusView,
   LlmWikiStatusView,
   WorkWikiSettings,
 } from '../shared/home-api'
@@ -126,6 +128,18 @@ const homeApi: HomeApi = {
       baseUrl: string
       model: string
     } | null
+  },
+  async getCodexStatus(cliPath) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexStatus, cliPath)) as CodexStatusView
+  },
+  async startCodexLogin() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.startCodexLogin)) as CodexLoginView
+  },
+  async getCodexLogin() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexLogin)) as CodexLoginView
+  },
+  async cancelCodexLogin() {
+    await ipcRenderer.invoke(HOME_CHANNELS.cancelCodexLogin)
   },
   async getLlmWikiStatus() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getLlmWikiStatus)) as LlmWikiStatusView

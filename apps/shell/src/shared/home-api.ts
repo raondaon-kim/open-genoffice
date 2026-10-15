@@ -141,6 +141,20 @@ export interface WorkWikiSettings {
   exclude: string[]
 }
 
+/** Codex as Settings shows it: who is signed in, or why it cannot be used */
+export type CodexStatusView =
+  | { state: 'connected'; account: string; loginable: boolean }
+  | { state: 'needs-login'; loginable: boolean }
+  | { state: 'missing'; reason: string; loginable: boolean }
+  | { state: 'error'; reason: string; loginable: boolean }
+
+/** a browser sign-in to Codex: running, finished, failed (with why) or not started */
+export interface CodexLoginView {
+  state: 'idle' | 'waiting' | 'done' | 'failed'
+  url?: string
+  reason?: string
+}
+
 /** how the bundled LLM Wiki is doing (for Settings) */
 export interface LlmWikiStatusView {
   state: 'stopped' | 'starting' | 'running' | 'failed'
@@ -381,6 +395,12 @@ export interface HomeApi {
   getAiProviders(): AiCatalogEntry[]
   /** the company build's LiteLLM address and model (null for a build without them) */
   getOrgAiDefaults(): Promise<{ baseUrl: string; model: string } | null>
+  /** Codex: who is signed in (the bundled or configured executable) */
+  getCodexStatus(cliPath?: string): Promise<CodexStatusView>
+  /** start the browser sign-in (`codex login`); a running one is reused */
+  startCodexLogin(): Promise<CodexLoginView>
+  getCodexLogin(): Promise<CodexLoginView>
+  cancelCodexLogin(): Promise<void>
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
   /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
@@ -533,6 +553,10 @@ export const HOME_CHANNELS = {
   searchFiles: 'home:search-files',
   rerankSearch: 'home:rerank-search',
   getOrgAiDefaults: 'home:get-org-ai-defaults',
+  getCodexStatus: 'home:get-codex-status',
+  startCodexLogin: 'home:start-codex-login',
+  getCodexLogin: 'home:get-codex-login',
+  cancelCodexLogin: 'home:cancel-codex-login',
   getFileSearchSettings: 'home:get-file-search-settings',
   setFileSearchSettings: 'home:set-file-search-settings',
   testFileSearchRerank: 'home:test-file-search-rerank',

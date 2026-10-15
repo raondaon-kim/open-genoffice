@@ -240,6 +240,7 @@ import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
 import { firstRunAiSettings, orgDefaultsView, readOrgDefaults } from './org-defaults'
+import { registerCodexIpc, stopCodexLoginForQuit } from './codex-connection'
 import {
   addWikiMaterialFromDialog,
   openLlmWiki,
@@ -5936,6 +5937,7 @@ installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
 registerWorkWikiIpc()
+registerCodexIpc()
 // Settings reads the build's LiteLLM address and model (never a key) to prefill the LiteLLM card
 ipcMain.handle(HOME_CHANNELS.getOrgAiDefaults, () =>
   orgDefaultsView(orgDefaultsPath ? readOrgDefaults(orgDefaultsPath) : null),
@@ -6263,6 +6265,7 @@ app.on('window-all-closed', () => {
 let quittingAfterWikiStop = false
 app.on('before-quit', (event) => {
   if (!quittingAfterWikiStop) {
+    stopCodexLoginForQuit()
     event.preventDefault()
     quittingAfterWikiStop = true
     void stopWorkWikiForQuit().finally(() => app.quit())
