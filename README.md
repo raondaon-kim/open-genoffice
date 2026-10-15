@@ -3,7 +3,9 @@
 > (`.hwp`/`.hwpx`) module** built on rhwp, an organization's **document-style
 > wiki** that the Hangul, Word and PowerPoint assistants read before writing a new
 > document, a **LiteLLM provider** with build-time organization defaults, and its
-> own app identity. See [MODIFICATIONS.md](MODIFICATIONS.md) for the list and
+> own app identity. The work wiki ships a bundled, modified
+> [LLM Wiki](https://github.com/nashsu/llm_wiki) (GPL-3.0) that learns the material the user
+> adds. See [MODIFICATIONS.md](MODIFICATIONS.md) for the list and
 > [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md); the upstream README follows unchanged.
 >
 > Company build (Windows): set `OPEN_GENOFFICE_LITELLM_URL=<proxy>/v1`,

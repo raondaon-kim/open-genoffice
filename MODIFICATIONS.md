@@ -47,8 +47,14 @@ The fork's material changes on top of upstream:
   - **What is kept:** every saved Hangul, Word and PowerPoint document, files dropped into
     `raw/sources/`, and durable points from chat are learned into a small wiki of works (업무),
     working methods (작업 방식) and clients (기관).
-  - **Folder:** the LLM Wiki folder format, `Documents\GenOffice 업무위키` by default. It follows
-    the LLM Wiki pattern only; no LLM Wiki code is used.
+  - **Folder:** the LLM Wiki folder format, `Documents\GenOffice 업무위키` by default. Our pages
+    live in `wiki/work`, `wiki/methods` and `wiki/clients`; LLM Wiki owns the rest.
+  - **Bundled LLM Wiki:** the Windows installer carries a modified [LLM Wiki](https://github.com/nashsu/llm_wiki)
+    (GPL-3.0) as a separate program in `resources/llm-wiki/`, with its license and the exact
+    source location. It runs hidden while GenOffice runs, learns the files the user adds
+    (File menu or Home: add material), and stops when GenOffice quits. Its settings are seeded
+    from GenOffice's AI settings. The assistants search both wikis through one `wiki_search`
+    (pages are named by path, e.g. `work/koica-health`, `entities/koica`).
   - **How it learns:**
     - The first save sends an outline digest; later saves send only the changed paragraphs.
     - A plan call and 1–3 merge calls (thinking off) keep the pages under their caps.

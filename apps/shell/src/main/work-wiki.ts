@@ -169,7 +169,8 @@ async function startLlmWiki(): Promise<void> {
       fetch: realFetch,
       pickPorts: pickFreePorts,
       stale: pidFileStore(join(paths!.userData, 'llm-wiki.pid')),
-      extraEnv: { PDFIUM_DYNAMIC_LIB_PATH: join(dirname(exe), 'pdfium') },
+      // the fork binds pdfium to this file path (not a folder)
+      extraEnv: { PDFIUM_DYNAMIC_LIB_PATH: join(dirname(exe), 'pdfium', 'pdfium.dll') },
       log: (m) => console.warn(`[work-wiki] ${m}`),
     })
     llmWiki = proc

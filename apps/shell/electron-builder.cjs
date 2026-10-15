@@ -114,6 +114,16 @@ const winSidecarTarget =
   (winArm64 ? 'aarch64-pc-windows-msvc' : 'x86_64-pc-windows-gnu')
 const WIN_SIDECAR = `../sheets/native/xlsx-engine/target/${winSidecarTarget}/release/xlsx-sidecar.exe`
 
+// the Windows x64 installer must carry LLM Wiki (run `npm run fetch:llm-wiki` first)
+function assertLlmWikiStaged() {
+  const exe = join(__dirname, 'build/llm-wiki/llm-wiki.exe')
+  if (!existsSync(exe)) {
+    throw new Error(
+      'LLM Wiki is not staged: run npm run fetch:llm-wiki (build/llm-wiki/llm-wiki.exe)',
+    )
+  }
+}
+
 function assertExtraResourceSources() {
   for (const rel of [
     '../../node_modules/@genspark/cli',
@@ -625,6 +635,12 @@ const config = {
         to: 'shell-new',
         filter: ['*.docx', '*.xlsx', '*.pptx'],
       },
+      // LLM Wiki (GPL-3.0), a separate program the work wiki runs hidden (tools/fetch-llm-wiki.mjs)
+      {
+        from: 'build/llm-wiki',
+        to: 'llm-wiki',
+        filter: ['llm-wiki.exe', 'pdfium/**', 'scripts/**', 'LICENSE', 'SOURCE.txt'],
+      },
     ],
   },
   // Unlike win (which cross-compiles the sidecar to an explicit target
@@ -726,6 +742,7 @@ const config = {
   beforePack: async (context) => {
     ensurePlatformHelpers()
     assertExtraResourceSources()
+    if (context.electronPlatformName === 'win32' && !winArm64) assertLlmWikiStaged()
     ensureThirdPartyNotices()
     assertModuleTreesPresent()
     ensureCliBundleCarriesAppVersion()

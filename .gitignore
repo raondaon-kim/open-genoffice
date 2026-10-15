@@ -48,3 +48,4 @@ _scratch-*
 /apps/hwp/native/
 /scripts/drivers/probe-*.mjs
 /apps/shell/build/org-defaults.json
+/apps/shell/build/llm-wiki/
