@@ -1,0 +1,7 @@
+{
+  "package": "@openai/codex",
+  "version": "0.162.1-win32-x64",
+  "integrity": "sha512-dfl4MhHuEi0ARKyNmrTxk+RQmsWNCQAoVLUtrYq+yrW1C8P2sg5ziwgHUUACHjYLKuACV7ARH5Nq5pnCz3GlaQ==",
+  "tarball": "https://registry.npmjs.org/@openai/codex/-/codex-0.162.1-win32-x64.tgz",
+  "licenseUrl": "https://raw.githubusercontent.com/openai/codex/rust-v0.162.1/LICENSE"
+}

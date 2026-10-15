@@ -37,11 +37,12 @@
     "notices": "node tools/gen-third-party-notices.mjs",
     "licenses": "node tools/check-licenses.mjs",
     "dist:mac": "npm run notices && npm run build:all && npm run native:build:universal -w @genoffice/sheets && npm run dist:mac -w @genoffice/shell",
-    "dist:win": "npm run fetch:llm-wiki && npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell",
+    "dist:win": "npm run fetch:llm-wiki && npm run fetch:codex-cli && npm run notices && npm run build:all && npm run dist:win -w @genoffice/shell",
     "dist:linux": "npm run notices && npm run build:all && npm run dist:linux -w @genoffice/shell",
     "build:hwp-studio": "node tools/build-hwp-studio.mjs",
     "fetch:rhwp-cli": "node tools/fetch-rhwp-cli.mjs",
-    "fetch:llm-wiki": "node tools/fetch-llm-wiki.mjs"
+    "fetch:llm-wiki": "node tools/fetch-llm-wiki.mjs",
+    "fetch:codex-cli": "node tools/fetch-codex-cli.mjs"
   },
   "dependencies": {
     "ws": "^8.21.1"
