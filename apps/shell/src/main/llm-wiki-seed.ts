@@ -31,7 +31,8 @@ export function llmWikiLlmFromAiSettings(
   if (!config.model) return { ok: false, reason: 'no model is set' }
   const base = {
     apiKey: config.apiKey,
-    model: config.model,
+    // the id the vendor serves (e.g. deepseek-flash), not GenOffice's display spelling
+    model: endpoint.model ?? config.model,
     ollamaUrl: 'http://localhost:11434',
     maxContextSize: MAX_CONTEXT,
   }

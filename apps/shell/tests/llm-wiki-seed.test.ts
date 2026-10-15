@@ -25,7 +25,7 @@ describe('llmWikiLlmFromAiSettings', () => {
       llm: {
         provider: 'custom',
         apiKey: 'k',
-        model: 'deep-seek-v4.1-flash',
+        model: 'deepseek-flash', // the wire id, not GenOffice's display spelling
         customEndpoint: base,
         apiMode: 'chat_completions',
       },
