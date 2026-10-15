@@ -37,6 +37,11 @@ describe('desiredSignature', () => {
     expect(desiredSignature(llm, 'D:/other')).not.toBe(base)
     expect(desiredSignature(null, 'D:/wiki')).not.toBe(base)
   })
+  it('changes when the bridge address changes', () => {
+    const a = { ...llm, customEndpoint: 'http://127.0.0.1:51001/v1' }
+    const b = { ...llm, customEndpoint: 'http://127.0.0.1:51002/v1' }
+    expect(desiredSignature(a, 'D:/wiki')).not.toBe(desiredSignature(b, 'D:/wiki'))
+  })
   it('does not contain the API key in clear text', () => {
     expect(desiredSignature(llm, 'D:/wiki')).not.toContain('sk-secret-123')
   })

@@ -55,6 +55,30 @@ describe('llmWikiLlmFromAiSettings', () => {
     ).toMatchObject({ ok: true, llm: { provider: 'google' } })
   })
 
+  it('lets Codex through a local bridge as a custom endpoint', () => {
+    const bridge = { baseUrl: 'http://127.0.0.1:51234/v1', token: 'tok', model: 'gpt-test' }
+    expect(
+      llmWikiLlmFromAiSettings(settings('codex', { apiKey: '', model: '' }), bridge),
+    ).toMatchObject({
+      ok: true,
+      llm: {
+        provider: 'custom',
+        apiKey: 'tok',
+        model: 'gpt-test',
+        customEndpoint: 'http://127.0.0.1:51234/v1',
+        apiMode: 'chat_completions',
+      },
+    })
+    // the model the user picked wins over the bridge's placeholder
+    expect(
+      llmWikiLlmFromAiSettings(settings('codex', { apiKey: '', model: 'gpt-picked' }), bridge),
+    ).toMatchObject({ ok: true, llm: { model: 'gpt-picked' } })
+    // without a bridge Codex is still refused
+    expect(llmWikiLlmFromAiSettings(settings('codex', { apiKey: '', model: 'x' }))).toMatchObject({
+      ok: false,
+    })
+  })
+
   it('refuses what LLM Wiki cannot use: the Codex bridge, a missing key or model', () => {
     expect(llmWikiLlmFromAiSettings(settings('codex', { apiKey: '', model: 'x' }))).toMatchObject({
       ok: false,

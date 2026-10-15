@@ -12,6 +12,7 @@ import { WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { addMaterial } from './add-material'
+import { CodexBridge } from './codex-bridge'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import {
   desiredSignature,
@@ -30,6 +31,7 @@ import {
   seedAppState,
   writeAppState,
 } from './llm-wiki-seed'
+import type { CodexBridgeEndpoint } from './llm-wiki-seed'
 import { normalizeWorkWikiSettings } from './work-wiki-settings'
 import type { WorkWikiSettings } from './work-wiki-settings'
 
@@ -128,6 +130,42 @@ export async function openLlmWiki(): Promise<boolean> {
   return (await llmWiki?.show()) ?? false
 }
 
+let codexBridge: CodexBridge | null = null
+let codexBridgeEndpoint: CodexBridgeEndpoint | null = null
+
+/** the adapter that lets LLM Wiki use Codex; it runs only while the provider is Codex */
+async function ensureCodexBridge(aiPath: string): Promise<CodexBridgeEndpoint | null> {
+  if (readAiSettingsFile(aiPath).provider !== 'codex') {
+    await stopCodexBridge()
+    return null
+  }
+  if (!codexBridge) {
+    const bridge = new CodexBridge({
+      model: () => readAiSettingsFile(aiPath).providers.codex?.model || 'codex',
+      complete: async ({ system, messages, maxTokens, signal, onDelta }) => {
+        const config = readAiSettingsFile(aiPath).providers.codex
+        if (!config) throw new Error('Codex is not configured')
+        await streamForProvider('codex', config, system, messages, [], maxTokens, {
+          signal,
+          onDelta,
+          onToolCall: () => {},
+        })
+      },
+    })
+    const { baseUrl, token } = await bridge.start()
+    codexBridge = bridge
+    codexBridgeEndpoint = { baseUrl, token, model: 'codex' }
+  }
+  return codexBridgeEndpoint
+}
+
+async function stopCodexBridge(): Promise<void> {
+  const bridge = codexBridge
+  codexBridge = null
+  codexBridgeEndpoint = null
+  await bridge?.stop()
+}
+
 /** (re)start LLM Wiki for the current settings; every failure becomes a status, never an exception */
 async function startLlmWiki(): Promise<void> {
   await llmWiki?.stopAndWait()
@@ -136,15 +174,20 @@ async function startLlmWiki(): Promise<void> {
   if (driftTimer) clearInterval(driftTimer)
   driftTimer = null
   const s = readWorkWikiSettings()
-  if (!s.enabled || process.platform !== 'win32') return
+  if (!s.enabled || process.platform !== 'win32') {
+    await stopCodexBridge()
+    return
+  }
   const exe = llmWikiExePath(process.resourcesPath, devLlmWikiDir())
   if (!exe) {
+    await stopCodexBridge()
     llmWikiReason = 'LLM Wiki is not installed'
     return
   }
   try {
     const aiPath = join(paths!.userData, 'ai-settings.json')
-    const ai = llmWikiLlmFromAiSettings(readAiSettingsFile(aiPath))
+    const bridge = await ensureCodexBridge(aiPath)
+    const ai = llmWikiLlmFromAiSettings(readAiSettingsFile(aiPath), bridge ?? undefined)
     const llm = ai.ok ? ai.llm : null
     if (!ai.ok) llmWikiReason = ai.reason
     const projectId = ensureProjectId(s.folder)
@@ -178,7 +221,13 @@ async function startLlmWiki(): Promise<void> {
     await proc.start()
     // a changed model, key or folder in GenOffice restarts it with the new settings
     driftTimer = setInterval(() => {
-      const next = llmWikiLlmFromAiSettings(readAiSettingsFile(aiPath))
+      // a switch to or away from Codex starts or stops the adapter on the next start
+      const nextSettings = readAiSettingsFile(aiPath)
+      const nextBridge =
+        nextSettings.provider === 'codex'
+          ? (codexBridgeEndpoint ?? { baseUrl: 'pending', token: '', model: 'codex' })
+          : undefined
+      const next = llmWikiLlmFromAiSettings(nextSettings, nextBridge)
       if (
         desiredSignature(next.ok ? next.llm : null, readWorkWikiSettings().folder) !==
         llmWikiSignature
@@ -198,7 +247,7 @@ export async function stopWorkWikiForQuit(): Promise<void> {
   const old = engine
   engine = null
   await Promise.race([
-    Promise.all([old?.stopAndWait(), llmWiki?.stopAndWait()]),
+    Promise.all([old?.stopAndWait(), llmWiki?.stopAndWait(), stopCodexBridge()]),
     new Promise((r) => setTimeout(r, 4000)),
   ])
 }

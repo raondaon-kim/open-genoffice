@@ -17,15 +17,36 @@ export interface LlmWikiLlm {
 const MAX_CONTEXT = 64000
 
 /** GenOffice's AI settings as LLM Wiki's llmConfig, or why it cannot use them */
+/** the local adapter that lets LLM Wiki reach Codex (apps/shell/src/main/codex-bridge.ts) */
+export interface CodexBridgeEndpoint {
+  baseUrl: string
+  token: string
+  /** the id reported when the user has not picked a Codex model */
+  model: string
+}
+
 export function llmWikiLlmFromAiSettings(
   settings: AiSettings,
+  bridge?: CodexBridgeEndpoint,
 ): { ok: true; llm: LlmWikiLlm } | { ok: false; reason: string } {
   const provider = settings.provider
   const config = settings.providers?.[provider]
   if (!config) return { ok: false, reason: 'no AI provider is configured' }
   const endpoint = getProviderAdapter(provider).resolveEndpoint(config)
   if (endpoint.protocol === 'codex-app-server') {
-    return { ok: false, reason: 'the Codex bridge cannot be used by LLM Wiki' }
+    if (!bridge) return { ok: false, reason: 'the Codex bridge is not running' }
+    return {
+      ok: true,
+      llm: {
+        provider: 'custom',
+        apiKey: bridge.token,
+        model: config.model || bridge.model,
+        customEndpoint: bridge.baseUrl,
+        ollamaUrl: 'http://localhost:11434',
+        maxContextSize: MAX_CONTEXT,
+        apiMode: 'chat_completions',
+      },
+    }
   }
   if (!config.apiKey) return { ok: false, reason: 'no API key is set' }
   if (!config.model) return { ok: false, reason: 'no model is set' }
