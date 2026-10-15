@@ -26,6 +26,7 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  LlmWikiStatusView,
   WorkWikiSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
@@ -119,6 +120,12 @@ const homeApi: HomeApi = {
   },
   async pickWorkWikiFolder() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.pickWorkWikiFolder)) as string | null
+  },
+  async getLlmWikiStatus() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getLlmWikiStatus)) as LlmWikiStatusView
+  },
+  async openLlmWiki() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.openLlmWiki)) === true
   },
   async getFileSearchSettings() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings

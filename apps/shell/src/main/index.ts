@@ -240,7 +240,12 @@ import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
 import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
-import { registerWorkWikiIpc, startWorkWiki, workWikiDocumentSaved } from './work-wiki'
+import {
+  registerWorkWikiIpc,
+  startWorkWiki,
+  stopWorkWikiForQuit,
+  workWikiDocumentSaved,
+} from './work-wiki'
 import {
   configureHtmlRuntime,
   exportHtmlHeadless,
@@ -6194,7 +6199,15 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+// the work wiki engine and LLM Wiki stop first (bounded), then the normal shutdown runs
+let quittingAfterWikiStop = false
+app.on('before-quit', (event) => {
+  if (!quittingAfterWikiStop) {
+    event.preventDefault()
+    quittingAfterWikiStop = true
+    void stopWorkWikiForQuit().finally(() => app.quit())
+    return
+  }
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
-import { join, resolve } from 'node:path'
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { mkdirSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { streamForProvider } from '@genoffice/ai-provider'
 import { readAiSettingsFile } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
@@ -9,14 +10,37 @@ import { WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { readAppSettings, writeAppSetting } from './app-settings'
+import {
+  desiredSignature,
+  llmWikiExePath,
+  pickFreePorts,
+  pidFileStore,
+  realFetch,
+  realSpawn,
+} from './llm-wiki'
+import { LlmWikiProcess } from './llm-wiki-process'
+import type { LlmWikiStatus } from './llm-wiki-process'
+import {
+  ensureProjectId,
+  llmWikiLlmFromAiSettings,
+  readAppState,
+  seedAppState,
+  writeAppState,
+} from './llm-wiki-seed'
 import { normalizeWorkWikiSettings } from './work-wiki-settings'
 import type { WorkWikiSettings } from './work-wiki-settings'
 
 const LEARN_TIMEOUT_MS = 180_000
 const LEARN_MAX_TOKENS = 8192
+const LLM_WIKI_IDENTIFIER = 'com.opengenoffice.llmwiki'
+const DRIFT_CHECK_MS = 30_000
 
 let engine: WorkWikiEngine | null = null
 let paths: { userData: string; documents: string; appSettingsPath: string } | null = null
+let llmWiki: LlmWikiProcess | null = null
+let llmWikiSignature = ''
+let driftTimer: ReturnType<typeof setInterval> | null = null
+let llmWikiReason: string | null = null
 
 const defaultFolder = () => join(paths!.documents, 'GenOffice 업무위키')
 
@@ -81,13 +105,110 @@ function stateDirFor(root: string): string {
   return join(paths!.userData, 'work-wiki', key)
 }
 
+const llmWikiDataDir = () => join(app.getPath('appData'), LLM_WIKI_IDENTIFIER)
+const devLlmWikiDir = () => join(app.getAppPath(), 'build')
+const WEBVIEW2_HINT =
+  'LLM Wiki did not start; check that the Microsoft Edge WebView2 runtime is installed'
+
+/** status for Settings: whether this install ships it, and how it is doing */
+export function llmWikiStatus(): LlmWikiStatus & { available: boolean } {
+  const available = llmWikiExePath(process.resourcesPath, devLlmWikiDir()) !== null
+  const status: LlmWikiStatus = llmWiki
+    ? llmWiki.status()
+    : { state: 'stopped', ...(llmWikiReason ? { reason: llmWikiReason } : {}) }
+  // a program that never answers is most often missing its WebView2 runtime
+  const reason = status.reason === 'health check timed out' ? WEBVIEW2_HINT : status.reason
+  return { state: status.state, ...(reason ? { reason } : {}), available }
+}
+
+export async function openLlmWiki(): Promise<boolean> {
+  return (await llmWiki?.show()) ?? false
+}
+
+/** (re)start LLM Wiki for the current settings; every failure becomes a status, never an exception */
+async function startLlmWiki(): Promise<void> {
+  await llmWiki?.stopAndWait()
+  llmWiki = null
+  llmWikiReason = null
+  if (driftTimer) clearInterval(driftTimer)
+  driftTimer = null
+  const s = readWorkWikiSettings()
+  if (!s.enabled || process.platform !== 'win32') return
+  const exe = llmWikiExePath(process.resourcesPath, devLlmWikiDir())
+  if (!exe) {
+    llmWikiReason = 'LLM Wiki is not installed'
+    return
+  }
+  try {
+    const aiPath = join(paths!.userData, 'ai-settings.json')
+    const ai = llmWikiLlmFromAiSettings(readAiSettingsFile(aiPath))
+    const llm = ai.ok ? ai.llm : null
+    if (!ai.ok) llmWikiReason = ai.reason
+    const projectId = ensureProjectId(s.folder)
+    // LLM Wiki watches this folder; it must exist (the engine itself never creates it)
+    mkdirSync(join(s.folder, 'raw', 'sources'), { recursive: true })
+    const dir = llmWikiDataDir()
+    // its settings are written only now, while it is not running
+    writeAppState(
+      dir,
+      seedAppState(readAppState(dir), {
+        projectId,
+        wikiRoot: s.folder,
+        projectName: '업무 위키',
+        llm,
+        now: Date.now(),
+      }),
+    )
+    const proc = new LlmWikiProcess({
+      exePath: exe,
+      projectId,
+      spawn: realSpawn,
+      fetch: realFetch,
+      pickPorts: pickFreePorts,
+      stale: pidFileStore(join(paths!.userData, 'llm-wiki.pid')),
+      extraEnv: { PDFIUM_DYNAMIC_LIB_PATH: join(dirname(exe), 'pdfium') },
+      log: (m) => console.warn(`[work-wiki] ${m}`),
+    })
+    llmWiki = proc
+    llmWikiSignature = desiredSignature(llm, s.folder)
+    await proc.start()
+    // a changed model, key or folder in GenOffice restarts it with the new settings
+    driftTimer = setInterval(() => {
+      const next = llmWikiLlmFromAiSettings(readAiSettingsFile(aiPath))
+      if (
+        desiredSignature(next.ok ? next.llm : null, readWorkWikiSettings().folder) !==
+        llmWikiSignature
+      )
+        void startLlmWiki()
+    }, DRIFT_CHECK_MS)
+    driftTimer.unref()
+  } catch (err) {
+    llmWikiReason = err instanceof Error ? err.message : String(err)
+  }
+}
+
+/** engine and LLM Wiki stop together; bounded so quitting is never held up */
+export async function stopWorkWikiForQuit(): Promise<void> {
+  if (driftTimer) clearInterval(driftTimer)
+  driftTimer = null
+  const old = engine
+  engine = null
+  await Promise.race([
+    Promise.all([old?.stopAndWait(), llmWiki?.stopAndWait()]),
+    new Promise((r) => setTimeout(r, 4000)),
+  ])
+}
+
 /** settings changed: the old engine finishes its running job before the next one starts */
 async function restart(): Promise<void> {
   const old = engine
   engine = null
   await old?.stopAndWait()
   const s = readWorkWikiSettings()
-  if (!s.enabled) return
+  if (!s.enabled) {
+    void startLlmWiki() // stops it; returns early because the wiki is off
+    return
+  }
   const debounce = Number(process.env.GENOFFICE_WORK_WIKI_DEBOUNCE_MS)
   const next = new WorkWikiEngine({
     root: s.folder,
@@ -95,10 +216,12 @@ async function restart(): Promise<void> {
     exclude: s.exclude,
     complete: createWikiComplete(join(paths!.userData, 'ai-settings.json')),
     extractText,
+    extraSearch: (q) => llmWiki?.search(q) ?? Promise.resolve([]),
     ...(debounce > 0 ? { debounceMs: debounce } : {}),
     log: (m) => console.warn(`[work-wiki] ${m}`),
   })
   if (next.start()) engine = next
+  void startLlmWiki()
 }
 
 export function startWorkWiki(opts: {
@@ -136,6 +259,8 @@ export function registerWorkWikiIpc(): void {
     void engine.runDue()
     return r
   })
+  ipcMain.handle(HOME_CHANNELS.getLlmWikiStatus, () => llmWikiStatus())
+  ipcMain.handle(HOME_CHANNELS.openLlmWiki, () => openLlmWiki())
   ipcMain.handle(HOME_CHANNELS.getWorkWikiSettings, () => readWorkWikiSettings())
   ipcMain.handle(HOME_CHANNELS.setWorkWikiSettings, async (_e, patch: unknown) => {
     const next = normalizeWorkWikiSettings(

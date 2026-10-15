@@ -5,7 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HomeApi, WorkWikiSettings } from '../src/shared/home-api'
+import type { HomeApi, LlmWikiStatusView, WorkWikiSettings } from '../src/shared/home-api'
 import { WorkWikiSettingsBlock } from '../src/renderer/src/WorkWikiSettings'
 
 const actEnvironment = globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -25,13 +25,19 @@ afterEach(() => {
 
 const t = ((key: string) => key) as never
 
-async function render(initial: WorkWikiSettings, picked: string | null) {
+async function render(
+  initial: WorkWikiSettings,
+  picked: string | null,
+  llmStatus?: LlmWikiStatusView,
+) {
   let current = initial
   const set = vi.fn(async (patch: Partial<WorkWikiSettings>) => {
     current = { ...current, ...patch }
     return current
   })
+  const openLlmWiki = vi.fn(async () => true)
   window.aiOffice = {
+    ...(llmStatus ? { getLlmWikiStatus: async () => llmStatus, openLlmWiki } : {}),
     getWorkWikiSettings: async () => current,
     setWorkWikiSettings: set,
     pickWorkWikiFolder: async () => picked,
@@ -43,7 +49,7 @@ async function render(initial: WorkWikiSettings, picked: string | null) {
   await act(async () => {
     await Promise.resolve()
   })
-  return set
+  return Object.assign(set, { openLlmWiki })
 }
 
 const button = (label: string) =>
@@ -70,5 +76,37 @@ describe('work wiki settings block', () => {
       await Promise.resolve()
     })
     expect(set).toHaveBeenCalledWith({ exclude: [] })
+  })
+
+  it('shows why LLM Wiki is not running and keeps its open button off', async () => {
+    await render({ enabled: true, folder: 'D:/wiki', exclude: [] }, null, {
+      state: 'failed',
+      reason: 'x',
+      available: true,
+    })
+    expect(host.textContent).toContain('setLlmWikiFailed')
+    expect(button('setLlmWikiOpen')!.disabled).toBe(true)
+  })
+
+  it('opens LLM Wiki from the button when it is running', async () => {
+    const set = await render({ enabled: true, folder: 'D:/wiki', exclude: [] }, null, {
+      state: 'running',
+      available: true,
+    })
+    expect(host.textContent).toContain('setLlmWikiRunning')
+    expect(button('setLlmWikiOpen')!.disabled).toBe(false)
+    await act(async () => {
+      button('setLlmWikiOpen')!.click()
+      await Promise.resolve()
+    })
+    expect(set.openLlmWiki).toHaveBeenCalled()
+  })
+
+  it('says so when this install does not include LLM Wiki', async () => {
+    await render({ enabled: true, folder: 'D:/wiki', exclude: [] }, null, {
+      state: 'stopped',
+      available: false,
+    })
+    expect(host.textContent).toContain('setLlmWikiMissing')
   })
 })

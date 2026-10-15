@@ -141,6 +141,14 @@ export interface WorkWikiSettings {
   exclude: string[]
 }
 
+/** how the bundled LLM Wiki is doing (for Settings) */
+export interface LlmWikiStatusView {
+  state: 'stopped' | 'starting' | 'running' | 'failed'
+  reason?: string
+  /** this install ships LLM Wiki */
+  available: boolean
+}
+
 /** home search options persisted in app-settings.json under `fileSearch` */
 export interface FileSearchSettings {
   /** send the top local hits to a decision model for reranking; default off */
@@ -204,6 +212,10 @@ export interface HomeApi {
   setWorkWikiSettings(patch: Partial<WorkWikiSettings>): Promise<WorkWikiSettings>
   /** folder picker for the work wiki; null when canceled */
   pickWorkWikiFolder(): Promise<string | null>
+  /** the bundled LLM Wiki: state and whether this install has it */
+  getLlmWikiStatus(): Promise<LlmWikiStatusView>
+  /** bring the LLM Wiki window forward; false when it is not running */
+  openLlmWiki(): Promise<boolean>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -522,6 +534,8 @@ export const HOME_CHANNELS = {
   getWorkWikiSettings: 'home:get-work-wiki-settings',
   setWorkWikiSettings: 'home:set-work-wiki-settings',
   pickWorkWikiFolder: 'home:pick-work-wiki-folder',
+  getLlmWikiStatus: 'home:get-llm-wiki-status',
+  openLlmWiki: 'home:open-llm-wiki',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',

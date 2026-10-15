@@ -1,6 +1,54 @@
 import { useEffect, useState } from 'react'
-import type { WorkWikiSettings } from '../../shared/home-api'
+import type { LlmWikiStatusView, WorkWikiSettings } from '../../shared/home-api'
 import type { TFunc } from './locale'
+
+const STATUS_POLL_MS = 5000
+
+/** how the bundled LLM Wiki is doing, with a button to open its window */
+function LlmWikiRow({ t }: { t: TFunc }) {
+  const [status, setStatus] = useState<LlmWikiStatusView | null>(null)
+  useEffect(() => {
+    let alive = true
+    const poll = () => {
+      void window.aiOffice.getLlmWikiStatus?.().then((v) => {
+        if (alive && v) setStatus(v)
+      })
+    }
+    poll()
+    const timer = setInterval(poll, STATUS_POLL_MS)
+    return () => {
+      alive = false
+      clearInterval(timer)
+    }
+  }, [])
+  if (!status) return null
+  const text = !status.available
+    ? t('setLlmWikiMissing')
+    : status.state === 'running'
+      ? t('setLlmWikiRunning')
+      : status.state === 'starting'
+        ? t('setLlmWikiStarting')
+        : status.state === 'failed'
+          ? t('setLlmWikiFailed', { reason: status.reason ?? '' })
+          : t('setLlmWikiStopped')
+  return (
+    <div className="set-field">
+      <div className="set-field-text">
+        <div className="set-field-stack">
+          <div className="set-field-label">{t('setLlmWiki')}</div>
+          <div className="set-field-desc">{text}</div>
+        </div>
+      </div>
+      <button
+        className="set-btn"
+        disabled={status.state !== 'running'}
+        onClick={() => void window.aiOffice.openLlmWiki?.()}
+      >
+        {t('setLlmWikiOpen')}
+      </button>
+    </div>
+  )
+}
 
 /** Settings → AI media: switch the work wiki on/off and choose its folder */
 export function WorkWikiSettingsBlock({ t }: { t: TFunc }) {
@@ -55,6 +103,7 @@ export function WorkWikiSettingsBlock({ t }: { t: TFunc }) {
           </button>
         </div>
       )}
+      {settings.enabled && <LlmWikiRow t={t} />}
       {settings.enabled && (
         <div className="set-field">
           <div className="set-field-text">
