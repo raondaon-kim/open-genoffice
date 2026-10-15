@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetOutputCaps } from '../src/output-cap'
 import { streamForProvider } from '../src/stream'
+import type { AiProviderId } from '../src/types'
 import { okResponse, sseStream } from './test-utils'
 
 beforeEach(() => resetOutputCaps())
@@ -16,7 +17,7 @@ describe('streamForProvider: per-request thinking off', () => {
     onToolCall: () => {},
   })
   const sentBody = async (
-    provider: string,
+    provider: AiProviderId,
     model: string,
     thinking?: 'off',
     baseUrl?: string,
