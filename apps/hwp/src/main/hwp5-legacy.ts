@@ -44,6 +44,80 @@ export function legacyHangulHwp(bytes: Uint8Array): Uint8Array {
   return new Uint8Array(out.buffer, out.byteOffset, out.byteLength)
 }
 
+/**
+ * The re-packed file with a check on it: it is used only when it passes `check` (default
+ * isLegacyReadable) and the bytes rhwp wrote come back otherwise, so the re-packing can never
+ * leave the user with a file worse than the one rhwp produced.
+ */
+export function legacyHangulHwpChecked(
+  bytes: Uint8Array,
+  check: (repacked: Uint8Array) => boolean = isLegacyReadable,
+): { bytes: Uint8Array; repacked: boolean } {
+  try {
+    const repacked = legacyHangulHwp(bytes)
+    if (repacked !== bytes && check(repacked)) return { bytes: repacked, repacked: true }
+  } catch {
+    // fall through to the bytes as rhwp wrote them
+  }
+  return { bytes, repacked: false }
+}
+
+const HWP_SIGNATURE = 'HWP Document File'
+
+/** how a compressed stream ends: Hangul's CRC32 + size trailer, no trailer, or not deflate at all */
+function trailerState(raw: Buffer): 'ok' | 'missing' | 'mismatch' | 'not-deflate' {
+  let plain: Buffer
+  let used: number
+  try {
+    const r = inflateRawSync(raw, { info: true }) as unknown as {
+      buffer: Buffer
+      engine: { bytesWritten: number }
+    }
+    plain = r.buffer
+    used = r.engine.bytesWritten
+  } catch {
+    return 'not-deflate'
+  }
+  if (used + 8 !== raw.length) return 'missing'
+  const crc = raw.readUInt32LE(used)
+  const size = raw.readUInt32LE(used + 4)
+  return crc === crc32(plain) && size === plain.length >>> 0 ? 'ok' : 'mismatch'
+}
+
+/**
+ * True when older Hangul can read the file the way Hangul 2005 does: an HWP5 compound file with
+ * the document header, the document and first section streams, and (in a compressed document)
+ * every packed stream deflates cleanly and ends in a matching CRC32 + size trailer. A picture
+ * stored without compression in BinData is fine; a body stream that is not deflate is not.
+ */
+export function isLegacyReadable(bytes: Uint8Array): boolean {
+  if (!isCompoundFile(bytes)) return false
+  try {
+    const cfb = CFB.read(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength), {
+      type: 'buffer',
+    })
+    const header = CFB.find(cfb, 'FileHeader')
+    if (!header?.content || header.content.length < 40) return false
+    const head = Buffer.from(header.content as Uint8Array)
+    if (head.toString('latin1', 0, HWP_SIGNATURE.length) !== HWP_SIGNATURE) return false
+    if (!CFB.find(cfb, 'DocInfo') || !CFB.find(cfb, '/BodyText/Section0')) return false
+    if ((head.readUInt32LE(36) & 1) !== 1) return true
+    let ok = true
+    cfb.FileIndex.forEach((entry, i) => {
+      if (!ok || entry.type !== STREAM || !entry.content) return
+      const path = cfb.FullPaths[i]!.replace(/^Root Entry\//, '')
+      if (!PACKED_STREAM.test(path)) return
+      const state = trailerState(Buffer.from(entry.content as Uint8Array))
+      if (state === 'ok') return
+      if (state === 'not-deflate' && path.startsWith('BinData/')) return
+      ok = false
+    })
+    return ok
+  } catch {
+    return false
+  }
+}
+
 const FREE_SECTOR = 0xffffffff
 const DIFAT_SECTOR_END = 0xfffffffe
 

@@ -25,6 +25,10 @@ The fork's material changes on top of upstream:
   written so Hangul 2005 opens it too (compressed streams re-packed with a 4 KB
   window and Hangul's CRC32/size trailer, `apps/hwp/src/main/hwp5-legacy.ts`),
   while `.hwpx` needs Hangul 2010 or later.
+  A save keeps the user's original as `<name>.bak` before the app's first overwrite of an
+  existing file in a session, refuses bytes that are not the format the file name says, and
+  checks the Hangul 2005 re-pack (compound file, deflate streams, CRC32 + size trailers) before
+  writing it, falling back to the bytes rhwp wrote if it does not check out.
 - **Document-style wiki** (`packages/doc-styles`, pages in
   `apps/hwp/resources/doc-styles`, packaged as `modules/hwp-doc-styles`):
   markdown pages with measured role values for Hangul, Word and PowerPoint

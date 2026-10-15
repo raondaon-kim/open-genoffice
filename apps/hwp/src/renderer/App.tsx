@@ -212,7 +212,11 @@ export function App() {
         setDirty(false)
         window.hwpApi?.setDirty(false)
         if (aiPath !== path) setAiPath(path) // (re)bind AI chat to the saved file
-        setStatus('Saved')
+        setStatus(
+          result.backupPath
+            ? `Saved (the original is kept as ${basename(result.backupPath)})`
+            : 'Saved',
+        )
         return true
       } catch (err) {
         setStatus(`Save failed: ${err instanceof Error ? err.message : String(err)}`)

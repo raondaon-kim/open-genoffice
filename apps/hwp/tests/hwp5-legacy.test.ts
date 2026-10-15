@@ -1,7 +1,12 @@
 import * as CFB from 'cfb'
 import { deflateRawSync, inflateRawSync } from 'node:zlib'
 import { describe, expect, it } from 'vitest'
-import { crc32, legacyHangulHwp } from '../src/main/hwp5-legacy'
+import {
+  crc32,
+  isLegacyReadable,
+  legacyHangulHwp,
+  legacyHangulHwpChecked,
+} from '../src/main/hwp5-legacy'
 
 const OLD_HANGUL_INFLATE = { windowBits: 12, chunkSize: 64 }
 
@@ -120,5 +125,64 @@ describe('legacyHangulHwp', () => {
   it('returns bytes that are not an HWP5 file unchanged', () => {
     const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1, 2, 3, 4])
     expect(legacyHangulHwp(zip)).toBe(zip)
+  })
+})
+
+describe('isLegacyReadable', () => {
+  it('accepts the re-packed file and an uncompressed document', () => {
+    expect(isLegacyReadable(legacyHangulHwp(rhwpStyleHwp().bytes))).toBe(true)
+    expect(isLegacyReadable(rhwpStyleHwp({ compressed: false }).bytes)).toBe(true)
+  })
+
+  it('rejects rhwp output that still lacks the trailer, and bytes that are not an HWP5 file', () => {
+    expect(isLegacyReadable(rhwpStyleHwp().bytes)).toBe(false)
+    expect(isLegacyReadable(new Uint8Array([0x50, 0x4b, 3, 4, 0, 0, 0, 0]))).toBe(false)
+    expect(isLegacyReadable(new Uint8Array(0))).toBe(false)
+  })
+
+  it('rejects a stream whose CRC or size does not match its content', () => {
+    const good = legacyHangulHwp(rhwpStyleHwp().bytes)
+    const cfb = CFB.read(Buffer.from(good), { type: 'buffer' })
+    const entry = CFB.find(cfb, '/BodyText/Section0')!
+    const content = Buffer.from(entry.content as Uint8Array)
+    content.writeUInt32LE(
+      (content.readUInt32LE(content.length - 8) ^ 0xff) >>> 0,
+      content.length - 8,
+    )
+    entry.content = content
+    const bad = new Uint8Array(CFB.write(cfb, { type: 'buffer', fileType: 'cfb' }) as Buffer)
+    expect(isLegacyReadable(bad)).toBe(false)
+  })
+
+  it('rejects a document whose body stream is not valid deflate', () => {
+    const good = legacyHangulHwp(rhwpStyleHwp().bytes)
+    const cfb = CFB.read(Buffer.from(good), { type: 'buffer' })
+    const entry = CFB.find(cfb, '/BodyText/Section0')!
+    entry.content = Buffer.from('this is not deflate data at all, only text')
+    const bad = new Uint8Array(CFB.write(cfb, { type: 'buffer', fileType: 'cfb' }) as Buffer)
+    expect(isLegacyReadable(bad)).toBe(false)
+  })
+})
+
+describe('legacyHangulHwpChecked', () => {
+  it('returns the re-packed file when it checks out', () => {
+    const { bytes } = rhwpStyleHwp()
+    const r = legacyHangulHwpChecked(bytes)
+    expect(r.repacked).toBe(true)
+    expect(isLegacyReadable(r.bytes)).toBe(true)
+  })
+
+  it('falls back to the bytes rhwp wrote when the re-packed file fails its check', () => {
+    const { bytes } = rhwpStyleHwp()
+    const r = legacyHangulHwpChecked(bytes, () => false)
+    expect(r.repacked).toBe(false)
+    expect(r.bytes).toBe(bytes)
+  })
+
+  it('does not call a non-HWP5 input re-packed', () => {
+    const zip = new Uint8Array([0x50, 0x4b, 3, 4, 0, 0, 0, 0, 0, 0])
+    const r = legacyHangulHwpChecked(zip)
+    expect(r.bytes).toBe(zip)
+    expect(r.repacked).toBe(false)
   })
 })
