@@ -4,11 +4,12 @@ import { fenceWikiText } from '../fence'
 import { serializePage, todayIso } from '../page'
 import { WIKI_UNAVAILABLE } from '../types'
 import type { WikiHit } from '../types'
+import { readForeignDocs, resolveWikiFile } from './foreign'
 import { learn } from './learn'
 import type { WikiComplete } from './learn'
 import { maskSensitive } from './mask'
 import { buildFirstDigest, buildRevisionDigest, DocumentRegistry } from './registry'
-import { buildCatalog, WikiSearch } from './search'
+import { buildCatalog, docOfPage, mergeHits, WikiSearch } from './search'
 import { WikiStore } from './store'
 
 export interface EngineOptions {
@@ -22,6 +23,8 @@ export interface EngineOptions {
   /** wait after the last save of a path before learning it (default 2 minutes) */
   debounceMs?: number
   now?: () => Date
+  /** the other wiki's search (LLM Wiki); its failure only narrows the results */
+  extraSearch?: (query: string) => Promise<WikiHit[]>
   log?: (msg: string) => void
 }
 
@@ -34,6 +37,9 @@ interface Job {
 const LEARNED = new Set(['.hwp', '.hwpx', '.docx', '.pptx'])
 const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase()
 const DEFAULT_DEBOUNCE_MS = 120_000
+const INDEX_TTL_MS = 30_000
+const READ_CAP = 12_000
+const OWN_FOLDERS = new Set(['work', 'methods', 'clients'])
 
 export class WorkWikiEngine {
   private readonly opts: EngineOptions
@@ -41,6 +47,8 @@ export class WorkWikiEngine {
   private store: WikiStore | null = null
   private registry: DocumentRegistry | null = null
   private searchIndex: WikiSearch | null = null
+  private indexBuiltAt = 0
+  private foreignCount = 0
   private readonly jobs = new Map<string, Job>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
   private running: Promise<void> | null = null
@@ -225,36 +233,69 @@ export class WorkWikiEngine {
   }
 
   private refreshSearch(): void {
-    this.searchIndex = this.store ? new WikiSearch(this.store.listPages()) : null
+    if (!this.store) {
+      this.searchIndex = null
+      return
+    }
+    const foreign = readForeignDocs(this.store.wikiDir).docs
+    this.foreignCount = foreign.length
+    this.searchIndex = new WikiSearch([...this.store.listPages().map(docOfPage), ...foreign])
+    this.indexBuiltAt = Date.now()
   }
 
   catalog(): string {
     if (!this.isEnabled || !this.store) return ''
     try {
-      return buildCatalog(this.store.listPages())
+      if (Date.now() - this.indexBuiltAt > INDEX_TTL_MS) this.refreshSearch()
+      const own = buildCatalog(this.store.listPages())
+      return this.foreignCount > 0
+        ? `${own}\n- LLM Wiki 자료 페이지 ${this.foreignCount}개 (인물·기관·개념·자료 요약): wiki_search로 찾으세요`.trimStart()
+        : own
     } catch (err) {
       this.disable(err)
       return ''
     }
   }
 
-  search(query: string): WikiHit[] {
-    return this.isEnabled ? (this.searchIndex?.search(query) ?? []) : []
+  async search(query: string): Promise<WikiHit[]> {
+    if (!this.isEnabled || !this.store) return []
+    try {
+      if (Date.now() - this.indexBuiltAt > INDEX_TTL_MS) this.refreshSearch()
+    } catch (err) {
+      this.disable(err)
+      return []
+    }
+    const local = this.searchIndex?.search(query, 5) ?? []
+    let extra: WikiHit[] = []
+    try {
+      extra = (await this.opts.extraSearch?.(query)) ?? []
+    } catch {
+      // LLM Wiki being down only narrows the results
+    }
+    return mergeHits(local, extra)
   }
 
-  read(slug: string): { ok: true; page: string } | { ok: false; error: string } {
+  /** a page by path id (work/koica-health, entities/koica) or, for older callers, by our own slug */
+  read(id: string): { ok: true; page: string } | { ok: false; error: string } {
     if (!this.isEnabled || !this.store) return { ok: false, error: WIKI_UNAVAILABLE }
-    let page
+    const [folder, ...rest] = id.split('/')
+    const ownSlug =
+      rest.length === 1 && OWN_FOLDERS.has(folder!) ? rest[0]! : id.includes('/') ? null : id
     try {
-      page = this.store.readPage(slug)
+      if (ownSlug !== null) {
+        const page = this.store.readPage(ownSlug)
+        // the source list is for the wiki itself; the assistant does not need it
+        return page
+          ? { ok: true, page: fenceWikiText(serializePage(page).replace(/^sources: .*\n/m, '')) }
+          : { ok: false, error: `no wiki page: ${id}` }
+      }
+      const file = resolveWikiFile(this.store.wikiDir, id)
+      if (!file) return { ok: false, error: `no wiki page: ${id}` }
+      return { ok: true, page: fenceWikiText(readFileSync(file, 'utf8').slice(0, READ_CAP)) }
     } catch (err) {
       this.disable(err)
       return { ok: false, error: WIKI_UNAVAILABLE }
     }
-    return page
-      ? // the source list is for the wiki itself; the assistant does not need it
-        { ok: true, page: fenceWikiText(serializePage(page).replace(/^sources: .*\n/m, '')) }
-      : { ok: false, error: `no wiki page: ${slug}` }
   }
 
   /** write the points as a dated note under raw/genoffice-notes and learn it right away */

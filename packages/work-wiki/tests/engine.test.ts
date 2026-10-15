@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -117,10 +117,77 @@ describe('WorkWikiEngine', () => {
     engine.start()
     await engine.remember(['KOICA 보건 사업'])
     await engine.runDue()
-    const slug = engine.search('KOICA')[0]!.slug
-    const r = engine.read(slug)
+    const id = (await engine.search('KOICA'))[0]!.id
+    const r = engine.read(id)
     expect(r.ok && r.page.startsWith('⟦업무 위키:')).toBe(true)
     expect(engine.read('nope').ok).toBe(false)
+  })
+
+  it('search covers LLM Wiki pages, merges the extra search and degrades when it throws', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-'))
+    mkdirSync(join(root, 'wiki', 'entities'), { recursive: true })
+    writeFileSync(
+      join(root, 'wiki', 'entities', 'hanbit.md'),
+      '---\ntitle: 한빛정보\n---\n우리 회사. 보건 정보시스템 구축 실적.\n',
+    )
+    const extra = vi.fn(async () => [
+      {
+        id: 'sources/profile',
+        kind: 'source' as const,
+        title: '회사소개서',
+        summary: '',
+        score: 1,
+      },
+    ])
+    const engine = new WorkWikiEngine({
+      root,
+      complete: model(),
+      extractText: async () => null,
+      extraSearch: extra,
+    })
+    engine.start()
+    const ids = (await engine.search('한빛정보 실적')).map((h) => h.id)
+    expect(ids).toContain('entities/hanbit')
+    expect(ids).toContain('sources/profile')
+    const broken = new WorkWikiEngine({
+      root,
+      complete: model(),
+      extractText: async () => null,
+      extraSearch: async () => {
+        throw new Error('down')
+      },
+    })
+    broken.start()
+    expect((await broken.search('한빛정보')).map((h) => h.id)).toContain('entities/hanbit')
+  })
+
+  it('read takes a path id for any wiki page, fenced, and still takes a legacy slug', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-'))
+    mkdirSync(join(root, 'wiki', 'entities'), { recursive: true })
+    writeFileSync(
+      join(root, 'wiki', 'entities', 'hanbit.md'),
+      '---\ntitle: 한빛정보\n---\n우리 회사.\n',
+    )
+    const engine = new WorkWikiEngine({ root, complete: model(), extractText: async () => null })
+    engine.start()
+    const r = engine.read('entities/hanbit')
+    expect(r.ok && r.page.startsWith('⟦업무 위키:') && r.page.includes('우리 회사')).toBe(true)
+    expect(engine.read('../purpose').ok).toBe(false)
+    await engine.remember(['KOICA 보건 사업'])
+    await engine.runDue()
+    const hit = (await engine.search('KOICA'))[0]!
+    expect(hit.id.startsWith('work/')).toBe(true)
+    expect(engine.read(hit.id).ok).toBe(true)
+    expect(engine.read(hit.id.replace('work/', '')).ok).toBe(true) // legacy slug
+  })
+
+  it('the catalog mentions LLM Wiki pages when there are any', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-'))
+    mkdirSync(join(root, 'wiki', 'concepts'), { recursive: true })
+    writeFileSync(join(root, 'wiki', 'concepts', 'pdm.md'), '# PDM\n본문\n')
+    const engine = new WorkWikiEngine({ root, complete: model(), extractText: async () => null })
+    engine.start()
+    expect(engine.catalog()).toContain('LLM Wiki')
   })
 
   it('disables itself when the folder is not writable and never throws on saves', () => {

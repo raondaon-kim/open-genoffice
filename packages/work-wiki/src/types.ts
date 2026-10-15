@@ -28,9 +28,12 @@ export interface WikiPage {
   body: string
 }
 
+export type WikiHitKind = 'work' | 'method' | 'client' | 'entity' | 'concept' | 'source' | 'other'
+
 export interface WikiHit {
-  slug: string
-  type: WikiPageType
+  /** path under wiki/ without .md, e.g. work/koica-health or entities/koica */
+  id: string
+  kind: WikiHitKind
   title: string
   summary: string
   score: number
@@ -40,7 +43,7 @@ export interface WikiHit {
 export interface WorkWikiApi {
   catalog(): Promise<string>
   search(query: string): Promise<WikiHit[]>
-  read(slug: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
+  read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
   remember(points: string[], work?: string): Promise<{ ok: boolean; error?: string }>
 }
 

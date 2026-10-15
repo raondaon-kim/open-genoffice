@@ -12,6 +12,7 @@ declare global {
 const PROMPT = `## Work wiki (업무 위키)
 The user's work memory, kept automatically from saved documents and chat: past works (업무), how they do work (작업 방식) and client preferences (기관). The catalog of pages comes with each turn.
 - Before writing or restructuring a document, call wiki_search for the work or the kind of work, then wiki_read the matching work and method pages (2-3 pages at most).
+- For company facts, people, track record and past material, search the wiki first: LLM Wiki's pages (sources, entities, concepts) hold what the user added.
 - Follow the method page's structure, emphasis and wording unless the user asks otherwise.
 - Use facts from work pages (track record, staff, client) instead of placeholders, and name the pages used (e.g. "업무 위키: koica-health").
 - When the user states something durable about the work or how they want work done, call wiki_remember with short points — without being asked. Remember only what the user said (facts about the work, standing preferences), never your own drafts, plans or suggestions, one-off instructions or document text.
@@ -48,7 +49,7 @@ export function createWorkWikiSkill(
       {
         name: 'wiki_search',
         description:
-          'Search the work wiki by work, kind of work, client or method. Returns up to 5 pages with summaries.',
+          'Search the work wiki (our work, method and client pages and the LLM Wiki pages) by work, kind of work, client, person or topic. Returns up to 8 pages with ids and summaries.',
         inputSchema: {
           type: 'object',
           properties: { query: { type: 'string' } },
@@ -57,11 +58,12 @@ export function createWorkWikiSkill(
       },
       {
         name: 'wiki_read',
-        description: 'Read one work wiki page by slug (from the catalog or wiki_search).',
+        description:
+          'Read one work wiki page by its id, the path shown by wiki_search or the catalog (e.g. work/koica-health, entities/koica).',
         inputSchema: {
           type: 'object',
-          properties: { slug: { type: 'string' } },
-          required: ['slug'],
+          properties: { id: { type: 'string' } },
+          required: ['id'],
         },
       },
       {
@@ -95,17 +97,17 @@ export function createWorkWikiSkill(
           return {
             output: hits.length
               ? fenceWikiText(
-                  hits.map((h) => `- ${h.slug} [${h.type}] ${h.title} — ${h.summary}`).join('\n'),
+                  hits.map((h) => `- ${h.id} [${h.kind}] ${h.title} — ${h.summary}`).join('\n'),
                 )
               : 'no matching pages',
             summary: `업무 위키 검색: ${query}`,
           }
         }
         if (call.name === 'wiki_read') {
-          const slug = String(input.slug ?? '')
-          const r = await api.read(slug)
+          const id = String(input.id ?? input.slug ?? '')
+          const r = await api.read(id)
           return r.ok
-            ? { output: r.page, summary: `업무 위키 읽기: ${slug}` }
+            ? { output: r.page, summary: `업무 위키 읽기: ${id}` }
             : fail('wiki_read', r.error)
         }
         if (call.name === 'wiki_remember') {

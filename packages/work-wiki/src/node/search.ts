@@ -1,4 +1,5 @@
-import type { WikiHit, WikiPage } from '../types'
+import { PAGE_FOLDERS } from '../types'
+import type { WikiHit, WikiHitKind, WikiPage } from '../types'
 
 export function tokenize(text: string): string[] {
   const words = text
@@ -18,13 +19,34 @@ export function tokenize(text: string): string[] {
   return out
 }
 
-interface Doc {
-  page: WikiPage
+/** what the search indexes: our pages and LLM Wiki's pages alike */
+export interface SearchDoc {
+  id: string
+  kind: WikiHitKind
+  title: string
+  aliases: string[]
+  summary: string
+  tags: string[]
+  body: string
+}
+
+export const docOfPage = (p: WikiPage): SearchDoc => ({
+  id: `${PAGE_FOLDERS[p.type]}/${p.slug}`,
+  kind: p.type,
+  title: p.title,
+  aliases: p.aliases,
+  summary: p.summary,
+  tags: p.tags,
+  body: p.body,
+})
+
+interface Indexed {
+  doc: SearchDoc
   tf: Map<string, number>
   len: number
 }
 
-const FIELD_WEIGHTS: Array<[(p: WikiPage) => string, number]> = [
+const FIELD_WEIGHTS: Array<[(p: SearchDoc) => string, number]> = [
   [(p) => p.title, 3],
   [(p) => p.aliases.join(' '), 3],
   [(p) => p.summary, 2],
@@ -34,22 +56,22 @@ const FIELD_WEIGHTS: Array<[(p: WikiPage) => string, number]> = [
 
 /** BM25-style ranking over weighted page fields */
 export class WikiSearch {
-  private readonly docs: Doc[]
+  private readonly docs: Indexed[]
   private readonly df = new Map<string, number>()
   private readonly avgLen: number
 
-  constructor(pages: WikiPage[]) {
-    this.docs = pages.map((page) => {
+  constructor(docs: SearchDoc[]) {
+    this.docs = docs.map((doc) => {
       const tf = new Map<string, number>()
       let len = 0
       for (const [get, w] of FIELD_WEIGHTS) {
-        for (const t of tokenize(get(page))) {
+        for (const t of tokenize(get(doc))) {
           tf.set(t, (tf.get(t) ?? 0) + w)
           len += w
         }
       }
       for (const t of tf.keys()) this.df.set(t, (this.df.get(t) ?? 0) + 1)
-      return { page, tf, len }
+      return { doc, tf, len }
     })
     this.avgLen = this.docs.reduce((s, d) => s + d.len, 0) / Math.max(1, this.docs.length)
   }
@@ -74,10 +96,10 @@ export class WikiSearch {
       .sort((a, b) => b.score - a.score)
       .slice(0, k)
       .map(({ d, score }) => ({
-        slug: d.page.slug,
-        type: d.page.type,
-        title: d.page.title,
-        summary: d.page.summary,
+        id: d.doc.id,
+        kind: d.doc.kind,
+        title: d.doc.title,
+        summary: d.doc.summary,
         score,
       }))
   }
@@ -100,9 +122,26 @@ export function buildCatalog(
   let out = ''
   for (const p of sorted) {
     const alias = opts.aliases && p.aliases.length ? ` (aliases: ${p.aliases.join(', ')})` : ''
-    const line = `- [${LABEL[p.type]}] ${p.title}${alias} — ${p.summary} (${p.slug})\n`
+    const line = `- [${LABEL[p.type]}] ${p.title}${alias} — ${p.summary} (${PAGE_FOLDERS[p.type]}/${p.slug})\n`
     if (out.length + line.length > capChars) break
     out += line
   }
   return out.trimEnd()
+}
+
+/** local hits first, then the other source's, alternating, without duplicate ids */
+export function mergeHits(local: WikiHit[], extra: WikiHit[], limit = 8): WikiHit[] {
+  const out: WikiHit[] = []
+  const seen = new Set<string>()
+  const push = (h?: WikiHit) => {
+    if (h && !seen.has(h.id) && out.length < limit) {
+      seen.add(h.id)
+      out.push(h)
+    }
+  }
+  for (let i = 0; i < Math.max(local.length, extra.length); i++) {
+    push(local[i])
+    push(extra[i])
+  }
+  return out
 }

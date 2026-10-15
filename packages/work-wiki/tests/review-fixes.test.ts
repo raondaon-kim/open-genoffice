@@ -72,7 +72,7 @@ describe('review fixes', () => {
     const api: WorkWikiApi = {
       catalog: async () => '- [업무] KOICA — 요약 (koica)',
       search: async () => [
-        { slug: 'koica', type: 'work', title: 'KOICA', summary: '요약', score: 1 },
+        { id: 'work/koica', kind: 'work', title: 'KOICA', summary: '요약', score: 1 },
       ],
       read: async () => ({ ok: true, page: '' }),
       remember: async () => ({ ok: true }),

@@ -1,6 +1,8 @@
 export { maskSensitive } from './node/mask'
 export { WikiStore } from './node/store'
-export { buildCatalog, tokenize, WikiSearch } from './node/search'
+export { buildCatalog, docOfPage, mergeHits, tokenize, WikiSearch } from './node/search'
+export type { SearchDoc } from './node/search'
+export { readForeignDocs, resolveWikiFile } from './node/foreign'
 export {
   buildFirstDigest,
   buildRevisionDigest,

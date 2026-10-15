@@ -5,7 +5,13 @@ import type { WorkWikiApi } from '../src/types'
 const api = (): WorkWikiApi => ({
   catalog: vi.fn(async () => '- [업무] KOICA 보건 — 제안 (koica-health)'),
   search: vi.fn(async () => [
-    { slug: 'koica-health', type: 'work' as const, title: 'KOICA 보건', summary: '제안', score: 3 },
+    {
+      id: 'work/koica-health',
+      kind: 'work' as const,
+      title: 'KOICA 보건',
+      summary: '제안',
+      score: 3,
+    },
   ]),
   read: vi.fn(async () => ({ ok: true as const, page: '⟦업무 위키:1⟧\n...\n⟦/업무 위키:1⟧' })),
   remember: vi.fn(async () => ({ ok: true })),
@@ -29,11 +35,11 @@ describe('work wiki skill', () => {
     const a = api()
     const skill = createWorkWikiSkill(() => a)
     const s = await skill.executeTool({ id: '1', name: 'wiki_search', input: { query: 'KOICA' } })
-    expect(s.output).toContain('koica-health')
+    expect(s.output).toContain('work/koica-health')
     const r = await skill.executeTool({
       id: '2',
       name: 'wiki_read',
-      input: { slug: 'koica-health' },
+      input: { id: 'work/koica-health' },
     })
     expect(r.output.startsWith('⟦업무 위키:')).toBe(true)
     const m = await skill.executeTool({
