@@ -70,8 +70,8 @@ describe('connection modes', () => {
     expect(chooseLitellmModel(['gpt-5', 'claude-x'], '')).toBe('gpt-5')
   })
 
-  it('does not wipe the model when the list is empty', () => {
+  it('changes nothing while the list is unknown (empty), so no unlisted default gets pinned', () => {
     expect(chooseLitellmModel([], 'typed-by-hand')).toBe('typed-by-hand')
-    expect(chooseLitellmModel([], '')).toBe('deepseek-flash')
+    expect(chooseLitellmModel([], '')).toBe('')
   })
 })

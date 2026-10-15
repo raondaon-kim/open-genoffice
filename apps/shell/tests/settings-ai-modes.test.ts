@@ -155,6 +155,24 @@ describe('AI connection modes', () => {
     expect(saved?.byokProvider).toBe('anthropic')
   })
 
+  it('LiteLLM on a proxy without deepseek-flash picks the listed DeepSeek model', async () => {
+    const s = defaultAiSettings()
+    s.provider = 'litellm'
+    s.providers.litellm = { apiKey: 'k', model: '', baseUrl: 'http://proxy.test:4000/v1' }
+    install(s, { org: null, models: ['gpt-5', 'deepseek-chat'] })
+    await openAiPane()
+    // the model list is asked for after a short debounce
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700))
+    })
+    await flush()
+    await act(async () => {
+      saveButton().click()
+      await Promise.resolve()
+    })
+    expect(saved?.providers.litellm?.model).toBe('deepseek-chat')
+  })
+
   it('keeps the key of every provider when the mode changes and comes back to the same provider', async () => {
     const s = defaultAiSettings()
     s.provider = 'anthropic'

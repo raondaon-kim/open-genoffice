@@ -42,10 +42,11 @@ export function withConnectionMode(settings: AiSettings, mode: ConnectionMode): 
 /**
  * The model for a LiteLLM connection once the proxy's list is known: a model that is on the list
  * stays, else DeepSeek (`deepseek-flash`), else any DeepSeek id, else the first id. An empty list
- * (the proxy did not answer) never changes what the user has.
+ * (not loaded yet, or the proxy did not answer) changes nothing: a guess made then would be pinned
+ * into the picker and survive the real list.
  */
 export function chooseLitellmModel(models: string[], current: string): string {
-  if (models.length === 0) return current || LITELLM_DEFAULT_MODEL
+  if (models.length === 0) return current
   if (current && models.includes(current)) return current
   if (models.includes(LITELLM_DEFAULT_MODEL)) return LITELLM_DEFAULT_MODEL
   return models.find((m) => /deepseek/i.test(m)) ?? models[0]!
