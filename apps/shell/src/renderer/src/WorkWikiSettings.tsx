@@ -39,13 +39,18 @@ function LlmWikiRow({ t }: { t: TFunc }) {
           <div className="set-field-desc">{text}</div>
         </div>
       </div>
-      <button
-        className="set-btn"
-        disabled={status.state !== 'running'}
-        onClick={() => void window.aiOffice.openLlmWiki?.()}
-      >
-        {t('setLlmWikiOpen')}
-      </button>
+      <div>
+        <button className="set-btn" onClick={() => void window.aiOffice.addWikiMaterial?.()}>
+          {t('setWikiAddMaterial')}
+        </button>{' '}
+        <button
+          className="set-btn"
+          disabled={status.state !== 'running'}
+          onClick={() => void window.aiOffice.openLlmWiki?.()}
+        >
+          {t('setLlmWikiOpen')}
+        </button>
+      </div>
     </div>
   )
 }

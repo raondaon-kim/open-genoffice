@@ -216,6 +216,8 @@ export interface HomeApi {
   getLlmWikiStatus(): Promise<LlmWikiStatusView>
   /** bring the LLM Wiki window forward; false when it is not running */
   openLlmWiki(): Promise<boolean>
+  /** pick files and put them into the work wiki's raw/sources for LLM Wiki to learn */
+  addWikiMaterial(): Promise<{ added: number; skipped: number; canceled: boolean }>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -536,6 +538,7 @@ export const HOME_CHANNELS = {
   pickWorkWikiFolder: 'home:pick-work-wiki-folder',
   getLlmWikiStatus: 'home:get-llm-wiki-status',
   openLlmWiki: 'home:open-llm-wiki',
+  addWikiMaterial: 'home:add-wiki-material',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',

@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { streamForProvider } from '@genoffice/ai-provider'
+import { format, getUiLang } from '@genoffice/i18n'
+import type { Lang } from '@genoffice/i18n'
 import { readAiSettingsFile } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { WIKI_CHANNELS, WIKI_UNAVAILABLE } from '@genoffice/work-wiki'
 import { WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
+import { addMaterial } from './add-material'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import {
   desiredSignature,
@@ -199,6 +202,80 @@ export async function stopWorkWikiForQuit(): Promise<void> {
   ])
 }
 
+const MATERIAL_TEXT = {
+  zh: {
+    materialFilter: '文档',
+    materialAdded: '已向工作维基添加 {n} 份资料。整理完成后 AI 会参考。',
+    materialOff: '工作维基已关闭或无法使用。',
+  },
+  en: {
+    materialFilter: 'Documents',
+    materialAdded:
+      'Added {n} file(s) to the work wiki. The AI will use them once they are organized.',
+    materialOff: 'The work wiki is off or unavailable.',
+  },
+  ko: {
+    materialFilter: '문서',
+    materialAdded: '업무 위키에 자료 {n}개를 넣었습니다. 정리가 끝나면 AI가 참고합니다.',
+    materialOff: '업무 위키가 꺼져 있거나 사용할 수 없습니다.',
+  },
+} as const
+
+/** Korean, Chinese and English texts; every other language reads the English one */
+function tmw(
+  lang: Lang,
+  key: keyof (typeof MATERIAL_TEXT)['en'],
+  params?: Record<string, string | number>,
+): string {
+  const table =
+    lang === 'zh' || lang === 'zh-TW'
+      ? MATERIAL_TEXT.zh
+      : lang === 'ko'
+        ? MATERIAL_TEXT.ko
+        : MATERIAL_TEXT.en
+  return format(table[key], params)
+}
+
+/** ask for files and put them into the wiki's raw/sources; the result is shown in a message box */
+export async function addWikiMaterialFromDialog(
+  parent: BrowserWindow | null,
+): Promise<{ added: number; skipped: number; canceled: boolean }> {
+  const s = readWorkWikiSettings()
+  const lang = getUiLang()
+  if (!s.enabled || !engine?.enabled) {
+    await dialog.showMessageBox({ type: 'info', message: tmw(lang, 'materialOff') })
+    return { added: 0, skipped: 0, canceled: true }
+  }
+  const options = {
+    properties: ['openFile', 'multiSelections'] as Array<'openFile' | 'multiSelections'>,
+    filters: [
+      {
+        name: tmw(lang, 'materialFilter'),
+        extensions: ['hwp', 'hwpx', 'docx', 'pptx', 'xlsx', 'pdf', 'md', 'txt'],
+      },
+    ],
+  }
+  const picked = parent
+    ? await dialog.showOpenDialog(parent, options)
+    : await dialog.showOpenDialog(options)
+  if (picked.canceled || picked.filePaths.length === 0)
+    return { added: 0, skipped: 0, canceled: true }
+  const r = await addMaterial({
+    files: picked.filePaths,
+    rawSources: join(s.folder, 'raw', 'sources'),
+    extractText,
+  })
+  const lines = [
+    tmw(lang, 'materialAdded', { n: r.added.length }),
+    ...r.skipped.map((k) => `· ${basename(k.file)}: ${k.reason}`),
+  ]
+  await dialog.showMessageBox({
+    type: r.skipped.length ? 'warning' : 'info',
+    message: lines.join(String.fromCharCode(10)),
+  })
+  return { added: r.added.length, skipped: r.skipped.length, canceled: false }
+}
+
 /** settings changed: the old engine finishes its running job before the next one starts */
 async function restart(): Promise<void> {
   const old = engine
@@ -259,6 +336,9 @@ export function registerWorkWikiIpc(): void {
     void engine.runDue()
     return r
   })
+  ipcMain.handle(HOME_CHANNELS.addWikiMaterial, (e) =>
+    addWikiMaterialFromDialog(BrowserWindow.fromWebContents(e.sender)),
+  )
   ipcMain.handle(HOME_CHANNELS.getLlmWikiStatus, () => llmWikiStatus())
   ipcMain.handle(HOME_CHANNELS.openLlmWiki, () => openLlmWiki())
   ipcMain.handle(HOME_CHANNELS.getWorkWikiSettings, () => readWorkWikiSettings())

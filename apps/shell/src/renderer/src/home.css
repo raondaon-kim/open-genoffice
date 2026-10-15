@@ -393,6 +393,10 @@ body.vib .home {
   gap: 10px;
 }
 
+.quick-cards-wiki {
+  margin-top: 10px;
+}
+
 .quick-card {
   position: relative;
   flex: 1;

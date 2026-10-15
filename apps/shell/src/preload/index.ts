@@ -127,6 +127,13 @@ const homeApi: HomeApi = {
   async openLlmWiki() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.openLlmWiki)) === true
   },
+  async addWikiMaterial() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.addWikiMaterial)) as {
+      added: number
+      skipped: number
+      canceled: boolean
+    }
+  },
   async getFileSearchSettings() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings
   },

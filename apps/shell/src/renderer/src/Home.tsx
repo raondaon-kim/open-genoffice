@@ -2138,39 +2138,58 @@ export function Home() {
 
   function renderQuickCards() {
     return (
-      <div className="quick-cards">
-        {NEW_ITEMS.map((item) => (
+      <>
+        <div className="quick-cards">
+          {NEW_ITEMS.map((item) => (
+            <button
+              key={'key' in item && item.key ? item.key : item.ext}
+              className="quick-card"
+              onClick={() => void item.action()}
+            >
+              <FileBadge ext={item.ext} size={30} />
+              <span className="quick-text">
+                <span className="quick-title-row">
+                  <span className="quick-title">{item.title}</span>
+                  <span className="ai-chip">AI</span>
+                </span>
+                <span className="quick-sub">{item.sub}</span>
+              </span>
+            </button>
+          ))}
           <button
-            key={'key' in item && item.key ? item.key : item.ext}
             className="quick-card"
-            onClick={() => void item.action()}
+            onClick={() => void window.aiOffice.browse()}
+            data-tip={OPEN_LOCAL_EXTENSIONS}
           >
-            <FileBadge ext={item.ext} size={30} />
+            <span className="quick-folder">
+              <FolderIcon size={18} />
+            </span>
             <span className="quick-text">
               <span className="quick-title-row">
-                <span className="quick-title">{item.title}</span>
-                <span className="ai-chip">AI</span>
+                <span className="quick-title">{t('openLocal')}</span>
               </span>
-              <span className="quick-sub">{item.sub}</span>
+              <span className="quick-sub">{OPEN_LOCAL_EXTENSIONS}</span>
             </span>
           </button>
-        ))}
-        <button
-          className="quick-card"
-          onClick={() => void window.aiOffice.browse()}
-          data-tip={OPEN_LOCAL_EXTENSIONS}
-        >
-          <span className="quick-folder">
-            <FolderIcon size={18} />
-          </span>
-          <span className="quick-text">
-            <span className="quick-title-row">
-              <span className="quick-title">{t('openLocal')}</span>
+        </div>
+        <div className="quick-cards quick-cards-wiki">
+          <button className="quick-card" onClick={() => void window.aiOffice.addWikiMaterial()}>
+            <span className="quick-text">
+              <span className="quick-title-row">
+                <span className="quick-title">{t('wikiAddMaterial')}</span>
+              </span>
+              <span className="quick-sub">{t('wikiAddMaterialSub')}</span>
             </span>
-            <span className="quick-sub">{OPEN_LOCAL_EXTENSIONS}</span>
-          </span>
-        </button>
-      </div>
+          </button>
+          <button className="quick-card" onClick={() => void window.aiOffice.openLlmWiki()}>
+            <span className="quick-text">
+              <span className="quick-title-row">
+                <span className="quick-title">{t('wikiOpen')}</span>
+              </span>
+            </span>
+          </button>
+        </div>
+      </>
     )
   }
 
