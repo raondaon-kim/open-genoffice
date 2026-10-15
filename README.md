@@ -1,18 +1,32 @@
-> **Open GenOffice** — an independent fork of GenOffice, based on upstream main
-> `2490e20d` (2026-10-07). On top of upstream it adds a **Hangul
-> (`.hwp`/`.hwpx`) module** built on rhwp, an organization's **document-style
-> wiki** that the Hangul, Word and PowerPoint assistants read before writing a new
-> document, a **LiteLLM provider** with build-time organization defaults, and its
-> own app identity. The work wiki ships a bundled, modified
-> [LLM Wiki](https://github.com/nashsu/llm_wiki) (GPL-3.0) that learns the material the user
-> adds. See [MODIFICATIONS.md](MODIFICATIONS.md) for the list and
-> [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md); the upstream README follows unchanged.
+> **Open GenOffice** is an independent fork of [GenOffice](https://github.com/genspark-ai/genoffice)
+> (based on upstream main `2490e20d`, 2026-10-07). It keeps everything upstream offers and adds:
 >
-> Company build (Windows): set `OPEN_GENOFFICE_LITELLM_URL=<proxy>/v1`,
-> `OPEN_GENOFFICE_LITELLM_MODEL=deepseek-flash` (the default model) and
-> `OPEN_GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc`, then run
-> `npm run dist:win`. A first run uses the proxy and only asks for the user's
-> virtual key in Settings › AI model, where the LiteLLM card is the first choice.
+> - **Hangul documents (`.hwp`/`.hwpx`)**: open, edit and save in a shell tab, built on
+>   [rhwp](https://github.com/edwardkim/rhwp); `.hwp` files also open in old Hangul (2005).
+> - **Document-style wiki**: an organization's styles and proposal templates that the Hangul, Word
+>   and PowerPoint assistants follow when they write a new document.
+> - **Work wiki**: saved documents, chat and the files a user adds are learned into a small wiki of
+>   works, working methods and clients, and the assistants search and read it before they write.
+>   It ships a bundled, modified [LLM Wiki](https://github.com/nashsu/llm_wiki) (GPL-3.0) that runs
+>   hidden while the app runs.
+> - **Three ways to connect AI** (Settings › AI model):
+>   1. **LiteLLM**: an organization's proxy; the user enters only a virtual key. The default model
+>      is `deepseek-flash`.
+>   2. **Codex**: sign in with a ChatGPT account. The Codex CLI ships inside the Windows installer,
+>      and a user already signed in to Codex is connected at once.
+>   3. **Own API keys**: Claude, OpenAI, Gemini, DeepSeek and the other upstream providers.
+> - Its own app identity (`com.sergedoub.opengenoffice`) and update feed.
+>
+> See [MODIFICATIONS.md](MODIFICATIONS.md) for the full list and
+> [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md) for the projects it builds on. The upstream README
+> follows unchanged.
+>
+> **Windows installer:** `npm run dist:win` builds `OpenGenOfficeSetup-<version>-x64.exe`. It stages
+> LLM Wiki from a checkout of its fork (`LLM_WIKI_FORK_DIR=<checkout>`) and the pinned Codex CLI
+> first. For an organization build, also set `OPEN_GENOFFICE_LITELLM_URL=<proxy>/v1` and
+> `OPEN_GENOFFICE_LITELLM_MODEL=deepseek-flash`; the values go into the installer only, never into
+> this repository, and a first run starts on the LiteLLM card. Add
+> `OPEN_GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc` on a machine without the GNU toolchain.
 
 <p align="center">
   <a href="https://genoffice.ai/">
