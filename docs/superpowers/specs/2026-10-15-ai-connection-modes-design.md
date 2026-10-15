@@ -8,7 +8,7 @@ Settings → AI model becomes a choice between **three ways to connect**, so a u
 to connect instead of scanning one long provider list:
 
 1. **LiteLLM** (first, the default of a company build): the in-house proxy; the user enters only
-   their virtual key. The default model is DeepSeek (`deepseek-chat`).
+   their virtual key. The default model is DeepSeek (`deepseek-flash`).
 2. **Codex**: ChatGPT-account login, connected automatically. Codex CLI ships inside the
    installer, so nothing else is installed.
 3. **Own API keys**: the existing providers (Claude, OpenAI, Gemini, DeepSeek, Genspark, …).
@@ -64,9 +64,8 @@ Connection
   - Prefill: choosing the card fills the address from `org-defaults.json` when the LiteLLM config
     has none, also on installs that already exist, so only the key is left to enter.
   - **DeepSeek default:** when no model is chosen, or the chosen one is not in the proxy's list,
-    the model becomes `deepseek-chat` (DeepSeek V4 Flash, thinking off), else the first
-    `deepseek*` entry, else the first entry. `deepseek-pro` and `deepseek-reasoner` stay
-    selectable. `OPEN_GENOFFICE_LITELLM_MODEL` at build time still wins for a new install.
+    the model becomes `deepseek-flash` (DeepSeek Flash), else the first
+    `deepseek*` entry, else the first entry. Other proxy models stay selectable. `OPEN_GENOFFICE_LITELLM_MODEL` at build time still wins for a new install.
 - **2 Codex:** status line (connected with the account, login needed, component missing),
   buttons **Login** and **Check connection**, model dropdown (the existing live model list),
   and a collapsed "Advanced: executable path" holding today's `cliPath` field.
@@ -131,7 +130,7 @@ OpenAI-compatible adapter** in the shell main process:
 - Local run: the installer contains `resources/codex/`; `codex` starts from there; the app-server
   answers `account/read` without a login; with a login (the user signs in once in the browser) a
   chat works and an LLM Wiki ingest succeeds through the bridge; LiteLLM against the real proxy
-  with the user's virtual key using `deepseek-chat`.
+  with the user's virtual key using `deepseek-flash`.
 
 ## 7. Open items for the plan
 
