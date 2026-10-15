@@ -95,7 +95,7 @@ describe('seedAppState', () => {
       sourceWatchConfig: { other: { enabled: false } },
       activePresetId: 'deepseek',
     }
-     
+
     const s = seedAppState(existing, input) as Record<string, any>
     expect(s.proxyConfig).toEqual({ enabled: false })
     expect(s.embeddingConfig).toEqual({ enabled: true })
@@ -109,7 +109,7 @@ describe('seedAppState', () => {
       path: 'C:/Users/u/Documents/GenOffice 업무위키',
       lastOpened: 1700000000000,
     })
-     
+
     expect(s.recentProjects.map((p: any) => p.id)).toEqual(['p-1', 'other'])
     expect(s.llmConfig).toMatchObject({
       provider: 'custom',
@@ -125,9 +125,9 @@ describe('seedAppState', () => {
 
   it('does not duplicate the project in the recent list, and leaves llmConfig alone without a usable model', () => {
     const first = seedAppState({}, input)
-     
+
     const again = seedAppState(first, { ...input, llm: null }) as Record<string, any>
-     
+
     expect(again.recentProjects.filter((p: any) => p.id === 'p-1')).toHaveLength(1)
     expect(again.llmConfig).toMatchObject({ apiKey: 'k' })
   })
