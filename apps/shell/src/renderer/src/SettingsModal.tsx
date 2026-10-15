@@ -15,8 +15,13 @@ import {
   DEFAULT_MAX_OUTPUT_TOKENS,
   MAX_MAX_OUTPUT_TOKENS,
   MIN_MAX_OUTPUT_TOKENS,
+  chooseLitellmModel,
   clampMaxOutputTokens,
+  connectionModeOf,
+  isByokProvider,
+  withConnectionMode,
 } from '@genoffice/ai-provider/browser'
+import type { ConnectionMode } from '@genoffice/ai-provider/browser'
 import type {
   AiMediaProviderId,
   AiMediaProviderMeta,
@@ -29,6 +34,7 @@ import { useI18n } from './locale'
 import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import { ProviderLogo } from './provider-logos'
+import { ConnectionCards } from './ConnectionCards'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
 import { WorkWikiSettingsBlock } from './WorkWikiSettings'
 import './settings.css'
@@ -392,6 +398,30 @@ function AiModelPane({ t }: { t: TFunc }) {
     }
   }, [endpointProvider, endpointBaseUrl, endpointApiKey])
 
+  // the address the company build carries (empty for an open build)
+  const [orgBaseUrl, setOrgBaseUrl] = useState('')
+  useEffect(() => {
+    void window.aiOffice.getOrgAiDefaults?.().then((o) => setOrgBaseUrl(o?.baseUrl ?? ''))
+  }, [])
+
+  // LiteLLM calls DeepSeek unless the user picked something else: once the proxy's list is known
+  // (or while it is not), a missing or unlisted model becomes the default. Only a new list or a
+  // new mode re-runs it, so clearing the field to type another id is never undone.
+  const litellmListed = catalog.find((c) => c.id === 'litellm')?.models ?? []
+  useEffect(() => {
+    if (!settings || settings.provider !== 'litellm') return
+    const own = settings.providers.litellm ?? { apiKey: '', model: '' }
+    const next = chooseLitellmModel(litellmListed, own.model)
+    if (next === own.model) return
+    setSettings({
+      ...settings,
+      providers: { ...settings.providers, litellm: { ...own, model: next } },
+    })
+    setDirty(true)
+    setSaved(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.provider, litellmListed])
+
   if (!settings) return null
   const provider = settings.provider
   const meta = catalog.find((c) => c.id === provider)
@@ -403,6 +433,8 @@ function AiModelPane({ t }: { t: TFunc }) {
   }
   const isGenspark = provider === 'genspark'
   const isCodex = provider === 'codex'
+  const mode = connectionModeOf(provider)
+  const isLitellm = mode === 'litellm'
 
   const touch = () => {
     setDirty(true)
@@ -430,9 +462,36 @@ function AiModelPane({ t }: { t: TFunc }) {
     setSettings({
       ...settings,
       provider: id,
+      byokProvider: id,
       ...(id === 'genspark' ? { gskToolsEnabled: true } : {}),
     })
     touch()
+  }
+  /** the build's address and model fill the LiteLLM config where the user has none yet */
+  const prefillLitellm = async () => {
+    const org = await window.aiOffice.getOrgAiDefaults?.()
+    if (!org) return
+    setSettings((cur) => {
+      if (!cur) return cur
+      const own = cur.providers.litellm ?? { apiKey: '', model: '' }
+      return {
+        ...cur,
+        providers: {
+          ...cur.providers,
+          litellm: { ...own, baseUrl: own.baseUrl || org.baseUrl, model: own.model || org.model },
+        },
+      }
+    })
+  }
+  const selectMode = (next: ConnectionMode) => {
+    const switched = withConnectionMode(settings, next)
+    setSettings(switched)
+    touch()
+    if (next === 'litellm') void prefillLitellm()
+    if (next === 'codex') {
+      const codex = switched.providers.codex
+      void refreshCodexModels(codex?.cliPath ?? '', codex?.model ?? '').catch(() => undefined)
+    }
   }
   const save = () => {
     window.aiOffice
@@ -488,27 +547,32 @@ function AiModelPane({ t }: { t: TFunc }) {
           </button>
         </div>
       </div>
-      <div className="set-field">
-        <div className="set-field-text">
-          <label className="set-field-label">{t('setAiProvider')}</label>
+      <ConnectionCards mode={mode} onPick={selectMode} t={t} />
+      {mode === 'byok' && (
+        <div className="set-field">
+          <div className="set-field-text">
+            <label className="set-field-label">{t('setAiProvider')}</label>
+          </div>
+          <Dropdown
+            className="set-dd"
+            value={provider}
+            ariaLabel={t('setAiProvider')}
+            options={catalog
+              .filter((c) => isByokProvider(c.id))
+              .map((c) => ({
+                value: c.id,
+                label: c.label,
+                render: (
+                  <>
+                    <ProviderLogo id={c.id} />
+                    {c.label}
+                  </>
+                ),
+              }))}
+            onPick={(v) => selectProvider(v as AiSettings['provider'])}
+          />
         </div>
-        <Dropdown
-          className="set-dd"
-          value={provider}
-          ariaLabel={t('setAiProvider')}
-          options={catalog.map((c) => ({
-            value: c.id,
-            label: c.label,
-            render: (
-              <>
-                <ProviderLogo id={c.id} />
-                {c.label}
-              </>
-            ),
-          }))}
-          onPick={(v) => selectProvider(v as AiSettings['provider'])}
-        />
-      </div>
+      )}
       <div className="set-field-desc set-ai-note">
         {isGenspark ? t('setAiGensparkHint') : isCodex ? t('setAiCodexHint') : t('setAiByokNote')}
       </div>
@@ -537,30 +601,33 @@ function AiModelPane({ t }: { t: TFunc }) {
         )}
       </div>
       {isCodex ? (
-        <div className="set-field">
-          <div className="set-field-text">
-            <div className="set-field-stack">
-              <label className="set-field-label" htmlFor="set-ai-cli-path">
-                {t('setAiCodexPath')}
-              </label>
-              <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
+        <details className="set-ai-advanced">
+          <summary>{t('setAiCodexAdvanced')}</summary>
+          <div className="set-field">
+            <div className="set-field-text">
+              <div className="set-field-stack">
+                <label className="set-field-label" htmlFor="set-ai-cli-path">
+                  {t('setAiCodexPath')}
+                </label>
+                <div className="set-field-desc">{t('setAiCodexPathHint')}</div>
+              </div>
             </div>
+            <input
+              id="set-ai-cli-path"
+              className="set-input"
+              type="text"
+              value={config.cliPath ?? ''}
+              placeholder={t('setAiCodexAutoPlaceholder')}
+              spellCheck={false}
+              autoComplete="off"
+              onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
+              onBlur={(e) => {
+                const cliPath = e.target.value.trim()
+                void refreshCodexModels(cliPath, config.model).catch(() => undefined)
+              }}
+            />
           </div>
-          <input
-            id="set-ai-cli-path"
-            className="set-input"
-            type="text"
-            value={config.cliPath ?? ''}
-            placeholder={t('setAiCodexAutoPlaceholder')}
-            spellCheck={false}
-            autoComplete="off"
-            onChange={(e) => updateConfig({ cliPath: e.target.value.trim() })}
-            onBlur={(e) => {
-              const cliPath = e.target.value.trim()
-              void refreshCodexModels(cliPath, config.model).catch(() => undefined)
-            }}
-          />
-        </div>
+        </details>
       ) : !isGenspark ? (
         <>
           <div className="set-field">
@@ -592,6 +659,9 @@ function AiModelPane({ t }: { t: TFunc }) {
                 {!meta?.needsBaseUrl && (
                   <div className="set-field-desc">{t('setAiBaseUrlHint')}</div>
                 )}
+                {isLitellm && orgBaseUrl && (config.baseUrl ?? '') === orgBaseUrl && (
+                  <div className="set-field-desc">{t('setAiLitellmManaged')}</div>
+                )}
               </div>
             </div>
             <input
@@ -600,6 +670,7 @@ function AiModelPane({ t }: { t: TFunc }) {
               type="text"
               value={config.baseUrl ?? ''}
               placeholder={meta?.needsBaseUrl ? 'https://…/v1' : meta?.defaultBaseUrl}
+              readOnly={isLitellm && !!orgBaseUrl && (config.baseUrl ?? '') === orgBaseUrl}
               spellCheck={false}
               onChange={(e) => updateConfig({ baseUrl: e.target.value.trim() })}
             />

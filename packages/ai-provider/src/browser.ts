@@ -16,5 +16,14 @@ export {
   clampMaxOutputTokens,
 } from './providers'
 export { getProviderAdapter, modelLacksVision } from './registry'
+export {
+  byokProviderOf,
+  chooseLitellmModel,
+  connectionModeOf,
+  isByokProvider,
+  LITELLM_DEFAULT_MODEL,
+  withConnectionMode,
+} from './connection-modes'
+export type { ConnectionMode } from './connection-modes'
 export { AI_MEDIA_PROVIDERS, imageGenerationAvailable, mediaAnalysisAvailable } from './media'
 export { AI_SEARCH_PROVIDERS } from './search-settings'

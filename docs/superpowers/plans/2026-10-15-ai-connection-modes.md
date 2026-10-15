@@ -751,7 +751,7 @@ Add CSS next to the other `.set-*` rules (find them with `grep -rn "\.set-field 
 | `setAiLitellmManaged`  | Set by your company's build                          | 회사 빌드에서 설정됨                      |
 | `setAiCodexAdvanced`   | Advanced: executable path                            | 고급: 실행 파일 경로                      |
 
-(zh: 连接方式 / LiteLLM / 使用公司提供的密钥连接 / Codex / ChatGPT 账号，登录一次即可连接 / 自己的 API 密钥 / 用你自己的密钥使用多家模型 / 由公司版本设置 / 高级：可执行文件路径; zh-TW: 連線方式 / LiteLLM / 使用公司提供的金鑰連線 / Codex / ChatGPT 帳號，登入一次即可連線 / 自己的 API 金鑰 / 用你自己的金鑰使用多家模型 / 由公司版本設定 / 進階：執行檔路徑; ja: 接続方式 / LiteLLM / 会社から受け取ったキーで接続 / Codex / ChatGPT アカウント — 一度のログインで接続 / 自分の API キー / 自分のキーで複数社のモデルを使う / 会社のビルドで設定済み / 詳細設定：実行ファイルのパス; every other language: the English text.)
+(The Chinese, Traditional Chinese and Japanese texts are written natively in the script that inserts them; every other language gets the English text.)
 
 - [ ] **Step 5: Rework `AiModelPane`** in `SettingsModal.tsx`.
 
