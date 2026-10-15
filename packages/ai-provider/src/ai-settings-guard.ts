@@ -15,6 +15,7 @@ import { statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { isByokProvider } from './connection-modes'
 import { AI_PROVIDER_ADAPTERS, normalizeBaseUrl } from './registry'
 import type { AiProviderConfig, AiProviderId, AiSettings } from './types'
 
@@ -113,6 +114,13 @@ export function sanitizeAiSettings(input: unknown): AiSettings | null {
     providers,
   }
   if (typeof raw.gskToolsEnabled === 'boolean') settings.gskToolsEnabled = raw.gskToolsEnabled
+  if (
+    typeof raw.byokProvider === 'string' &&
+    PROVIDER_IDS.includes(raw.byokProvider as AiProviderId) &&
+    isByokProvider(raw.byokProvider as AiProviderId)
+  ) {
+    settings.byokProvider = raw.byokProvider as AiProviderId
+  }
   if (
     typeof raw.maxOutputTokens === 'number' &&
     Number.isFinite(raw.maxOutputTokens) &&

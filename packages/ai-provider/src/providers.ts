@@ -1,3 +1,4 @@
+import { isByokProvider } from './connection-modes'
 import { defaultAiMediaSettings, resolveAiMediaSettings } from './media'
 import { defaultAiSearchSettings, resolveAiSearchSettings } from './search-settings'
 import type { AiProviderId, AiProviderMeta, AiSettings, LegacyAiSettings } from './types'
@@ -629,6 +630,11 @@ export function resolveAiSettings(stored: unknown, defaults: AiSettings): AiSett
   }
   return {
     provider: settings.provider ?? defaults.provider,
+    ...(typeof settings.byokProvider === 'string' &&
+    AI_PROVIDERS.some((m) => m.id === settings.byokProvider) &&
+    isByokProvider(settings.byokProvider)
+      ? { byokProvider: settings.byokProvider }
+      : {}),
     // Trim before migrating: a pasted " deepseek-reasoner " must still hit
     // the retired-id remap instead of being sent to the API verbatim.
     providers: migrateRetiredModels(
