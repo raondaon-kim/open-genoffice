@@ -9,10 +9,10 @@
 > [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md); the upstream README follows unchanged.
 >
 > Company build (Windows): set `OPEN_GENOFFICE_LITELLM_URL=<proxy>/v1`,
-> `OPEN_GENOFFICE_LITELLM_MODEL=<model>` and
+> `OPEN_GENOFFICE_LITELLM_MODEL=deepseek-flash` (the default model) and
 > `OPEN_GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc-windows-msvc`, then run
 > `npm run dist:win`. A first run uses the proxy and only asks for the user's
-> virtual key in Settings › AI.
+> virtual key in Settings › AI model, where the LiteLLM card is the first choice.
 
 <p align="center">
   <a href="https://genoffice.ai/">

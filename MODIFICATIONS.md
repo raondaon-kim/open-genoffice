@@ -78,6 +78,9 @@ The fork's material changes on top of upstream:
   `OPEN_GENOFFICE_LITELLM_MODEL` at packaging time; the values ship as
   `org-defaults.json` and seed the AI settings on a first run only. No internal
   address is stored in the repository.
+  Settings › AI model offers LiteLLM, Codex and own API keys as three connection modes;
+  the LiteLLM card prefills the build's address (also on an existing install) and defaults to
+  `deepseek-flash`.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and
