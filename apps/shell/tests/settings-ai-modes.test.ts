@@ -5,7 +5,7 @@ import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defaultAiSettings } from '@genoffice/ai-provider'
+import { activeProvider, defaultAiSettings } from '@genoffice/ai-provider'
 import type { AiSettings, CodexModelCatalog } from '@genoffice/ai-provider'
 import type { HomeApi } from '../src/shared/home-api'
 import { LocaleProvider } from '../src/renderer/src/locale'
@@ -171,6 +171,36 @@ describe('AI connection modes', () => {
       await Promise.resolve()
     })
     expect(saved?.providers.litellm?.model).toBe('deepseek-chat')
+  })
+
+  it('an incomplete LiteLLM setup reopens as LiteLLM and Save keeps it (main process resolves a fallback)', async () => {
+    const stored = defaultAiSettings()
+    stored.provider = 'litellm'
+    stored.providers.litellm = { apiKey: 'k', model: 'deepseek-flash', baseUrl: '' }
+    // what ai:get-settings sends: the usable-provider fallback plus the stored choice
+    const resolved = {
+      ...stored,
+      provider: activeProvider(stored),
+      storedProvider: stored.provider,
+    }
+    expect(resolved.provider).toBe('genspark')
+    install(resolved as AiSettings, { org: null })
+    await openAiPane()
+    expect(card('LiteLLM').getAttribute('aria-checked')).toBe('true')
+    expect(host.querySelector('#set-ai-base-url')).not.toBeNull()
+    // any edit (here: the key) and Save must keep the LiteLLM choice
+    const key = host.querySelector<HTMLInputElement>('#set-ai-key')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(key, 'k2')
+      key.dispatchEvent(new Event('input', { bubbles: true }))
+      await Promise.resolve()
+    })
+    await act(async () => {
+      saveButton().click()
+      await Promise.resolve()
+    })
+    expect(saved?.provider).toBe('litellm')
+    expect(saved?.providers.litellm?.apiKey).toBe('k2')
   })
 
   it('keeps the key of every provider when the mode changes and comes back to the same provider', async () => {

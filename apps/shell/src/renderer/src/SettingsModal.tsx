@@ -322,11 +322,14 @@ function AiModelPane({ t }: { t: TFunc }) {
     let alive = true
     void window.aiOffice.getAiSettings?.().then((s) => {
       if (!alive || !s) return
-      // The switch is disabled with genspark, so never present it stranded
-      // off. Display-only: s.provider may be the activeProvider fallback for
-      // a half-configured BYOK selection, so writing anything back here would
-      // clobber the stored choice — the main process heals a genuine legacy
-      // genspark+off file itself, judged on the raw stored provider.
+      // s.provider may be the usable-provider fallback for a half-configured choice; the pane
+      // shows (and saves) the stored choice instead, so an incomplete LiteLLM or own-key setup
+      // keeps its mode and only the missing field is left to fill
+      if (s.storedProvider && s.storedProvider !== s.provider) {
+        s = { ...s, provider: s.storedProvider }
+      }
+      // The switch is disabled with genspark, so never present it stranded off;
+      // the main process heals a genuine legacy genspark+off file itself.
       if (s.provider === 'genspark' && s.gskToolsEnabled === false) {
         s = { ...s, gskToolsEnabled: true }
       }

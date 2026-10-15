@@ -3794,9 +3794,11 @@ export function registerAiIpc(): void {
       writeJsonAtomic(SETTINGS_PATH(), stored)
     }
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark
+    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark.
+    // The stored choice travels along so Settings can show (and keep) an incomplete setup.
+    const storedProvider = settings.provider
     settings.provider = activeProvider(settings)
-    return settings
+    return { ...settings, storedProvider }
   })
 
   // Genspark account (gsk login state): auth source for AI features; the frontend uses it to prompt login when logged out
