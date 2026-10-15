@@ -131,7 +131,8 @@ GenOffice keeps working without LLM Wiki.
 
 - **Settings → AI media → 업무 위키 block**, which gets one more line: LLM Wiki status
   (실행 중 / 정리 중 n건 / 실행 안 됨 + reason).
-- **File menu in every editor:**
+- **Entry points (first version):** the Home screen (a card pair and the File menu), the Hangul File menu, and buttons in Settings. Word and PowerPoint menus are built inside those apps and are left for later.
+- **File menu items:**
   - "업무 위키 열기" (shows the LLM Wiki window)
   - "업무 위키에 자료 추가…"
 
