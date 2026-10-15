@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, renameSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, renameSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -29,7 +29,6 @@ describe('WorkWikiEngine hardening', () => {
       complete: model(),
       extractText: text,
       debounceMs: 0,
-      watch: false,
     })
     engine.start()
     engine.onDocumentSaved('D:/docs/a.hwp')
@@ -51,7 +50,6 @@ describe('WorkWikiEngine hardening', () => {
       complete,
       extractText: text,
       debounceMs: 0,
-      watch: false,
     })
     engine.start()
     engine.onDocumentSaved('D:/docs/a.hwp')
@@ -76,7 +74,6 @@ describe('WorkWikiEngine hardening', () => {
       complete: model(),
       extractText: text,
       debounceMs: 0,
-      watch: false,
     })
     first.start()
     first.onDocumentSaved('D:/private/secret.hwp')
@@ -89,7 +86,6 @@ describe('WorkWikiEngine hardening', () => {
       extractText: text,
       exclude: ['D:/private'],
       debounceMs: 0,
-      watch: false,
     })
     again.start()
     await again.runDue()
@@ -103,7 +99,6 @@ describe('WorkWikiEngine hardening', () => {
       complete: model(),
       extractText: text,
       debounceMs: 0,
-      watch: false,
     })
     engine.start()
     engine.onDocumentSaved('D:/docs/a.hwp')
@@ -112,5 +107,25 @@ describe('WorkWikiEngine hardening', () => {
     expect(engine.enabled).toBe(false)
     expect(engine.read('x')).toEqual({ ok: false, error: '업무 위키를 사용할 수 없습니다' })
     expect(() => engine.onDocumentSaved('D:/docs/b.hwp')).not.toThrow()
+  })
+
+  it('never writes index.md, log.md or anything under raw/sources', async () => {
+    const root = tmp()
+    const engine = new WorkWikiEngine({
+      root,
+      stateDir: join(tmp(), 'state'),
+      complete: model(),
+      extractText: text,
+      debounceMs: 0,
+    })
+    engine.start()
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await engine.runDue()
+    await engine.remember(['표는 앞에'])
+    await engine.runDue()
+    expect(existsSync(join(root, 'wiki', 'index.md'))).toBe(false)
+    expect(existsSync(join(root, 'wiki', 'log.md'))).toBe(false)
+    expect(existsSync(join(root, 'raw', 'sources'))).toBe(false)
+    expect(readdirSync(join(root, 'raw', 'genoffice-notes')).length).toBe(1)
   })
 })

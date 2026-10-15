@@ -110,7 +110,6 @@ describe('review fixes', () => {
       root: store.root,
       complete: vi.fn(),
       extractText: async () => null,
-      watch: false,
     })
     engine.start()
     const r = engine.read(method.slug)

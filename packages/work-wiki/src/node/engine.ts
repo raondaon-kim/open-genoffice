@@ -1,5 +1,4 @@
-import { existsSync, readFileSync, renameSync, watch, writeFileSync } from 'node:fs'
-import type { FSWatcher } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fenceWikiText } from '../fence'
 import { serializePage, todayIso } from '../page'
@@ -23,24 +22,18 @@ export interface EngineOptions {
   /** wait after the last save of a path before learning it (default 2 minutes) */
   debounceMs?: number
   now?: () => Date
-  /** watch raw/sources for dropped files (default true) */
-  watch?: boolean
-  /** wait after a file appears in raw/sources before learning it (default 10 s) */
-  sourceSettleMs?: number
   log?: (msg: string) => void
 }
 
 interface Job {
   path: string
   dueAt: number
-  kind: 'document' | 'source' | 'note'
+  kind: 'document' | 'note'
 }
 
 const LEARNED = new Set(['.hwp', '.hwpx', '.docx', '.pptx'])
-const SOURCE_EXT = new Set([...LEARNED, '.pdf', '.md', '.txt'])
 const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase()
 const DEFAULT_DEBOUNCE_MS = 120_000
-const SOURCE_SETTLE_MS = 10_000
 
 export class WorkWikiEngine {
   private readonly opts: EngineOptions
@@ -51,7 +44,6 @@ export class WorkWikiEngine {
   private readonly jobs = new Map<string, Job>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
   private running: Promise<void> | null = null
-  private watcher: FSWatcher | null = null
   private isEnabled = false
 
   constructor(opts: EngineOptions) {
@@ -83,7 +75,6 @@ export class WorkWikiEngine {
       this.disable(err)
       return false
     }
-    if (this.opts.watch !== false) this.watchSources()
     this.refreshSearch()
     return true
   }
@@ -93,8 +84,6 @@ export class WorkWikiEngine {
     this.isEnabled = false
     for (const t of this.timers.values()) clearTimeout(t)
     this.timers.clear()
-    this.watcher?.close()
-    this.watcher = null
   }
 
   async stopAndWait(): Promise<void> {
@@ -132,15 +121,11 @@ export class WorkWikiEngine {
   }
 
   private accepts(path: string, kind: Job['kind']): boolean {
+    if (kind === 'note') return true // written by remember(), under raw/genoffice-notes
     const p = norm(path)
-    const root = norm(this.opts.root)
-    const raw = norm(join(this.opts.root, 'raw', 'sources'))
-    const ext = extname(path).toLowerCase()
-    if (kind === 'document') {
-      if (!LEARNED.has(ext)) return false
-      // the wiki's own files are learned only from raw/sources
-      if (p.startsWith(`${root}/`) && !p.startsWith(`${raw}/`)) return false
-    } else if (!SOURCE_EXT.has(ext)) return false
+    if (!LEARNED.has(extname(path).toLowerCase())) return false
+    // nothing inside the wiki folder is a document of the user's
+    if (p.startsWith(`${norm(this.opts.root)}/`)) return false
     if (basename(path).startsWith('~$') || /\.tmp$/i.test(path)) return false
     return !(this.opts.exclude ?? []).some((e) => p === norm(e) || p.startsWith(`${norm(e)}/`))
   }
@@ -239,32 +224,6 @@ export class WorkWikiEngine {
     }
   }
 
-  private watchSources(): void {
-    const store = this.store!
-    try {
-      this.watcher = watch(store.rawDir, { recursive: true }, (_event, name) => {
-        if (!name) return
-        const path = join(store.rawDir, name.toString())
-        // notes are queued by remember()
-        if (norm(path).startsWith(`${norm(store.notesDir)}/`)) return
-        if (existsSync(path) && this.accepts(path, 'source')) {
-          try {
-            this.schedule({
-              path,
-              dueAt: Date.now() + (this.opts.sourceSettleMs ?? SOURCE_SETTLE_MS),
-              kind: 'source',
-            })
-          } catch (err) {
-            this.disable(err)
-          }
-        }
-      })
-      this.watcher.on('error', (err) => this.disable(err))
-    } catch (err) {
-      this.opts.log?.(`work wiki watch: ${String(err)}`)
-    }
-  }
-
   private refreshSearch(): void {
     this.searchIndex = this.store ? new WikiSearch(this.store.listPages()) : null
   }
@@ -298,7 +257,7 @@ export class WorkWikiEngine {
       : { ok: false, error: `no wiki page: ${slug}` }
   }
 
-  /** write the points as a dated note under raw/sources/genoffice and learn it right away */
+  /** write the points as a dated note under raw/genoffice-notes and learn it right away */
   async remember(points: string[], work?: string): Promise<{ ok: boolean; error?: string }> {
     if (!this.isEnabled || !this.store) return { ok: false, error: WIKI_UNAVAILABLE }
     const clean = points

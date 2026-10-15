@@ -31,7 +31,6 @@ describe('WorkWikiEngine', () => {
       complete,
       extractText: async (p) => texts[p] ?? null,
       debounceMs: 1000,
-      watch: false,
       ...over,
     })
     return { engine, complete, texts, root }
@@ -96,7 +95,6 @@ describe('WorkWikiEngine', () => {
       complete,
       extractText: async () => 'Ⅰ. 개요\n내용',
       debounceMs: 1000,
-      watch: false,
     })
     again.start()
     await vi.advanceTimersByTimeAsync(1100)
@@ -132,31 +130,10 @@ describe('WorkWikiEngine', () => {
       root: join(root, 'blocker', 'wiki'),
       complete: model(),
       extractText: async () => null,
-      watch: false,
     })
     expect(engine.start()).toBe(false)
     expect(engine.enabled).toBe(false)
     expect(() => engine.onDocumentSaved('D:/docs/a.hwp')).not.toThrow()
     expect(engine.read('x')).toEqual({ ok: false, error: '업무 위키를 사용할 수 없습니다' })
-  })
-
-  it('learns a file dropped into raw/sources', async () => {
-    vi.useRealTimers()
-    const root = mkdtempSync(join(tmpdir(), 'ww-'))
-    const complete = model()
-    const engine = new WorkWikiEngine({
-      root,
-      complete,
-      extractText: async () => '회사 소개\n보건 ODA 사업 수행',
-      sourceSettleMs: 50,
-    })
-    engine.start()
-    writeFileSync(join(root, 'raw', 'sources', '회사소개.md'), '회사 소개')
-    for (let i = 0; i < 40 && complete.mock.calls.length === 0; i++) {
-      await new Promise((r) => setTimeout(r, 50))
-    }
-    await engine.runDue()
-    engine.stop()
-    expect(complete).toHaveBeenCalled()
   })
 })

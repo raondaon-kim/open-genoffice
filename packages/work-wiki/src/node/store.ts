@@ -24,27 +24,31 @@ GenOffice가 저장된 문서와 대화에서 자동으로 정리하는 업무 �
 
 const SCHEMA = `# 페이지 규칙
 
+이 폴더는 GenOffice와 LLM Wiki가 함께 씁니다.
+
+## GenOffice가 관리 (사람이 고치지 않습니다)
 - wiki/work/: 업무 하나에 한 페이지 (1,500자 이내). 섹션: 개요, 진행·결정, 관련 문서, 이력
 - wiki/methods/: 작업 방식 (2,000자 이내). 섹션: 방식, 수정 경향, 이력
 - wiki/clients/: 기관 (800자 이내). 섹션: 선호, 이력
+- raw/genoffice-notes/: 대화에서 기억한 메모
+
+## LLM Wiki가 관리
+- raw/sources/: 사용자가 넣은 자료 (회사소개서, 지난 제안서 등)
+- wiki/entities/: 인물·기관·사업, wiki/concepts/: 개념·방법, wiki/sources/: 자료 요약
+- wiki/queries, comparisons, synthesis, index.md, log.md, overview.md
+
+## 공통
 - 앞머리: type, title, aliases, summary, tags, related, sources, created, updated
-- 본문 링크는 [[slug]]
+- 본문 링크는 [[이름]]
 `
 
 /** page names are file names: letters, digits and hyphens only, so no name leaves its folder */
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]{0,79}$/u
 export const isValidSlug = (slug: string): boolean => SLUG.test(slug)
 
-const TYPE_HEADINGS: Record<WikiPageType, string> = {
-  work: '업무',
-  method: '작업 방식',
-  client: '기관',
-}
-
 export class WikiStore {
   readonly root: string
   readonly wikiDir: string
-  readonly rawDir: string
   readonly notesDir: string
   readonly stateDir: string
   private readonly now: () => Date
@@ -53,8 +57,7 @@ export class WikiStore {
   constructor(root: string, now: () => Date = () => new Date(), stateDir?: string) {
     this.root = root
     this.wikiDir = join(root, 'wiki')
-    this.rawDir = join(root, 'raw', 'sources')
-    this.notesDir = join(this.rawDir, 'genoffice')
+    this.notesDir = join(root, 'raw', 'genoffice-notes')
     this.stateDir = stateDir ?? join(root, '.genoffice-wiki')
     this.now = now
   }
@@ -67,11 +70,10 @@ export class WikiStore {
       ...Object.values(PAGE_FOLDERS).map((f) => join(this.wikiDir, f)),
     ]
     for (const dir of dirs) mkdirSync(dir, { recursive: true })
+    // index.md, log.md and raw/sources belong to LLM Wiki: not created or written here
     const seed: Array<[string, string]> = [
       [join(this.root, 'purpose.md'), PURPOSE],
       [join(this.root, 'schema.md'), SCHEMA],
-      [join(this.wikiDir, 'index.md'), '# 업무 위키 목차\n'],
-      [join(this.wikiDir, 'log.md'), '# 업무 위키 기록\n'],
     ]
     for (const [path, text] of seed) if (!existsSync(path)) writeFileSync(path, text, 'utf8')
     // a read-only share fails here, not in the middle of a learn job
@@ -131,30 +133,10 @@ export class WikiStore {
     return `${base}-${n}`
   }
 
-  rebuildIndex(): void {
-    const pages = this.listPages()
-    const lines = ['# 업무 위키 목차', '']
-    for (const type of ['work', 'method', 'client'] as WikiPageType[]) {
-      const group = pages
-        .filter((p) => p.type === type)
-        .sort((a, b) =>
-          b.updated > a.updated ? 1 : b.updated < a.updated ? -1 : a.title.localeCompare(b.title),
-        )
-      if (group.length === 0) continue
-      lines.push(`## ${TYPE_HEADINGS[type]}`)
-      for (const p of group) {
-        const alias = p.aliases.length ? ` (${p.aliases.join(', ')})` : ''
-        lines.push(`- [[${p.slug}]] ${p.title}${alias} — ${p.summary}`)
-      }
-      lines.push('')
-    }
-    this.atomicWrite(join(this.wikiDir, 'index.md'), lines.join('\n'))
-  }
-
   appendLog(line: string): void {
     const d = this.now()
     const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    appendFileSync(join(this.wikiDir, 'log.md'), `- ${todayIso(d)} ${hm} ${line}\n`, 'utf8')
+    appendFileSync(join(this.stateDir, 'log.md'), `- ${todayIso(d)} ${hm} ${line}\n`, 'utf8')
   }
 
   today(): string {

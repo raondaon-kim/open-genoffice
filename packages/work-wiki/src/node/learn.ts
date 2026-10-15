@@ -282,7 +282,6 @@ export async function learn(
       store.writePage(workPage)
     }
   }
-  store.rebuildIndex()
   const verb =
     input.kind === 'revision' ? '수정 반영' : input.kind === 'note' ? '대화 기억' : '학습'
   store.appendLog(`${verb}: ${input.title} → ${touched.join(', ')}`)

@@ -35,14 +35,32 @@ describe('WikiStore', () => {
     for (const p of [
       'purpose.md',
       'schema.md',
-      'wiki/index.md',
-      'wiki/log.md',
-      'raw/sources/genoffice',
+      'raw/genoffice-notes',
       'wiki/work',
       'wiki/methods',
       'wiki/clients',
     ]) {
       expect(existsSync(join(root, p))).toBe(true)
+    }
+    // LLM Wiki owns these: the store neither creates nor writes them
+    for (const p of ['wiki/index.md', 'wiki/log.md', 'raw/sources']) {
+      expect(existsSync(join(root, p))).toBe(false)
+    }
+  })
+
+  it("seeds a schema that names both programs' folders", () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-'))
+    new WikiStore(root, fixed).bootstrap()
+    const schema = readFileSync(join(root, 'schema.md'), 'utf8')
+    for (const name of [
+      'wiki/work',
+      'wiki/methods',
+      'wiki/clients',
+      'entities',
+      'concepts',
+      'raw/sources',
+    ]) {
+      expect(schema).toContain(name)
     }
   })
 
@@ -62,20 +80,10 @@ describe('WikiStore', () => {
     )
   })
 
-  it('rebuilds index.md grouped by type, work newest first', () => {
-    const store = newStore()
-    store.writePage(page({ slug: 'old', title: '옛 업무', updated: '2026-01-01' }))
-    store.writePage(page({ slug: 'new', title: '새 업무', updated: '2026-10-01' }))
-    store.rebuildIndex()
-    const index = readFileSync(join(store.root, 'wiki/index.md'), 'utf8')
-    expect(index.indexOf('새 업무')).toBeLessThan(index.indexOf('옛 업무'))
-    expect(index).toContain('## 업무')
-  })
-
   it('appends dated log lines and gives unique slugs', () => {
     const store = newStore()
     store.appendLog('학습: 제안서.hwp')
-    expect(readFileSync(join(store.root, 'wiki/log.md'), 'utf8')).toMatch(
+    expect(readFileSync(join(store.stateDir, 'log.md'), 'utf8')).toMatch(
       /- 2026-10-14 09:00 학습: 제안서\.hwp/,
     )
     store.writePage(page({ slug: 'koica', title: 'KOICA' }))
