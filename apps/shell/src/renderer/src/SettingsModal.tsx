@@ -35,6 +35,7 @@ import type { StringKey, TFunc } from './locale'
 import type { AccountStatus, AiCatalogEntry, DocTheme, UiTheme } from '../../shared/home-api'
 import { ProviderLogo } from './provider-logos'
 import { ConnectionCards } from './ConnectionCards'
+import { CodexConnectionRow } from './CodexConnectionRow'
 import { IntegrationsPane, skillUpdateDue } from './IntegrationsPane'
 import { WorkWikiSettingsBlock } from './WorkWikiSettings'
 import './settings.css'
@@ -600,6 +601,15 @@ function AiModelPane({ t }: { t: TFunc }) {
           />
         )}
       </div>
+      {isCodex && (
+        <CodexConnectionRow
+          t={t}
+          cliPath={config.cliPath ?? ''}
+          onConnected={() =>
+            void refreshCodexModels(config.cliPath ?? '', config.model).catch(() => undefined)
+          }
+        />
+      )}
       {isCodex ? (
         <details className="set-ai-advanced">
           <summary>{t('setAiCodexAdvanced')}</summary>
