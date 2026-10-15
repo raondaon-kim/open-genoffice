@@ -20,8 +20,8 @@
     "@genoffice/ai-provider": "*",
     "@genoffice/ui": "*",
     "@hwpforge/mcp": "^0.16.4",
-    "@rhwp/core": "0.8.6",
-    "@rhwp/editor": "0.8.6"
+    "@rhwp/core": "0.8.7",
+    "@rhwp/editor": "0.8.7"
   },
   "devDependencies": {
     "@genoffice/doc-styles": "*",

@@ -47,7 +47,8 @@ const SCRIPT_VERSION = 1
 const FORCE = process.argv.includes('--force')
 const IS_WIN = process.platform === 'win32'
 
-const require = createRequire(import.meta.url)
+// resolve @rhwp/core from the hwp app: npm may keep it in apps/hwp/node_modules instead of the root
+const require = createRequire(join(HWP_DIR, 'package.json'))
 const coreDir = dirname(require.resolve('@rhwp/core/package.json'))
 const rhwpVersion = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf8')).version
 const tag = `v${rhwpVersion}`
@@ -150,7 +151,7 @@ function placeFontsAndIcon() {
 }
 
 function buildStudio() {
-  // upstream ships a package-lock.json (v0.8.6); fall back to install if a later tag drops it
+  // upstream ships a package-lock.json (v0.8.7); fall back to install if a later tag drops it
   run('npm', [existsSync(join(STUDIO_DIR, 'package-lock.json')) ? 'ci' : 'install'], {
     cwd: STUDIO_DIR,
   })
