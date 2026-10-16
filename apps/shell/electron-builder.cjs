@@ -71,6 +71,15 @@ const fontCdnUrl = normalizeHttpsBaseUrl(
 // switch.
 const includeMacX64 = process.env.GENOFFICE_MAC_X64 === '1'
 
+// Unsigned contributor / PR dmgs. Signed mac releases set CSC_LINK or CSC_NAME
+// and keep hardened runtime, notarization, and the zip update artifact.
+// GENOFFICE_MAC_UNSIGNED=1 (or CSC_IDENTITY_AUTO_DISCOVERY=false, which the
+// macos-dmg workflow sets) forces identity=null and turns hardened runtime off:
+// an unsigned app cannot carry the hardened runtime, and electron-builder
+// otherwise fails the build looking for a Developer ID.
+const macUnsigned =
+  process.env.GENOFFICE_MAC_UNSIGNED === '1' || process.env.CSC_IDENTITY_AUTO_DISCOVERY === 'false'
+
 // GENOFFICE_WIN_ARM64=1 — package the Windows ARM64 installer instead of x64.
 // CI runs it as a second electron-builder pass (own BUILD_DIR) after the
 // unchanged x64 pass, so the two never share an output dir or a sidecar path:
@@ -271,6 +280,36 @@ function assertUniversalSidecar() {
         `xlsx-sidecar is [${archs.join(', ')}] but both mac arch packages ship it — ` +
           'run "npm run native:build:universal -w @genoffice/sheets" before packaging mac',
       )
+    }
+  }
+}
+
+// arm64 dmg inputs electron-builder would otherwise skip with exit 0: the
+// icns (generated from apps/shell/build/icon.png by
+// tools/gen-open-genoffice-icons.mjs), the host-arch xlsx-sidecar, and the
+// macOS Hangul binaries npm/rhwp fetch place on disk.
+function assertMacPackagingInputs() {
+  const required = [
+    [
+      'build/icon.icns',
+      'mac icon missing (apps/shell/build/icon.icns; generate with node tools/gen-open-genoffice-icons.mjs)',
+    ],
+    [
+      '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
+      'xlsx-sidecar missing (npm run native:build -w @genoffice/sheets, or native:build:universal when GENOFFICE_MAC_X64=1)',
+    ],
+    [
+      '../../node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp',
+      'hwpforge darwin-arm64 binary missing (npm ci on macOS installs the optional package)',
+    ],
+    [
+      '../hwp/native/rhwp/darwin-arm64/rhwp',
+      'rhwp CLI missing (npm run fetch:rhwp-cli, which the hwp build already runs)',
+    ],
+  ]
+  for (const [rel, message] of required) {
+    if (!existsSync(join(__dirname, rel))) {
+      throw new Error(`mac packaging input missing: ${join(__dirname, rel)} — ${message}`)
     }
   }
 }
@@ -607,16 +646,27 @@ const config = {
     // GenOffice-<v>-mac.zip). Both zips land in one latest-mac.yml and
     // electron-updater picks by process.arch. Dual-arch packs ship the same
     // lipo fat xlsx-sidecar (see assertUniversalSidecar above).
-    target: [
-      { target: 'dmg', arch: includeMacX64 ? ['arm64', 'x64'] : ['arm64'] },
-      { target: 'zip', arch: includeMacX64 ? ['arm64', 'x64'] : ['arm64'] },
-    ],
+    //
+    // Unsigned builds (macUnsigned) ship a dmg only — there is no update zip —
+    // with an explicit arch in the file name. icon.icns is the mac icon
+    // generated from build/icon.png.
+    icon: 'build/icon.icns',
+    target: macUnsigned
+      ? [{ target: 'dmg', arch: includeMacX64 ? ['arm64', 'x64'] : ['arm64'] }]
+      : [
+          { target: 'dmg', arch: includeMacX64 ? ['arm64', 'x64'] : ['arm64'] },
+          { target: 'zip', arch: includeMacX64 ? ['arm64', 'x64'] : ['arm64'] },
+        ],
     category: 'public.app-category.productivity',
-    hardenedRuntime: true,
+    hardenedRuntime: !macUnsigned,
     gatekeeperAssess: false,
-    entitlements: 'build/entitlements.mac.plist',
-    entitlementsInherit: 'build/entitlements.mac.plist',
-    notarize: true,
+    ...(macUnsigned
+      ? { identity: null, notarize: false }
+      : {
+          entitlements: 'build/entitlements.mac.plist',
+          entitlementsInherit: 'build/entitlements.mac.plist',
+          notarize: true,
+        }),
     extraResources: [
       {
         from: '../sheets/native/xlsx-engine/target/release/xlsx-sidecar',
@@ -787,9 +837,12 @@ const config = {
     ensureThirdPartyNotices()
     assertModuleTreesPresent()
     ensureCliBundleCarriesAppVersion()
-    if (context.electronPlatformName === 'darwin' && includeMacX64) {
-      assertUniversalSidecar()
-      assertUniversalVisionOcr()
+    if (context.electronPlatformName === 'darwin') {
+      assertMacPackagingInputs()
+      if (includeMacX64) {
+        assertUniversalSidecar()
+        assertUniversalVisionOcr()
+      }
     }
     if (context.electronPlatformName === 'win32' && !existsSync(join(__dirname, WIN_SIDECAR))) {
       throw new Error(
@@ -798,7 +851,8 @@ const config = {
     }
   },
   dmg: {
-    sign: true,
+    sign: !macUnsigned,
+    ...(macUnsigned ? { artifactName: 'OpenGenOffice-${version}-${arch}.${ext}' } : {}),
   },
   afterAllArtifactBuild: 'build/notarize-dmg.js',
 }

@@ -96,6 +96,12 @@ The fork's material changes on top of upstream:
 - **Windows packaging**: `OPEN_GENOFFICE_WIN_SIDECAR_TARGET` selects the cargo
   target the Sheets sidecar is taken from (for example the MSVC target on a
   build machine without the GNU toolchain).
+- **macOS packaging**: an unsigned Apple Silicon `.dmg` for contributors and
+  CI. `GENOFFICE_MAC_UNSIGNED=1` (or `CSC_IDENTITY_AUTO_DISCOVERY=false`) sets
+  `identity` to null, turns the hardened runtime off, and skips dmg signing
+  and notarization. Signed mac releases that set `CSC_LINK` or `CSC_NAME` keep
+  the previous hardened-runtime path. `.github/workflows/macos-dmg.yml` builds
+  the dmg on `macos-14`. `GENOFFICE_MAC_X64=1` still adds an Intel dmg.
 
 Features of the August fork that upstream now provides itself (bring-your-own-
 key providers including DeepSeek, GLM, Kimi, MiniMax, OpenRouter and a custom
