@@ -1,0 +1,207 @@
+name: macOS dmg
+
+# Unsigned Apple Silicon dmg (optionally an Intel dmg too). workflow_dispatch
+# builds on demand; pull requests run only when packaging inputs change, so
+# the macOS runner is not used for unrelated edits. The Windows installer is
+# not built here and its electron-builder config is left on the signed path.
+
+on:
+  workflow_dispatch:
+    inputs:
+      x64:
+        description: Also build an Intel (x64) dmg (GENOFFICE_MAC_X64=1, fat sidecar)
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/macos-dmg.yml'
+      - 'apps/shell/electron-builder.cjs'
+      - 'apps/shell/package.json'
+      - 'apps/shell/build/**'
+      - 'apps/sheets/package.json'
+      - 'apps/sheets/scripts/build-sidecar-universal.mjs'
+      - 'apps/sheets/native/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tools/fetch-rhwp-cli.mjs'
+      - 'tools/build-hwp-studio.mjs'
+      - 'tools/gen-open-genoffice-icons.mjs'
+
+concurrency:
+  group: macos-dmg-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dmg:
+    runs-on: macos-14
+    timeout-minutes: 120
+    env:
+      # identity null / hardened runtime off inside electron-builder.cjs
+      GENOFFICE_MAC_UNSIGNED: '1'
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      GENOFFICE_MAC_X64: ${{ github.event.inputs.x64 == 'true' && '1' || '0' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require Apple Silicon runner
+        run: |
+          arch=$(uname -m)
+          echo "host arch: $arch"
+          test "$arch" = "arm64"
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Require Node 22.12 or newer
+        run: |
+          node -e 'const [major, minor] = process.versions.node.split(".").map(Number); if (major < 22 || (major === 22 && minor < 12)) { console.error("Node " + process.version + " is older than 22.12"); process.exit(1) } console.log("Node " + process.version); console.log("npm " + process.env.npm_config_user_agent)'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch, 2026-07
+        with:
+          toolchain: stable
+
+      - name: Show Rust toolchain
+        run: |
+          rustup show
+          rustc --version
+          cargo --version
+
+      - name: Cache cargo (xlsx-sidecar)
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: apps/sheets/native/xlsx-engine
+
+      - name: Cache electron binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: electron-mac-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-mac-
+
+      - name: Install dependencies
+        # npm ci on darwin installs the arm64 optional native packages
+        # (@hwpforge/mcp-darwin-arm64, @napi-rs/canvas-darwin-arm64, …).
+        # electron-builder npmRebuild stays false: those packages ship prebuilds,
+        # and the Rust sidecar is produced by cargo below rather than node-gyp.
+        run: npm ci --no-audit --no-fund
+
+      - name: Confirm macOS native packages and icon
+        run: |
+          test -f node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp
+          ls -l node_modules/@hwpforge/mcp-darwin-arm64/bin/hwpforge-mcp
+          test -f apps/shell/build/icon.icns
+          file apps/shell/build/icon.icns
+          swiftc --version
+
+      - name: Build app bundles and host xlsx sidecar
+        # sheets' build runs `cargo build --release` for the host (arm64).
+        # hwp's build fetches the darwin-arm64 rhwp CLI and builds the studio.
+        run: npm run build:all
+
+      - name: Build universal xlsx sidecar
+        if: github.event.inputs.x64 == 'true'
+        run: |
+          rustup target add aarch64-apple-darwin x86_64-apple-darwin
+          npm run native:build:universal -w @genoffice/sheets
+
+      - name: Package unsigned dmg
+        run: npm run dist:mac -w @genoffice/shell
+
+      - name: Verify unsigned dmg
+        run: |
+          set -eu
+          dmgs=()
+          while IFS= read -r -d '' f; do
+            dmgs+=("$f")
+          done < <(find apps/shell/release -name '*.dmg' -print0)
+          if [ "${#dmgs[@]}" -eq 0 ]; then
+            echo "no dmg under apps/shell/release" >&2
+            find apps/shell/release -type f | head -100 || true
+            exit 1
+          fi
+          mkdir -p dist-dmg
+          for f in "${dmgs[@]}"; do
+            echo "DMG $(basename "$f") $(stat -f%z "$f") bytes"
+            file "$f"
+            mnt=$(mktemp -d)
+            hdiutil attach "$f" -nobrowse -readonly -mountpoint "$mnt"
+            detach() { hdiutil detach "$mnt" || hdiutil detach -force "$mnt" || true; }
+            app=$(find "$mnt" -maxdepth 2 -name '*.app' | head -1)
+            if [ -z "$app" ]; then
+              detach
+              echo "dmg has no .app" >&2
+              exit 1
+            fi
+            exe=$(defaults read "$app/Contents/Info" CFBundleExecutable)
+            echo "app=$app exe=$exe"
+            file "$app/Contents/MacOS/$exe"
+            app_archs=$(lipo -archs "$app/Contents/MacOS/$exe")
+            side_archs=$(lipo -archs "$app/Contents/Resources/native/xlsx-sidecar")
+            echo "app archs: $app_archs"
+            echo "sidecar archs: $side_archs"
+            echo "$app_archs" | grep -q arm64
+            echo "$side_archs" | grep -q arm64
+            if [ "$GENOFFICE_MAC_X64" = "1" ]; then
+              echo "$side_archs" | grep -q x86_64
+            fi
+            test -x "$app/Contents/Resources/native/xlsx-sidecar"
+            test -x "$app/Contents/Resources/native/hwpforge-mcp"
+            test -x "$app/Contents/Resources/native/rhwp"
+            test -f "$app/Contents/Resources/ocr/vision-ocr"
+            icon=$(defaults read "$app/Contents/Info" CFBundleIconFile)
+            echo "CFBundleIconFile=$icon"
+            icon_base=${icon%.icns}
+            test -f "$app/Contents/Resources/$icon_base.icns"
+            set +e
+            sign_info=$(codesign -dv "$app" 2>&1)
+            set -e
+            echo "$sign_info"
+            # Electron ships a linker ad-hoc signature. identity=null means no
+            # Developer ID: TeamIdentifier stays unset.
+            if echo "$sign_info" | grep -q 'Authority=Developer ID'; then
+              echo "expected an unsigned app (no Developer ID)" >&2
+              detach
+              exit 1
+            fi
+            echo "$sign_info" | grep -q 'TeamIdentifier=not set'
+            detach
+            cp "$f" dist-dmg/
+          done
+
+      - name: Upload dmg artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: OpenGenOffice-macos-dmg
+          path: dist-dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Note unsigned install
+        run: |
+          {
+            echo "### Unsigned macOS dmg"
+            echo
+            echo "No Developer ID. Electron's main binary stays linker-signed (ad hoc) and Gatekeeper still quarantines the app. After copying it to Applications:"
+            echo
+            echo '```sh'
+            echo 'xattr -cr "/Applications/Open GenOffice.app"'
+            echo '```'
+            echo
+            echo "| file | bytes |"
+            echo "| --- | --- |"
+            while IFS= read -r -d '' f; do
+              echo "| $(basename "$f") | $(stat -f%z "$f") |"
+            done < <(find apps/shell/release -name '*.dmg' -print0)
+          } >> "$GITHUB_STEP_SUMMARY"
