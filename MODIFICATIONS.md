@@ -81,6 +81,9 @@ The fork's material changes on top of upstream:
   Settings › AI model offers LiteLLM, Codex and own API keys as three connection modes;
   the LiteLLM card prefills the build's address (also on an existing install) and defaults to
   `deepseek-flash`.
+- **Scanned PDFs:** the Windows installer carries Tesseract with Korean and English data
+  (`tools/fetch-tesseract.mjs`, pinned and hash-checked); LLM Wiki reads scanned PDFs with it, so
+  nothing extra is installed.
 - **Codex connection:** the Windows installer carries the unmodified Codex CLI (Apache-2.0,
   pinned and integrity-checked by `tools/fetch-codex-cli.mjs`) in `resources/codex/`; Settings
   can sign in to it and connect, and the work wiki can learn through it.

@@ -131,6 +131,19 @@ function assertCodexStaged() {
   }
 }
 
+// the Windows x64 installer must carry Tesseract for scanned PDFs (run `npm run fetch:tesseract`)
+function assertTesseractStaged() {
+  for (const rel of [
+    'build/tesseract/tesseract.exe',
+    'build/tesseract/tessdata/kor.traineddata',
+    'build/tesseract/LICENSE',
+  ]) {
+    if (!existsSync(join(__dirname, rel))) {
+      throw new Error(`Tesseract is not staged: run npm run fetch:tesseract (${rel})`)
+    }
+  }
+}
+
 function assertExtraResourceSources() {
   for (const rel of [
     '../../node_modules/@genspark/cli',
@@ -654,6 +667,12 @@ const config = {
         to: 'codex',
         filter: ['**/*', '!.version'],
       },
+      // Tesseract (Apache-2.0) for LLM Wiki's scanned-PDF reading (tools/fetch-tesseract.mjs)
+      {
+        from: 'build/tesseract',
+        to: 'llm-wiki/tesseract',
+        filter: ['**/*', '!.version'],
+      },
     ],
   },
   // Unlike win (which cross-compiles the sidecar to an explicit target
@@ -758,6 +777,7 @@ const config = {
     if (context.electronPlatformName === 'win32' && !winArm64) {
       assertLlmWikiStaged()
       assertCodexStaged()
+      assertTesseractStaged()
     }
     ensureThirdPartyNotices()
     assertModuleTreesPresent()

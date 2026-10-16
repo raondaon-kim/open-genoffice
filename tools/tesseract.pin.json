@@ -1,0 +1,48 @@
+{
+  "version": "5.4.0.20240606",
+  "installer": {
+    "url": "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe",
+    "sha256": "c885fff6998e0608ba4bb8ab51436e1c6775c2bafc2559a19b423e18678b60c9"
+  },
+  "files": [
+    "tesseract.exe",
+    "libtesseract-5.dll",
+    "libleptonica-6.dll",
+    "libarchive-13.dll",
+    "libb2-1.dll",
+    "libbz2-1.dll",
+    "libcrypto-3-x64.dll",
+    "libdeflate.dll",
+    "libexpat-1.dll",
+    "libgcc_s_seh-1.dll",
+    "libgif-7.dll",
+    "libiconv-2.dll",
+    "libjbig-0.dll",
+    "libjpeg-8.dll",
+    "liblerc.dll",
+    "liblz4.dll",
+    "liblzma-5.dll",
+    "libopenjp2-7.dll",
+    "libpng16-16.dll",
+    "libsharpyuv-0.dll",
+    "libstdc++-6.dll",
+    "libtiff-6.dll",
+    "libwebp-7.dll",
+    "libwebpmux-3.dll",
+    "libwinpthread-1.dll",
+    "libzstd.dll",
+    "zlib1.dll"
+  ],
+  "tessdata": [
+    {
+      "name": "kor",
+      "url": "https://github.com/tesseract-ocr/tessdata_best/raw/4.1.0/kor.traineddata",
+      "sha256": "f888d4038348a0c3d25151e7f452bda0d74ca275b18cab146798bcbb94084fff"
+    },
+    {
+      "name": "eng",
+      "url": "https://github.com/tesseract-ocr/tessdata_fast/raw/4.1.0/eng.traineddata",
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+    }
+  ]
+}
