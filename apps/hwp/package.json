@@ -20,8 +20,8 @@
     "@genoffice/ai-provider": "*",
     "@genoffice/ui": "*",
     "@hwpforge/mcp": "^0.16.4",
-    "@rhwp/core": "0.8.6",
-    "@rhwp/editor": "0.8.6"
+    "@rhwp/core": "0.8.7",
+    "@rhwp/editor": "0.8.7"
   },
   "devDependencies": {
     "@genoffice/doc-styles": "*",
@@ -38,7 +38,8 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11",
     "@genoffice/file-parse": "*",
-    "cfb": "^1.2.2"
+    "cfb": "^1.2.2",
+    "@genoffice/work-wiki": "*"
   },
   "author": "Serge Doub and Open GenOffice contributors"
 }

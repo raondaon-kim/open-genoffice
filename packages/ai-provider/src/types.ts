@@ -139,6 +139,17 @@ export interface AiSearchSettings {
 
 export interface AiSettings {
   provider: AiProviderId
+  /**
+   * The provider own-key mode (mode 3) shows. Remembered while LiteLLM or Codex is selected so a
+   * round trip through them returns to it. Never `litellm` or `codex`.
+   */
+  byokProvider?: AiProviderId | undefined
+  /**
+   * Read-only, set by the settings reader: the provider as stored, before a half-configured choice
+   * falls back to a usable one. Settings shows the stored choice so an incomplete setup is not lost
+   * on the next save. Never persisted (the schema check drops it).
+   */
+  storedProvider?: AiProviderId | undefined
   providers: Record<AiProviderId, AiProviderConfig>
   /**
    * Provider for generate_image / analyze_media. Absent (pre-media settings

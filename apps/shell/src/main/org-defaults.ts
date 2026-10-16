@@ -33,6 +33,13 @@ export function parseOrgDefaults(raw: unknown): OrgAiDefaults | null {
   return { provider, baseUrl: url, model: id }
 }
 
+/** what the Settings screen may see of the build's defaults: no provider id, never a key */
+export function orgDefaultsView(
+  defaults: OrgAiDefaults | null,
+): { baseUrl: string; model: string } | null {
+  return defaults ? { baseUrl: defaults.baseUrl, model: defaults.model } : null
+}
+
 export function readOrgDefaults(path: string): OrgAiDefaults | null {
   if (!existsSync(path)) return null
   try {

@@ -3794,9 +3794,11 @@ export function registerAiIpc(): void {
       writeJsonAtomic(SETTINGS_PATH(), stored)
     }
     const settings = resolveAiSettings(stored, defaultAiSettings())
-    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark
+    // a stored BYOK provider is honored when usable; half-filled configs fall back to genspark.
+    // The stored choice travels along so Settings can show (and keep) an incomplete setup.
+    const storedProvider = settings.provider
     settings.provider = activeProvider(settings)
-    return settings
+    return { ...settings, storedProvider }
   })
 
   // Genspark account (gsk login state): auth source for AI features; the frontend uses it to prompt login when logged out
@@ -4074,6 +4076,19 @@ let projectIpcRegistered = false
 function getProjectStore(): ProjectStore {
   if (!projectStore) projectStore = new ProjectStore(app.getPath('userData'))
   return projectStore
+}
+
+/** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setDocsDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
 }
 
 /**
@@ -4523,6 +4538,7 @@ export function registerDocsIpc(): void {
         )
         clearRecoveryCopy(filePath)
         pushRecent(filePath)
+        notifyDocumentSaved(filePath)
         return {
           ok: true,
           passwordIntentPending,
@@ -4729,6 +4745,7 @@ export function registerDocsIpc(): void {
           result.filePath,
         )
         pushRecent(result.filePath)
+        notifyDocumentSaved(result.filePath)
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
         const savedPath = notifyFileSaved(event.sender, result.filePath)
@@ -4774,6 +4791,7 @@ export function registerDocsIpc(): void {
       }
       const passwordIntentPending = commitDocPasswordSave(event.sender.id, passwordState, filePath)
       pushRecent(filePath)
+      notifyDocumentSaved(filePath)
       const savedPath = notifyFileSaved(event.sender, filePath)
       return {
         ok: true,
@@ -4844,6 +4862,7 @@ export function registerDocsIpc(): void {
           filePath,
         )
         pushRecent(filePath)
+        notifyDocumentSaved(filePath)
         rememberOpenDoc(event.sender.id, filePath)
         notifyFileSaved(event.sender, filePath)
         return {

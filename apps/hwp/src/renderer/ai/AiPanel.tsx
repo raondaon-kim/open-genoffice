@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
-import { AgentLoop, composeSkills } from '@genoffice/agent-core'
+import { AgentLoop } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { AiComposer, Markdown } from '@genoffice/ui'
 import type { AiConversationIdentity, HwpAttachment, ProjectChatMessage } from '../../shared/ipc'
-import { createFilesSkill } from './files-skill'
-import { createHwpSkill, HWP_MAX_TURNS } from './hwp-skill'
+import { createHwpAssistantSkill } from './assistant-skill'
+import { HWP_MAX_TURNS } from './hwp-skill'
 import { persistedRunText, runEndText } from './run-notice'
 import { shouldRebindChat } from './chat-identity'
 import { createElectronTransport } from './transport'
@@ -127,13 +127,12 @@ export function HwpAiPanel({
   if (!loopRef.current) {
     loopRef.current = new AgentLoop({
       transport: transportRef.current,
-      skill: composeSkills('hwp+files', '', [
-        createHwpSkill(ctxRef.current),
-        createFilesSkill(
-          () => attachmentsRef.current,
-          () => window.hwpApi,
-        ),
-      ]),
+      skill: createHwpAssistantSkill(
+        ctxRef.current,
+        () => attachmentsRef.current,
+        () => window.hwpApi,
+        () => window.workWiki,
+      ),
       maxTurns: HWP_MAX_TURNS,
       events: {
         onText: (text) => {

@@ -17,7 +17,8 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const require = createRequire(import.meta.url)
+// resolve @rhwp/core from the hwp app: npm may keep it in apps/hwp/node_modules instead of the root
+const require = createRequire(join(ROOT, 'apps', 'hwp', 'package.json'))
 const FORCE = process.argv.includes('--force')
 const REPO = 'edwardkim/rhwp'
 

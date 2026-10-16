@@ -26,7 +26,8 @@ import { HwpIntentStore } from './hwp-intents'
 import type { NativeBinaryName } from './native-binary-path'
 import { runRhwp } from './rhwp-cli'
 import { dumpForShape } from './dump-shape'
-import { legacyHangulHwp } from './hwp5-legacy'
+import { legacyHangulHwpChecked } from './hwp5-legacy'
+import { backupBeforeOverwrite, bytesMatchPath } from './save-guard'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import { buildStyledDocument } from './styled-document'
@@ -401,6 +402,8 @@ export function configureHwpRuntime(paths: RuntimePaths): void {
 const intents = new HwpIntentStore()
 /** File paths granted to each view — readFile/save only allow these */
 const allowedByWc = new Map<number, Set<string>>()
+/** Paths each view has already written this session: its first overwrite of a file keeps a .bak of the original */
+const writtenByWc = new Map<number, Set<string>>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
 const dirtyByWc = new Set<number>()
 const saveWaiters = new Map<number, (ok: boolean) => void>()
@@ -567,15 +570,30 @@ function registerHwpIpc(): void {
     try {
       let bytes: Uint8Array = new Uint8Array(request.data)
       if (bytes.byteLength === 0) return { ok: false, error: 'hwp: empty save payload' }
-      // an .hwp is written so older Hangul (2005 and up) opens it too
-      if (/\.hwp$/i.test(path)) bytes = legacyHangulHwp(bytes)
+      // the bytes must be the format the file name says (an .hwpx is a zip, an .hwp a compound file)
+      if (!bytesMatchPath(bytes, path)) {
+        return { ok: false, error: 'hwp: the exported bytes do not match the file type' }
+      }
+      // an .hwp is written so older Hangul (2005 and up) opens it too; a re-packed file that
+      // fails its own check is dropped in favour of what rhwp wrote
+      if (/\.hwp$/i.test(path)) {
+        const legacy = legacyHangulHwpChecked(bytes)
+        if (!legacy.repacked) {
+          console.warn('hwp: kept the rhwp bytes, the Hangul 2005 re-pack did not check out')
+        }
+        bytes = legacy.bytes
+      }
+      // the user's original is kept as <name>.bak before the app's first overwrite of it
+      const written = writtenByWc.get(e.sender.id) ?? new Set<string>()
+      writtenByWc.set(e.sender.id, written)
+      const backupPath = await backupBeforeOverwrite(path, written)
       // Temp file + rename for atomic replace; a mid-write crash won't corrupt the original
       const tmp = `${path}.gensave-${process.pid}.tmp`
       await writeFile(tmp, bytes)
       await rename(tmp, path)
       // first save of an untitled doc / title + recent-file updates
       runtime.onSaved?.(e.sender.id, path)
-      return { ok: true }
+      return backupPath ? { ok: true, backupPath } : { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -862,6 +880,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   wc.once('destroyed', () => {
     intents.forget(wcId)
     allowedByWc.delete(wcId)
+    writtenByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)

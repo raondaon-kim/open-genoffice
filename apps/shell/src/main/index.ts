@@ -139,6 +139,7 @@ import {
   setDocsHostWindowHook,
   setDocsShellWindow,
   setDocsFileSavedHook,
+  setDocsDocumentSavedHook,
   setDocsFileOpenedHook,
   setSessionPathResolver,
   defaultSaveDir,
@@ -198,6 +199,7 @@ import {
   setSlidesCloseTabHook,
   setSlidesExtraFileMenuItems,
   setSlidesOpenedHook,
+  setSlidesDocumentSavedHook,
   setSlidesHostWindowHook,
   setSlidesShellWindow,
   setSlidesShowBleed,
@@ -237,7 +239,16 @@ import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hw
 import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
-import { firstRunAiSettings, readOrgDefaults } from './org-defaults'
+import { firstRunAiSettings, orgDefaultsView, readOrgDefaults } from './org-defaults'
+import { registerCodexIpc, stopCodexLoginForQuit } from './codex-connection'
+import {
+  addWikiMaterialFromDialog,
+  openLlmWiki,
+  registerWorkWikiIpc,
+  startWorkWiki,
+  stopWorkWikiForQuit,
+  workWikiDocumentSaved,
+} from './work-wiki'
 import {
   configureHtmlRuntime,
   exportHtmlHeadless,
@@ -382,10 +393,10 @@ if (!app.isPackaged)
 // its resources; an unpacked run can point OPEN_GENOFFICE_ORG_DEFAULTS at one. Only a first run
 // is seeded — existing AI settings are the user's. Settings left by the pre-upstream fork (a
 // format upstream cannot read) are kept as ai-settings.pre-upstream.json and replaced.
+const orgDefaultsPath = app.isPackaged
+  ? join(process.resourcesPath, 'org-defaults.json')
+  : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
 {
-  const orgDefaultsPath = app.isPackaged
-    ? join(process.resourcesPath, 'org-defaults.json')
-    : (process.env.OPEN_GENOFFICE_ORG_DEFAULTS ?? '')
   const aiSettingsPath = join(app.getPath('userData'), 'ai-settings.json')
   let existing: unknown
   if (existsSync(aiSettingsPath)) {
@@ -532,6 +543,8 @@ configureHwpRuntime({
     detachedSetFileFor(webContentsId, path)
     recordRecentFile(path)
     applyPendingDir(webContentsId, path)
+    // hwp calls onSaved after every write, so every Hangul save feeds the work wiki
+    workWikiDocumentSaved(path)
   },
   onCreateDocument: (path) => {
     openDocumentPath(path)
@@ -817,6 +830,8 @@ const tMain = createI18n({
     menuOpen: '打开…',
     menuSave: '保存',
     menuSaveAs: '另存为…',
+    menuWikiAddMaterial: '添加资料到工作维基…',
+    menuWikiOpen: '打开工作维基',
     menuClose: '关闭',
     menuEdit: '编辑',
     menuWindow: '窗口',
@@ -914,6 +929,8 @@ const tMain = createI18n({
     menuOpen: 'Open…',
     menuSave: 'Save',
     menuSaveAs: 'Save As…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Close',
     menuEdit: 'Edit',
     menuWindow: 'Window',
@@ -1019,6 +1036,8 @@ const tMain = createI18n({
     menuOpen: 'Mở…',
     menuSave: 'Lưu',
     menuSaveAs: 'Lưu dưới dạng…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Đóng',
     menuEdit: 'Chỉnh sửa',
     menuWindow: 'Cửa sổ',
@@ -1124,6 +1143,8 @@ const tMain = createI18n({
     menuOpen: '開く…',
     menuSave: '保存',
     menuSaveAs: '名前を付けて保存…',
+    menuWikiAddMaterial: '業務ウィキに資料を追加…',
+    menuWikiOpen: '業務ウィキを開く',
     menuClose: '閉じる',
     menuEdit: '編集',
     menuWindow: 'ウィンドウ',
@@ -1229,6 +1250,8 @@ const tMain = createI18n({
     menuOpen: '열기…',
     menuSave: '저장',
     menuSaveAs: '다른 이름으로 저장…',
+    menuWikiAddMaterial: '업무 위키에 자료 추가…',
+    menuWikiOpen: '업무 위키 열기',
     menuClose: '닫기',
     menuEdit: '편집',
     menuWindow: '창',
@@ -1333,6 +1356,8 @@ const tMain = createI18n({
     menuOpen: 'Ouvrir…',
     menuSave: 'Enregistrer',
     menuSaveAs: 'Enregistrer sous…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Fermer',
     menuEdit: 'Édition',
     menuWindow: 'Fenêtre',
@@ -1439,6 +1464,8 @@ const tMain = createI18n({
     menuOpen: 'Öffnen…',
     menuSave: 'Speichern',
     menuSaveAs: 'Speichern unter…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Schließen',
     menuEdit: 'Bearbeiten',
     menuWindow: 'Fenster',
@@ -1546,6 +1573,8 @@ const tMain = createI18n({
     menuOpen: 'Abrir…',
     menuSave: 'Guardar',
     menuSaveAs: 'Guardar como…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Cerrar',
     menuEdit: 'Edición',
     menuWindow: 'Ventana',
@@ -1652,6 +1681,8 @@ const tMain = createI18n({
     menuOpen: 'เปิด…',
     menuSave: 'บันทึก',
     menuSaveAs: 'บันทึกเป็น…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'ปิด',
     menuEdit: 'แก้ไข',
     menuWindow: 'หน้าต่าง',
@@ -1754,6 +1785,8 @@ const tMain = createI18n({
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
     menuSaveAs: 'Simpan Sebagai…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Tutup',
     menuEdit: 'Edit',
     menuWindow: 'Jendela',
@@ -1860,6 +1893,8 @@ const tMain = createI18n({
     menuOpen: 'Открыть…',
     menuSave: 'Сохранить',
     menuSaveAs: 'Сохранить как…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Закрыть',
     menuEdit: 'Правка',
     menuWindow: 'Окно',
@@ -1966,6 +2001,8 @@ const tMain = createI18n({
     menuOpen: 'فتح…',
     menuSave: 'حفظ',
     menuSaveAs: 'حفظ باسم…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'إغلاق',
     menuEdit: 'تحرير',
     menuWindow: 'نافذة',
@@ -2068,6 +2105,8 @@ const tMain = createI18n({
     menuOpen: 'Abrir…',
     menuSave: 'Salvar',
     menuSaveAs: 'Salvar Como…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Fechar',
     menuEdit: 'Editar',
     menuWindow: 'Janela',
@@ -2174,6 +2213,8 @@ const tMain = createI18n({
     menuOpen: 'Apri…',
     menuSave: 'Salva',
     menuSaveAs: 'Salva con nome…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Chiudi',
     menuEdit: 'Modifica',
     menuWindow: 'Finestra',
@@ -2280,6 +2321,8 @@ const tMain = createI18n({
     menuOpen: 'Otwórz…',
     menuSave: 'Zapisz',
     menuSaveAs: 'Zapisz jako…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Zamknij',
     menuEdit: 'Edycja',
     menuWindow: 'Okno',
@@ -2386,6 +2429,8 @@ const tMain = createI18n({
     menuOpen: 'Otevřít…',
     menuSave: 'Uložit',
     menuSaveAs: 'Uložit jako…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Zavřít',
     menuEdit: 'Úpravy',
     menuWindow: 'Okno',
@@ -2490,6 +2535,8 @@ const tMain = createI18n({
     menuOpen: 'Openen…',
     menuSave: 'Opslaan',
     menuSaveAs: 'Opslaan als…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Sluiten',
     menuEdit: 'Bewerken',
     menuWindow: 'Venster',
@@ -2596,6 +2643,8 @@ const tMain = createI18n({
     menuOpen: 'Buka…',
     menuSave: 'Simpan',
     menuSaveAs: 'Simpan Sebagai…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'Tutup',
     menuEdit: 'Edit',
     menuWindow: 'Tetingkap',
@@ -2701,6 +2750,8 @@ const tMain = createI18n({
     menuOpen: 'פתיחה…',
     menuSave: 'שמירה',
     menuSaveAs: 'שמירה בשם…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'סגירה',
     menuEdit: 'עריכה',
     menuWindow: 'חלון',
@@ -2804,6 +2855,8 @@ const tMain = createI18n({
     menuOpen: 'खोलें…',
     menuSave: 'सहेजें',
     menuSaveAs: 'इस रूप में सहेजें…',
+    menuWikiAddMaterial: 'Add Material to Work Wiki…',
+    menuWikiOpen: 'Open Work Wiki',
     menuClose: 'बंद करें',
     menuEdit: 'संपादन',
     menuWindow: 'विंडो',
@@ -2910,6 +2963,8 @@ const tMain = createI18n({
     menuOpen: '開啟…',
     menuSave: '儲存',
     menuSaveAs: '另存新檔…',
+    menuWikiAddMaterial: '新增資料到工作維基…',
+    menuWikiOpen: '開啟工作維基',
     menuClose: '關閉',
     menuEdit: '編輯',
     menuWindow: '視窗',
@@ -3387,6 +3442,9 @@ function createShellWindow(): void {
     applyPendingDir(wc.id, path)
   })
   // docs' save-as / silent first save lands on a new path → sync the tab title too
+  // every docx / pptx save feeds the work wiki
+  setDocsDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setSlidesDocumentSavedHook((path) => workWikiDocumentSaved(path))
   setDocsFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
@@ -4968,6 +5026,12 @@ function buildHomeMenu(): void {
           click: () => void openFileViaDialog(),
         },
         { type: 'separator' },
+        {
+          label: tm('menuWikiAddMaterial'),
+          click: () => void addWikiMaterialFromDialog(BrowserWindow.getFocusedWindow()),
+        },
+        { label: tm('menuWikiOpen'), click: () => void openLlmWiki() },
+        { type: 'separator' },
         { role: 'close', label: tm('menuClose') },
       ],
     },
@@ -5112,6 +5176,12 @@ function buildHwpMenu(): void {
             if (tab) void requestHwpSaveAs(tab.webContents)
           },
         },
+        { type: 'separator' },
+        {
+          label: tm('menuWikiAddMaterial'),
+          click: () => void addWikiMaterialFromDialog(BrowserWindow.getFocusedWindow()),
+        },
+        { label: tm('menuWikiOpen'), click: () => void openLlmWiki() },
         { type: 'separator' },
         {
           label: tm('menuClose'),
@@ -5866,6 +5936,12 @@ app.on('second-instance', (_event, argv, _cwd, additionalData) => {
 installNavigationGuard(app)
 installContextMenu(app, () => contextMenuLabels(currentLang()))
 registerAiIpc()
+registerWorkWikiIpc()
+registerCodexIpc()
+// Settings reads the build's LiteLLM address and model (never a key) to prefill the LiteLLM card
+ipcMain.handle(HOME_CHANNELS.getOrgAiDefaults, () =>
+  orgDefaultsView(orgDefaultsPath ? readOrgDefaults(orgDefaultsPath) : null),
+)
 registerProjectIpc()
 registerDocsIpc()
 registerHomeIpc()
@@ -5931,6 +6007,11 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  startWorkWiki({
+    userData: app.getPath('userData'),
+    documents: app.getPath('documents'),
+    appSettingsPath: APP_SETTINGS_PATH(),
+  })
   // first scan waits for the windows to come up; later ones follow folder changes
   setTimeout(() => ensureFileIndexer()?.refresh(), 4000)
   installRendererProtocol({
@@ -6180,7 +6261,16 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+// the work wiki engine and LLM Wiki stop first (bounded), then the normal shutdown runs
+let quittingAfterWikiStop = false
+app.on('before-quit', (event) => {
+  if (!quittingAfterWikiStop) {
+    stopCodexLoginForQuit()
+    event.preventDefault()
+    quittingAfterWikiStop = true
+    void stopWorkWikiForQuit().finally(() => app.quit())
+    return
+  }
   // No close prompt may fall through to "Save" during shutdown
   markSheetsShuttingDown()
   stopSheetsSidecar()

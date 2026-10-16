@@ -882,3 +882,51 @@
 .set-update-btn:hover {
   background: var(--hover);
 }
+
+.set-ai-modes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 8px 0 14px;
+}
+
+.set-ai-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.set-ai-mode:hover {
+  background: var(--bg-hover);
+}
+
+.set-ai-mode.selected {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--text-primary);
+}
+
+.set-ai-mode-title {
+  font-weight: 600;
+}
+
+.set-ai-mode-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.set-ai-advanced > summary {
+  cursor: pointer;
+  margin: 6px 0;
+}
+
+.set-code {
+  font-family: ui-monospace, monospace;
+  word-break: break-all;
+}

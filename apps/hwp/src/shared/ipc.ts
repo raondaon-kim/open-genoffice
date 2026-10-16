@@ -83,6 +83,8 @@ export interface SaveHwpRequest {
 export interface SaveHwpResult {
   ok: boolean
   error?: string
+  /** the user's original, kept as <name>.bak by this save (the first overwrite of a file in a session) */
+  backupPath?: string
 }
 
 export interface CreateDocumentResult {

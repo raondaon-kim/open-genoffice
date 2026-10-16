@@ -439,6 +439,19 @@ let elementClipboard: {
 
 /** Shell hook: a view opened a file (including ⌘O inside a tab) — used to update tab titles and de-duplicate paths */
 let slidesOpenedHook: ((wc: WebContents, path: string) => void) | null = null
+/** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setSlidesDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
+}
+
 export function setSlidesOpenedHook(fn: ((wc: WebContents, path: string) => void) | null): void {
   slidesOpenedHook = fn
 }
@@ -478,6 +491,7 @@ export async function saveSessionDeckTo(session: Session, filePath: string): Pro
   await mkdir(dirname(filePath), { recursive: true })
   const metaRevAtSave = session.metaRev ?? 0
   await savePptxToFile(session.opened, filePath)
+  notifyDocumentSaved(filePath)
   session.path = filePath
   autosaveBackoff.delete(filePath)
   // mirror slides:save-as: a saved deck is no longer an unsaved untitled draft
@@ -4450,6 +4464,7 @@ export function registerSlidesIpc(): void {
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, session.path)
+      notifyDocumentSaved(session.path)
       autosaveBackoff.delete(session.path)
       void rm(autosavePathFor(session.path), { force: true }).catch(() => {})
       dropUntitledRecovery(e.sender.id)
@@ -4482,6 +4497,7 @@ export function registerSlidesIpc(): void {
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, r.filePath)
+      notifyDocumentSaved(r.filePath)
       session.path = r.filePath
       autosaveBackoff.delete(r.filePath)
       dropUntitledRecovery(e.sender.id)

@@ -14,6 +14,14 @@ The Hangul module is built on [rhwp](https://github.com/edwardkim/rhwp) (MIT)
 for reading, rendering and editing `.hwp`/`.hwpx` documents, and uses HwpForge
 to generate new Hangul documents.
 
+The work wiki ships [LLM Wiki](https://github.com/nashsu/llm_wiki) by nashsu (GPL-3.0,
+Copyright (C) 2024-2026 Yong Su) as a separate program in `resources/llm-wiki/`, next to its
+license text and `SOURCE.txt`, which names the exact source of the shipped build. The changes in
+our fork are listed in its `MODIFICATIONS.md`.
+
+The Codex connection mode ships the unmodified [Codex CLI](https://github.com/openai/codex) by
+OpenAI (Apache-2.0) in `resources/codex/`, next to its license and `SOURCE.txt`.
+
 This fork is based on the upstream Git history and keeps its license, copyright
 and NOTICE. Its goal is complementary: Hangul documents, an organization's
 document-style wiki, and in-house model routing on top of upstream GenOffice.

@@ -177,6 +177,15 @@ interface CodexCliResolutionOptions {
   managedInstallRoot?: string | undefined
   env?: NodeJS.ProcessEnv | undefined
   platform?: NodeJS.Platform | undefined
+  /** The Codex shipped inside the installer; undefined = the one set by configureBundledCodex. */
+  bundledPath?: string | null | undefined
+}
+
+let bundledCodexPath: string | null = null
+
+/** the Codex executable shipped inside the installer; null when this run has none */
+export function configureBundledCodex(path: string | null): void {
+  bundledCodexPath = path
 }
 
 async function fileExists(path: string): Promise<boolean> {
@@ -313,6 +322,9 @@ export async function resolveCodexCliPath(
       if (await fileExists(configuredExecutable)) return configuredExecutable
     }
   }
+
+  const bundled = options.bundledPath === undefined ? bundledCodexPath : options.bundledPath
+  if (bundled && (await fileExists(bundled))) return bundled
 
   if (managedRoot) {
     const managed = await newestManagedCodex(managedRoot, platform)
@@ -1080,4 +1092,44 @@ export async function listCodexModels(cliPath?: string): Promise<CodexModelCatal
     if (!defaultModel) defaultModel = models[0] ?? ''
     return { models, defaultModel }
   })
+}
+
+export type CodexAccountState =
+  | { state: 'connected'; account: string }
+  | { state: 'needs-login' }
+  | { state: 'missing'; reason: string }
+  | { state: 'error'; reason: string }
+
+/** the app-server's account/read answer as a connection state */
+export function accountStateOf(answer: unknown): CodexAccountState {
+  const a = objectValue(answer)
+  if (!a) return { state: 'error', reason: 'no account answer' }
+  const account = objectValue(a.account)
+  if (!account) {
+    return a.requiresOpenaiAuth === false
+      ? { state: 'connected', account: 'API key' }
+      : { state: 'needs-login' }
+  }
+  const email = typeof account.email === 'string' && account.email ? account.email : ''
+  return { state: 'connected', account: email || 'ChatGPT' }
+}
+
+/** whether Codex is signed in, asked of the app-server (no login is started) */
+export async function readCodexAccount(cliPath?: string): Promise<CodexAccountState> {
+  let resolved: string
+  try {
+    resolved = await resolveCodexCliPath(cliPath)
+  } catch (err) {
+    return { state: 'missing', reason: err instanceof Error ? err.message : String(err) }
+  }
+  try {
+    return accountStateOf(
+      await withClient(cliPath, (client) =>
+        client.request('account/read', { refreshToken: false }),
+      ),
+    )
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err)
+    return { state: 'error', reason: `${resolved}: ${detail}`.slice(0, 300) }
+  }
 }

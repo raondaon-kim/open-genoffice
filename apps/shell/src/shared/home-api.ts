@@ -134,6 +134,35 @@ export interface FileSearchHit extends RecentEntry {
 export type DecisionEndpoint =
   'openrouter' | 'direct' | 'perplexity' | 'cloudflare' | 'kev' | 'rizzo' | 'custom'
 
+/** work wiki options persisted in app-settings.json under `workWiki` */
+export interface WorkWikiSettings {
+  enabled: boolean
+  folder: string
+  exclude: string[]
+}
+
+/** Codex as Settings shows it: who is signed in, or why it cannot be used */
+export type CodexStatusView =
+  | { state: 'connected'; account: string; loginable: boolean }
+  | { state: 'needs-login'; loginable: boolean }
+  | { state: 'missing'; reason: string; loginable: boolean }
+  | { state: 'error'; reason: string; loginable: boolean }
+
+/** a browser sign-in to Codex: running, finished, failed (with why) or not started */
+export interface CodexLoginView {
+  state: 'idle' | 'waiting' | 'done' | 'failed'
+  url?: string
+  reason?: string
+}
+
+/** how the bundled LLM Wiki is doing (for Settings) */
+export interface LlmWikiStatusView {
+  state: 'stopped' | 'starting' | 'running' | 'failed'
+  reason?: string
+  /** this install ships LLM Wiki */
+  available: boolean
+}
+
 /** home search options persisted in app-settings.json under `fileSearch` */
 export interface FileSearchSettings {
   /** send the top local hits to a decision model for reranking; default off */
@@ -192,6 +221,17 @@ export interface HomeApi {
   setFileSearchSettings(patch: Partial<FileSearchSettings>): Promise<FileSearchSettings>
   /** one two-document judgement against the (possibly unsaved) settings */
   testFileSearchRerank(settings: FileSearchSettings): Promise<{ ok: boolean; error?: string }>
+  /** work wiki: on/off, folder and excluded folders (app-settings.json `workWiki`) */
+  getWorkWikiSettings(): Promise<WorkWikiSettings>
+  setWorkWikiSettings(patch: Partial<WorkWikiSettings>): Promise<WorkWikiSettings>
+  /** folder picker for the work wiki; null when canceled */
+  pickWorkWikiFolder(): Promise<string | null>
+  /** the bundled LLM Wiki: state and whether this install has it */
+  getLlmWikiStatus(): Promise<LlmWikiStatusView>
+  /** bring the LLM Wiki window forward; false when it is not running */
+  openLlmWiki(): Promise<boolean>
+  /** pick files and put them into the work wiki's raw/sources for LLM Wiki to learn */
+  addWikiMaterial(): Promise<{ added: number; skipped: number; canceled: boolean }>
   /** starred files (independent of the recent list), newest first (paged) */
   starred(query?: RecentQuery): Promise<RecentPage>
   /** stat a specific set of paths (project view); unstat-able files come back flagged `missing` */
@@ -353,6 +393,14 @@ export interface HomeApi {
   setAiSettings(settings: AiSettings): Promise<void>
   /** provider catalog with each fixed endpoint's default base URL (empty for genspark/custom) */
   getAiProviders(): AiCatalogEntry[]
+  /** the company build's LiteLLM address and model (null for a build without them) */
+  getOrgAiDefaults(): Promise<{ baseUrl: string; model: string } | null>
+  /** Codex: who is signed in (the bundled or configured executable) */
+  getCodexStatus(cliPath?: string): Promise<CodexStatusView>
+  /** start the browser sign-in (`codex login`); a running one is reused */
+  startCodexLogin(cliPath?: string): Promise<CodexLoginView>
+  getCodexLogin(): Promise<CodexLoginView>
+  cancelCodexLogin(): Promise<void>
   /** live Codex model catalog discovered through the current or overridden app-server */
   getCodexModels(cliPath?: string): Promise<CodexModelCatalog>
   /** live model list advertised by a user-hosted OpenAI-compatible endpoint; empty when it cannot answer */
@@ -504,9 +552,20 @@ export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
   rerankSearch: 'home:rerank-search',
+  getOrgAiDefaults: 'home:get-org-ai-defaults',
+  getCodexStatus: 'home:get-codex-status',
+  startCodexLogin: 'home:start-codex-login',
+  getCodexLogin: 'home:get-codex-login',
+  cancelCodexLogin: 'home:cancel-codex-login',
   getFileSearchSettings: 'home:get-file-search-settings',
   setFileSearchSettings: 'home:set-file-search-settings',
   testFileSearchRerank: 'home:test-file-search-rerank',
+  getWorkWikiSettings: 'home:get-work-wiki-settings',
+  setWorkWikiSettings: 'home:set-work-wiki-settings',
+  pickWorkWikiFolder: 'home:pick-work-wiki-folder',
+  getLlmWikiStatus: 'home:get-llm-wiki-status',
+  openLlmWiki: 'home:open-llm-wiki',
+  addWikiMaterial: 'home:add-wiki-material',
   starred: 'home:starred',
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',

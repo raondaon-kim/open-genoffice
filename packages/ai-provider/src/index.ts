@@ -95,3 +95,12 @@ export {
   createStreamWatchdog,
 } from './watchdog'
 export type { StreamWatchdog } from './watchdog'
+export {
+  byokProviderOf,
+  chooseLitellmModel,
+  connectionModeOf,
+  isByokProvider,
+  LITELLM_DEFAULT_MODEL,
+  withConnectionMode,
+} from './connection-modes'
+export type { ConnectionMode } from './connection-modes'

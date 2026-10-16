@@ -26,6 +26,10 @@ import type {
   FileSearchPage,
   FileSearchRerank,
   FileSearchSettings,
+  CodexLoginView,
+  CodexStatusView,
+  LlmWikiStatusView,
+  WorkWikiSettings,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -109,6 +113,46 @@ const homeApi: HomeApi = {
     return result && typeof result === 'object' && Array.isArray((result as FileSearchRerank).order)
       ? (result as FileSearchRerank)
       : null
+  },
+  async getWorkWikiSettings() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getWorkWikiSettings)) as WorkWikiSettings
+  },
+  async setWorkWikiSettings(patch) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.setWorkWikiSettings, patch)) as WorkWikiSettings
+  },
+  async pickWorkWikiFolder() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.pickWorkWikiFolder)) as string | null
+  },
+  async getOrgAiDefaults() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getOrgAiDefaults)) as {
+      baseUrl: string
+      model: string
+    } | null
+  },
+  async getCodexStatus(cliPath) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexStatus, cliPath)) as CodexStatusView
+  },
+  async startCodexLogin(cliPath) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.startCodexLogin, cliPath)) as CodexLoginView
+  },
+  async getCodexLogin() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getCodexLogin)) as CodexLoginView
+  },
+  async cancelCodexLogin() {
+    await ipcRenderer.invoke(HOME_CHANNELS.cancelCodexLogin)
+  },
+  async getLlmWikiStatus() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.getLlmWikiStatus)) as LlmWikiStatusView
+  },
+  async openLlmWiki() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.openLlmWiki)) === true
+  },
+  async addWikiMaterial() {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.addWikiMaterial)) as {
+      added: number
+      skipped: number
+      canceled: boolean
+    }
   },
   async getFileSearchSettings() {
     return (await ipcRenderer.invoke(HOME_CHANNELS.getFileSearchSettings)) as FileSearchSettings

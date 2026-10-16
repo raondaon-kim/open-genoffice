@@ -25,6 +25,10 @@ The fork's material changes on top of upstream:
   written so Hangul 2005 opens it too (compressed streams re-packed with a 4 KB
   window and Hangul's CRC32/size trailer, `apps/hwp/src/main/hwp5-legacy.ts`),
   while `.hwpx` needs Hangul 2010 or later.
+  A save keeps the user's original as `<name>.bak` before the app's first overwrite of an
+  existing file in a session, refuses bytes that are not the format the file name says, and
+  checks the Hangul 2005 re-pack (compound file, deflate streams, CRC32 + size trailers) before
+  writing it, falling back to the bytes rhwp wrote if it does not check out.
 - **Document-style wiki** (`packages/doc-styles`, pages in
   `apps/hwp/resources/doc-styles`, packaged as `modules/hwp-doc-styles`):
   markdown pages with measured role values for Hangul, Word and PowerPoint
@@ -39,6 +43,25 @@ The fork's material changes on top of upstream:
     `wiki:<id>` style templates (a Style Skill plus a layout skeleton), so the
     upstream deck pipeline composes the deck in the organization's colors,
     fonts, sizes and title positions.
+- **Work wiki** (`packages/work-wiki`):
+  - **What is kept:** every saved Hangul, Word and PowerPoint document, files dropped into
+    `raw/sources/`, and durable points from chat are learned into a small wiki of works (업무),
+    working methods (작업 방식) and clients (기관).
+  - **Folder:** the LLM Wiki folder format, `Documents\GenOffice 업무위키` by default. Our pages
+    live in `wiki/work`, `wiki/methods` and `wiki/clients`; LLM Wiki owns the rest.
+  - **Bundled LLM Wiki:** the Windows installer carries a modified [LLM Wiki](https://github.com/nashsu/llm_wiki)
+    (GPL-3.0) as a separate program in `resources/llm-wiki/`, with its license and the exact
+    source location. It runs hidden while GenOffice runs, learns the files the user adds
+    (File menu or Home: add material), and stops when GenOffice quits. Its settings are seeded
+    from GenOffice's AI settings. The assistants search both wikis through one `wiki_search`
+    (pages are named by path, e.g. `work/koica-health`, `entities/koica`).
+  - **How it learns:**
+    - The first save sends an outline digest; later saves send only the changed paragraphs.
+    - A plan call and 1–3 merge calls (thinking off) keep the pages under their caps.
+    - Code maintains the work page's related-documents list.
+  - **How the assistants use it:** they get the catalog each turn, plus `wiki_search`, `wiki_read`
+    and `wiki_remember`. Wiki text is fenced as data.
+  - **Settings:** on/off and the folder, in Settings → AI media.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
   (`deck-bid-proposal`); PowerPoint pages may carry deck-type rules, and an A4
@@ -55,6 +78,12 @@ The fork's material changes on top of upstream:
   `OPEN_GENOFFICE_LITELLM_MODEL` at packaging time; the values ship as
   `org-defaults.json` and seed the AI settings on a first run only. No internal
   address is stored in the repository.
+  Settings › AI model offers LiteLLM, Codex and own API keys as three connection modes;
+  the LiteLLM card prefills the build's address (also on an existing install) and defaults to
+  `deepseek-flash`.
+- **Codex connection:** the Windows installer carries the unmodified Codex CLI (Apache-2.0,
+  pinned and integrity-checked by `tools/fetch-codex-cli.mjs`) in `resources/codex/`; Settings
+  can sign in to it and connect, and the work wiki can learn through it.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and
