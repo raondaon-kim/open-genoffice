@@ -13,12 +13,14 @@ describe('normalizeWorkWikiSettings', () => {
   })
 
   it('keeps valid values and drops junk', () => {
+    // an absolute path on this platform (a drive path is not absolute on Linux or macOS)
+    const root = process.platform === 'win32' ? 'D:' : ''
     expect(
       normalizeWorkWikiSettings(
-        { enabled: false, folder: '  D:/share/wiki ', exclude: ['D:/private', 3, ''] },
+        { enabled: false, folder: `  ${root}/share/wiki `, exclude: [`${root}/private`, 3, ''] },
         'X',
       ),
-    ).toEqual({ enabled: false, folder: 'D:/share/wiki', exclude: ['D:/private'] })
+    ).toEqual({ enabled: false, folder: `${root}/share/wiki`, exclude: [`${root}/private`] })
     expect(normalizeWorkWikiSettings({ folder: 'relative/path' }, 'X').folder).toBe('X')
   })
 })

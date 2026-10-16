@@ -12,14 +12,14 @@ import { launchShell, closeAndSaveVideo, waitForPageWithUrl } from './helpers'
  * `ctx.direction`.
  */
 
-/** The Home screen's new-document cards, in the order the shell lists them. */
+/** The Home screen's new-document cards, in the order the shell lists them (cards 4 and 5 are Hangul). */
 const APPS = [
   { name: 'docs', card: 0, url: '://docs/', host: '.editor-scroll' },
   { name: 'sheets', card: 1, url: '://sheets/', host: '#univer-container' },
   { name: 'slides', card: 2, url: '://slides/', host: '.stage-wrap' },
   { name: 'markdown', card: 3, url: '://markdown/', host: '.editor-scroll' },
-  { name: 'html', card: 4, url: '://html/', host: '.preview-stage' },
-  { name: 'pdf', card: 5, url: '://pdf/', host: '.pdf-scroll' },
+  { name: 'html', card: 6, url: '://html/', host: '.preview-stage' },
+  { name: 'pdf', card: 7, url: '://pdf/', host: '.pdf-scroll' },
 ] as const
 
 const directionOf = (page: Page, host: string) =>
