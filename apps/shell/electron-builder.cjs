@@ -136,7 +136,12 @@ function assertTesseractStaged() {
   for (const rel of [
     'build/tesseract/tesseract.exe',
     'build/tesseract/tessdata/kor.traineddata',
+    'build/tesseract/tessdata/eng.traineddata',
     'build/tesseract/LICENSE',
+    'build/tesseract/SOURCE.txt',
+    'build/tesseract/licenses/COPYING.GPL-2.0',
+    // written last by tools/fetch-tesseract.mjs, after every check passed
+    'build/tesseract/.version',
   ]) {
     if (!existsSync(join(__dirname, rel))) {
       throw new Error(`Tesseract is not staged: run npm run fetch:tesseract (${rel})`)

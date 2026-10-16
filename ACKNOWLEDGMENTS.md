@@ -24,8 +24,9 @@ OpenAI (Apache-2.0) in `resources/codex/`, next to its license and `SOURCE.txt`.
 
 Scanned PDFs are read with [Tesseract OCR](https://github.com/tesseract-ocr/tesseract)
 (Apache-2.0), shipped unmodified from the UB-Mannheim Windows build with its Korean and English
-trained data in `resources/llm-wiki/tesseract/`. The libraries it loads keep their own licenses
-(listed with their sources in `SOURCE.txt` there).
+trained data in `resources/llm-wiki/tesseract/`. The libraries it loads keep their own licenses:
+`SOURCE.txt` there lists each with its source, the GPL and LGPL texts are in `licenses/`, and it
+carries a written offer for the corresponding source of the GPL and LGPL libraries.
 
 This fork is based on the upstream Git history and keeps its license, copyright
 and NOTICE. Its goal is complementary: Hangul documents, an organization's
