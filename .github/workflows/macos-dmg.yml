@@ -167,7 +167,14 @@ jobs:
             sign_info=$(codesign -dv "$app" 2>&1)
             set -e
             echo "$sign_info"
-            echo "$sign_info" | grep -q 'not signed'
+            # Electron ships a linker ad-hoc signature. identity=null means no
+            # Developer ID: TeamIdentifier stays unset.
+            if echo "$sign_info" | grep -q 'Authority=Developer ID'; then
+              echo "expected an unsigned app (no Developer ID)" >&2
+              detach
+              exit 1
+            fi
+            echo "$sign_info" | grep -q 'TeamIdentifier=not set'
             detach
             cp "$f" dist-dmg/
           done
@@ -186,7 +193,7 @@ jobs:
           {
             echo "### Unsigned macOS dmg"
             echo
-            echo "Gatekeeper quarantines an unsigned app. After copying it to Applications, clear the attribute:"
+            echo "No Developer ID. Electron's main binary stays linker-signed (ad hoc) and Gatekeeper still quarantines the app. After copying it to Applications:"
             echo
             echo '```sh'
             echo 'xattr -cr "/Applications/Open GenOffice.app"'
