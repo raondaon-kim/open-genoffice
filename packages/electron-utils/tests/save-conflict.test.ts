@@ -194,7 +194,7 @@ describe('confirmOverwriteIfConflicted', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOptions()).toMatchObject({
       type: 'warning',
-      message: '이 파일이 다른 프로그램에서 수정되었습니다.',
+      message: '이 문서가 다른 곳에서 바뀌었습니다.',
       detail: '그래도 저장하여 디스크의 변경 사항을 덮어쓸까요?',
       buttons: ['덮어쓰기', '취소'],
       defaultId: 0,

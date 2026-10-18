@@ -16,6 +16,11 @@ import {
   SPLIT_MIN_PANE_PX,
 } from '../src/shared/split-view-api'
 import { TAB_STRIP_HEIGHT } from '../src/shared/tab-drag-geometry'
+import {
+  dividerRect,
+  ratioForDividerOffset,
+  ratioForDragOffset,
+} from '../src/renderer/src/split-view-geometry'
 
 const W = 1200
 const H = 800
@@ -82,6 +87,35 @@ describe('split geometry', () => {
         }
       }
     }
+  })
+
+  it('matches the renderer divider rectangle module (parity for both orientations)', () => {
+    const viewport = { width: W, height: H }
+    for (const orientation of ['side', 'stack'] as const) {
+      for (const ratio of [0.2, 0.5, 0.73]) {
+        const rects = paneRects(content, orientation, ratio)
+        const divider = dividerRect(viewport, orientation, ratio)
+        if (orientation === 'side') {
+          expect(divider.left).toBeCloseTo(rects.a.width)
+          expect(rects.b.x).toBeCloseTo(divider.left + SPLIT_DIVIDER_PX)
+        } else {
+          expect(divider.top).toBeCloseTo(rects.a.height + TAB_STRIP_HEIGHT)
+          expect(rects.b.y).toBeCloseTo(divider.top + SPLIT_DIVIDER_PX)
+        }
+      }
+    }
+  })
+
+  it('agrees with the renderer drag ratio: in-between = clamped, past a minimum = close', () => {
+    const viewport = { width: W, height: H }
+    const share = ratioForDividerOffset(300, viewport, 'side')
+    expect(ratioForDragOffset(300, viewport, 'side')).toBeCloseTo(
+      clampSplitRatio(share, content, 'side'),
+    )
+    // the renderer asks for a close (0/1) at the ends; setSplitRatio treats
+    // those as unsplit, so no clamp applies to them
+    expect(ratioForDragOffset(10, viewport, 'side')).toBe(0)
+    expect(ratioForDragOffset(W - 10, viewport, 'side')).toBe(1)
   })
 
   it('gives an in-between share back un-clamped and asks for a close past a minimum', () => {

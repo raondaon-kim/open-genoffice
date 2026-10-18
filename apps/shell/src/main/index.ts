@@ -5077,16 +5077,43 @@ function applyTornIntent(
   manager.splitWith(newTabId, intent)
 }
 
-/** one split change: remember the arrangement, tell every pane view its role,
- *  and push the state to the strip */
+/** last split state pushed through handleSplitChanged (for ratio-only detection) */
+let lastSplitState: SplitViewState | null = null
+let splitMemoryTimer: ReturnType<typeof setTimeout> | null = null
+
+/** the parts of a split a pane role depends on; the divider only moves ratio */
+function splitShape(state: SplitViewState | null): string {
+  return state === null
+    ? 'none'
+    : `${state.aTabId}|${state.bTabId}|${state.orientation}|${state.focus}`
+}
+
+/** one split change: tell every pane view its role, push the state to the strip,
+ *  and remember the arrangement. A divider drag changes only the ratio, so its
+ *  memory write is debounced (roles and tabs never change mid-drag, and a
+ *  per-frame settings rewrite would fsync on every pointer move). */
 function handleSplitChanged(
   win: BrowserWindow,
   manager: TabManager,
   state: SplitViewState | null,
 ): void {
-  persistSplitMemory(manager, state)
-  notifySplitRoles(manager)
+  const ratioOnly =
+    state !== null && lastSplitState !== null && splitShape(state) === splitShape(lastSplitState)
+  lastSplitState = state
+  if (!ratioOnly) notifySplitRoles(manager)
   if (!win.isDestroyed()) win.webContents.send(SPLIT_TABS_CHANNELS.changed, state)
+  if (splitMemoryTimer) {
+    clearTimeout(splitMemoryTimer)
+    splitMemoryTimer = null
+  }
+  if (ratioOnly) {
+    splitMemoryTimer = setTimeout(() => {
+      splitMemoryTimer = null
+      persistSplitMemory(manager, lastSplitState)
+    }, 400)
+  } else {
+    persistSplitMemory(manager, state)
+  }
 }
 
 /** save the split, or clear the memory when it is gone; best-effort */

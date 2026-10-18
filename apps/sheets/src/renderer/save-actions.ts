@@ -447,7 +447,9 @@ export async function handleSave(
         )
         return { ok: false }
       }
-      ctx.setMessage(t('appSaveCanceled'))
+      // a quiet (automatic) save deferred by the copy-pair guard stays silent:
+      // the renderer keeps its dirty state and the message would be wrong
+      if (!quiet) ctx.setMessage(t('appSaveCanceled'))
       return { ok: false }
     }
     if (!splitSave) {
