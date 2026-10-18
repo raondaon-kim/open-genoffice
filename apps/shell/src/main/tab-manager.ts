@@ -54,6 +54,20 @@ import {
 } from '../../../slides/src/main/slides-main'
 import type { DocumentTabKind, OpenDocumentTab, TabKind, TabSummary } from '../shared/tabs-api'
 import { TAB_STRIP_HEIGHT } from '../shared/tab-drag-geometry'
+import type {
+  SplitDropIntent,
+  SplitOrientation,
+  SplitPaneRole,
+  SplitViewState,
+} from '../shared/split-view-api'
+import {
+  activationMode,
+  clampSplitRatio,
+  oppositeDocumentId,
+  paneRects,
+  SPLIT_EVEN_RATIO,
+  splitSurvivor,
+} from './split-layout'
 
 /** a tab lifted out of the strip with its live view: what "Open in New Window",
  *  tear-off and dock hand back and forth between the shell and a detached window */
@@ -105,6 +119,20 @@ export class TabManager {
    *  the path over after mount anyway. */
   private spareSheetsView: WebContentsView | null = null
   private spareSheetsTimer: ReturnType<typeof setTimeout> | null = null
+  /** live two-pane split of this window (decision 0036); null = one visible document */
+  private split: SplitViewState | null = null
+  /** the tab shown before the current one: the "other document" a split falls
+   *  back to when the dropped tab was itself the visible one */
+  private previousActiveId: string | null = null
+  /** views whose pane-focus listener is installed (WeakSet: a view can dock
+   *  back from a detached window and must not get a second listener pair) */
+  private readonly paneFocusTracked = new WeakSet<WebContentsView>()
+  /** prompt-time arrangement snapshot: close prompts activate dirty tabs, and
+   *  the original split comes back afterwards (spec: 확인이 끝나면 원래 칸
+   *  문서를 되돌린다). Nested prompts count down to the outermost snapshot. */
+  private promptDepth = 0
+  private promptSplitSnapshot: SplitViewState | null = null
+  private promptActiveIdSnapshot: string | null = null
 
   constructor(
     private readonly shellWindow: BrowserWindow,
@@ -112,6 +140,8 @@ export class TabManager {
     private readonly applyMenuFor: (kind: TabKind) => void,
     /** localized placeholder title for a tab that has no file yet */
     private readonly untitledTitleFor?: (kind: TabKind) => string,
+    /** fired whenever the split appears, changes or goes away (roles + memory) */
+    private readonly onSplitChanged?: (state: SplitViewState | null) => void,
   ) {
     // Layout once synchronously for macOS/Windows (bounds are already correct),
     // then once more on the next tick. On Linux/X11, `resize` fires before the
@@ -126,10 +156,13 @@ export class TabManager {
 
   private scheduleSpareSheetsView(delayMs: number): void {
     if (process.env.GENOFFICE_NO_SPARE_VIEW || this.spareSheetsTimer || this.spareSheetsView) return
+    // a spare sheets view belongs to the single-pane shell; it must never
+    // shadow a pane while a split is live
+    if (this.split) return
     if (this.tabs.find((t) => t.id === this.activeId)?.kind !== 'sheets') return
     this.spareSheetsTimer = setTimeout(() => {
       this.spareSheetsTimer = null
-      if (this.spareSheetsView || this.shellWindow.isDestroyed()) return
+      if (this.spareSheetsView || this.shellWindow.isDestroyed() || this.split) return
       const active = this.tabs.find((t) => t.id === this.activeId)
       if (active?.kind !== 'sheets') return
       const view = createSheetsView({ includeAiHandlers: false })
@@ -167,16 +200,28 @@ export class TabManager {
     return this.untitledTitleFor?.(kind) ?? fallback
   }
 
+  /** the shell window's own content size — what a covering view fills */
+  private windowRect(): Rectangle {
+    const { width, height } = this.shellWindow.getContentBounds()
+    return { x: 0, y: 0, width, height }
+  }
+
+  /** the layout space normal tab views live in: the window below the strip */
   private contentBounds(): Rectangle {
     const { width, height } = this.shellWindow.getContentBounds()
-    if (this.htmlFullScreenId !== null && this.htmlFullScreenId === this.activeId) {
-      return { x: 0, y: 0, width, height }
-    }
-    const active = this.tabs.find((t) => t.id === this.activeId)
-    if (active?.view && this.bleedWcIds.has(active.view.webContents.id)) {
-      return { x: 0, y: 0, width, height }
-    }
     return { x: 0, y: TAB_STRIP_HEIGHT, width, height: Math.max(0, height - TAB_STRIP_HEIGHT) }
+  }
+
+  /** the tab whose view covers the whole window right now (HTML fullscreen / slides show) */
+  private coverTabId(): string | null {
+    if (this.htmlFullScreenId !== null) return this.htmlFullScreenId
+    const active = this.tabs.find((t) => t.id === this.activeId)
+    if (active?.view && this.bleedWcIds.has(active.view.webContents.id)) return this.activeId
+    return null
+  }
+
+  private tabById(id: string): TabRecord | undefined {
+    return this.tabs.find((t) => t.id === id)
   }
 
   /** Grow/restore a tab view over the tab strip on request (slides show fullscreen) */
@@ -209,12 +254,58 @@ export class TabManager {
     })
   }
 
-  /** re-fit the active tab's view after a window resize */
+  /**
+   * Note pointer focus on a pane view so the "focused pane" follows clicks.
+   * The renderer-side fallback ping reaches the same state through
+   * focusPaneByWebContents, so this listener being silent on some Electron
+   * builds (no focus events for WebContentsView) is survivable.
+   */
+  private trackPaneFocus(view: WebContentsView): void {
+    if (this.paneFocusTracked.has(view)) return
+    this.paneFocusTracked.add(view)
+    view.webContents.on('focus', () => {
+      const tab = this.tabs.find((t) => t.view === view)
+      const split = this.split
+      if (!tab || !split) return
+      if (tab.id === split.aTabId) this.focusPane('a')
+      else if (tab.id === split.bTabId) this.focusPane('b')
+    })
+  }
+
+  /**
+   * Re-fit every visible view after a window resize, an activation or a split
+   * change: a covering view (fullscreen / slides show) fills the window, a
+   * focused pane shows both panes at their computed rectangles, and anything
+   * else shows the single active tab below the strip.
+   */
   layout(): void {
     // Deferred resize layouts can land after the shell window was closed.
     if (this.shellWindow.isDestroyed()) return
-    const active = this.tabs.find((t) => t.id === this.activeId)
-    if (active?.view) active.view.setBounds(this.contentBounds())
+    // pane references can go stale while a close prompt is settling; drop them
+    if (
+      this.split &&
+      (!this.tabById(this.split.aTabId)?.view || !this.tabById(this.split.bTabId)?.view)
+    ) {
+      this.split = null
+    }
+    const cover = this.coverTabId()
+    if (cover !== null) {
+      for (const t of this.tabs) t.view?.setVisible(t.id === cover)
+      this.tabById(cover)?.view?.setBounds(this.windowRect())
+      return
+    }
+    const split = this.split
+    if (split && (this.activeId === split.aTabId || this.activeId === split.bTabId)) {
+      for (const t of this.tabs) {
+        t.view?.setVisible(t.id === split.aTabId || t.id === split.bTabId)
+      }
+      const rects = paneRects(this.contentBounds(), split.orientation, split.ratio)
+      this.tabById(split.aTabId)?.view?.setBounds(rects.a)
+      this.tabById(split.bTabId)?.view?.setBounds(rects.b)
+      return
+    }
+    for (const t of this.tabs) t.view?.setVisible(t.id === this.activeId)
+    this.tabById(this.activeId)?.view?.setBounds(this.contentBounds())
   }
 
   /** files open in any tab, for the open-documents registry */
@@ -295,6 +386,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'docs',
@@ -324,6 +416,7 @@ export class TabManager {
       view.setVisible(false)
     }
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'sheets',
@@ -341,6 +434,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'slides',
@@ -358,6 +452,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({ id, kind: 'pdf', view, title: basename(openPath), filePath: openPath })
     this.activateTab(id)
     return id
@@ -378,6 +473,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'markdown',
@@ -396,6 +492,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'hwp',
@@ -415,6 +512,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({ id, kind: 'hwp', view, title })
     this.activateTab(id)
     return id
@@ -426,6 +524,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'html',
@@ -444,6 +543,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     this.tabs.push({
       id,
       kind: 'html',
@@ -458,11 +558,40 @@ export class TabManager {
   activateTab(id: string): void {
     const target = this.tabs.find((t) => t.id === id)
     if (!target) return
-    for (const t of this.tabs) t.view?.setVisible(t.id === id)
-    if (target.view) target.view.setBounds(this.contentBounds())
+    const previous = this.activeId
+    if (this.split) {
+      const mode = activationMode(this.split, {
+        id: target.id,
+        kind: target.kind,
+        present: target.present,
+      })
+      if (mode === 'replace-pane') {
+        // a strip document tab takes over the focused pane; the replaced
+        // document stays open in the strip
+        const side = this.split.focus
+        this.split = side === 'a' ? { ...this.split, aTabId: id } : { ...this.split, bTabId: id }
+        if (previous !== id) this.previousActiveId = previous
+        this.activeId = id
+        this.layout()
+        this.refreshActiveTargets()
+        this.focusActiveView()
+        this.onChanged()
+        this.notifySplitChanged()
+        return
+      }
+      if (mode === 'pane') {
+        const side = id === this.split.aTabId ? 'a' : 'b'
+        if (this.split.focus !== side) {
+          this.split = { ...this.split, focus: side }
+          this.notifySplitChanged()
+        }
+      }
+    }
+    if (previous !== id) this.previousActiveId = previous
     this.activeId = id
-    if (target.kind === 'sheets') this.scheduleSpareSheetsView(3000)
+    if (target.kind === 'sheets' && !this.split) this.scheduleSpareSheetsView(3000)
     else this.discardSpareSheetsView()
+    this.layout()
     this.refreshActiveTargets()
     this.focusActiveView()
     this.onChanged()
@@ -495,6 +624,311 @@ export class TabManager {
     if (target.kind === 'sheets' && target.view) setActiveSheetsWebContents(target.view.webContents)
     if (target.kind === 'slides' && target.view) setActiveSlidesWebContents(target.view.webContents)
     this.applyMenuFor(target.present ? 'home' : target.kind)
+  }
+
+  // ---- two-pane split (decision 0036) ----
+
+  private notifySplitChanged(): void {
+    this.onSplitChanged?.(this.split ? { ...this.split } : null)
+  }
+
+  /** the live split (copy) or null */
+  splitState(): SplitViewState | null {
+    return this.split ? { ...this.split } : null
+  }
+
+  /** which pane role the given view plays right now (null = not a pane view) */
+  splitRoleOf(webContentsId: number): SplitPaneRole | null {
+    const split = this.split
+    if (!split) return null
+    const tab = this.tabs.find((t) => t.view?.webContents.id === webContentsId)
+    if (!tab) return null
+    if (tab.id === split.aTabId) return split.focus === 'a' ? 'focus' : 'secondary'
+    if (tab.id === split.bTabId) return split.focus === 'b' ? 'focus' : 'secondary'
+    return null
+  }
+
+  isPaneTab(tabId: string): boolean {
+    return !!this.split && (tabId === this.split.aTabId || tabId === this.split.bTabId)
+  }
+
+  /**
+   * Make the given pane the focused one without stealing keyboard focus: the
+   * click or the focus event already happened (or the rail click asked for it),
+   * so this only re-points state, menus and roles.
+   */
+  private focusPane(side: 'a' | 'b'): void {
+    const split = this.split
+    if (!split || split.focus === side) return
+    const id = side === 'a' ? split.aTabId : split.bTabId
+    this.split = { ...split, focus: side }
+    if (this.tabs.some((t) => t.id === id)) {
+      if (this.activeId !== id) this.previousActiveId = this.activeId
+      this.activeId = id
+    }
+    this.layout()
+    this.refreshActiveTargets()
+    this.onChanged()
+    this.notifySplitChanged()
+  }
+
+  /** focus the pane showing this view's document (focus events and the renderer ping) */
+  focusPaneByWebContents(webContentsId: number): void {
+    const split = this.split
+    if (!split) return
+    const tab = this.tabs.find((t) => t.view?.webContents.id === webContentsId)
+    if (!tab) return
+    if (tab.id === split.aTabId) this.focusPane('a')
+    else if (tab.id === split.bTabId) this.focusPane('b')
+  }
+
+  /** the pane whose document is this tab's document (same tab or same file) */
+  private paneOfDocument(tab: TabRecord): 'a' | 'b' | null {
+    const split = this.split
+    if (!split) return null
+    const wanted = canonicalPath(tab.filePath)
+    for (const side of ['a', 'b'] as const) {
+      const pane = this.tabById(side === 'a' ? split.aTabId : split.bTabId)
+      if (!pane) continue
+      if (pane.id === tab.id) return side
+      if (wanted !== undefined && canonicalPath(pane.filePath) === wanted) return side
+    }
+    return null
+  }
+
+  /** the last shown document tab other than the excluded one ("직전에 보던 문서") */
+  private previousDocumentTab(excludeId: string): string | null {
+    return oppositeDocumentId({
+      activeId: this.activeId,
+      previousActiveId: this.previousActiveId,
+      excludeId,
+      tabs: this.tabs.map((t) => ({
+        id: t.id,
+        kind: t.kind,
+        present: t.present,
+        hasView: t.view !== null,
+      })),
+    })
+  }
+
+  /** install a split state and make one of its tabs active (clamps the ratio) */
+  private setSplit(next: SplitViewState, activeTabId?: string): void {
+    const bounded =
+      next.ratio > 0 && next.ratio < 1
+        ? { ...next, ratio: clampSplitRatio(next.ratio, this.contentBounds(), next.orientation) }
+        : next
+    this.split = bounded
+    if (activeTabId !== undefined && this.tabs.some((t) => t.id === activeTabId)) {
+      if (this.activeId !== activeTabId) this.previousActiveId = this.activeId
+      this.activeId = activeTabId
+    }
+    this.layout()
+    this.refreshActiveTargets()
+    this.focusActiveView()
+    this.onChanged()
+    this.notifySplitChanged()
+  }
+
+  /**
+   * Apply a drop intent decided by split-layout.decideSplitDrop — the drag
+   * rules live there, this only realizes the outcome. A null intent means the
+   * caller keeps the existing tear-off / dock flow.
+   */
+  splitWith(tabId: string, intent: SplitDropIntent | null): void {
+    if (!intent) return
+    const tab = this.tabById(tabId)
+    if (!tab || !tab.view || tab.present) return
+    switch (intent.kind) {
+      case 'noop':
+        return
+      case 'create': {
+        let aTabId = this.previousDocumentTab(tabId)
+        if (aTabId === null) {
+          aTabId = this.openDuplicatePaneTab(tabId)
+          if (aTabId === null) return
+        }
+        this.setSplit(
+          {
+            aTabId,
+            bTabId: tabId,
+            orientation: intent.orientation,
+            ratio: SPLIT_EVEN_RATIO,
+            focus: 'b',
+          },
+          tabId,
+        )
+        return
+      }
+      case 'replace': {
+        if (!this.split) return
+        this.setSplit({ ...this.split, bTabId: tabId }, tabId)
+        return
+      }
+      case 'reorient': {
+        const split = this.split
+        if (!split) return
+        const focusedTabId = split.focus === 'a' ? split.aTabId : split.bTabId
+        this.setSplit(
+          {
+            aTabId: focusedTabId,
+            bTabId: tabId,
+            orientation: intent.orientation,
+            ratio: split.ratio,
+            focus: 'b',
+          },
+          tabId,
+        )
+        return
+      }
+      case 'flip': {
+        if (!this.split) return
+        this.split = { ...this.split, orientation: intent.orientation }
+        this.layout()
+        this.notifySplitChanged()
+        return
+      }
+      case 'focus': {
+        const side = this.paneOfDocument(tab)
+        if (side !== null) this.focusPane(side)
+        return
+      }
+    }
+  }
+
+  /**
+   * Rebuild a remembered split at launch (the wiring reads split-memory and
+   * opens both tabs first). Rejects tabs that cannot be panes.
+   */
+  beginSplit(
+    aTabId: string,
+    bTabId: string,
+    orientation: SplitOrientation,
+    ratio: number,
+    focus: 'a' | 'b',
+  ): void {
+    if (aTabId === bTabId) return
+    const a = this.tabById(aTabId)
+    const b = this.tabById(bTabId)
+    if (!a?.view || !b?.view || a.present || b.present) return
+    if (a.kind === 'home' || b.kind === 'home') return
+    const safeRatio = Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : SPLIT_EVEN_RATIO
+    this.setSplit(
+      { aTabId, bTabId, orientation, ratio: safeRatio, focus },
+      focus === 'a' ? aTabId : bTabId,
+    )
+  }
+
+  /**
+   * Divider drags: an in-between share resizes the panes; 0 closes the first
+   * pane and 1 closes the second (the surviving document fills the window).
+   */
+  setSplitRatio(ratio: number): void {
+    if (!this.split || !Number.isFinite(ratio)) return
+    if (ratio <= 0) {
+      this.unsplitKeeping('b')
+      return
+    }
+    if (ratio >= 1) {
+      this.unsplitKeeping('a')
+      return
+    }
+    const bounded = clampSplitRatio(ratio, this.contentBounds(), this.split.orientation)
+    if (bounded === this.split.ratio) return
+    this.split = { ...this.split, ratio: bounded }
+    this.layout()
+    this.notifySplitChanged()
+  }
+
+  /** drop the split; the focused pane's document becomes the single visible tab */
+  unsplit(): void {
+    if (!this.split) return
+    this.unsplitKeeping(this.split.focus)
+  }
+
+  private unsplitKeeping(side: 'a' | 'b'): void {
+    const split = this.split
+    if (!split) return
+    const keepId = side === 'a' ? split.aTabId : split.bTabId
+    this.split = null
+    if (this.tabs.some((t) => t.id === keepId)) this.activateTab(keepId)
+    else {
+      this.layout()
+      this.onChanged()
+    }
+    this.notifySplitChanged()
+  }
+
+  /**
+   * Open a second view of the same document for the same-document split: a
+   * fresh tab for the same path, or a blank tab of the same kind when the
+   * document has no file yet. Bypasses the single-instance open rule on
+   * purpose (this is the one path allowed to duplicate a document). Returns
+   * the new tab id, or null for a kind that cannot be duplicated.
+   */
+  openDuplicatePaneTab(tabId: string): string | null {
+    const tab = this.tabById(tabId)
+    if (!tab || !tab.view || tab.present) return null
+    const path = tab.filePath
+    switch (tab.kind) {
+      case 'docs':
+        return this.openDocsTab(path, path ? undefined : { newBlank: true })
+      case 'sheets':
+        return this.openSheetsTab(path, path ? undefined : { newBlank: true })
+      case 'slides':
+        return this.openSlidesTab(path)
+      case 'pdf':
+        return path ? this.openPdfTab(path) : null
+      case 'markdown':
+        return this.openMarkdownTab(path)
+      case 'html':
+        return this.openHtmlTab(path)
+      case 'hwp':
+        return this.openHwpTab(path)
+      default:
+        return null
+    }
+  }
+
+  /**
+   * Snapshot the arrangement around a prompt that may activate dirty tabs
+   * (tab close, window close). endExclusivePrompt puts it back exactly as it
+   * was before the outermost begin — cancel or proceed alike, because the
+   * temporarily shown tab was never a real pane member.
+   */
+  beginExclusivePrompt(): void {
+    if (this.promptDepth === 0) {
+      this.promptSplitSnapshot = this.split ? { ...this.split } : null
+      this.promptActiveIdSnapshot = this.activeId
+    }
+    this.promptDepth++
+  }
+
+  endExclusivePrompt(): void {
+    if (this.promptDepth === 0) return
+    this.promptDepth--
+    if (this.promptDepth > 0) return
+    const split = this.promptSplitSnapshot
+    const activeId = this.promptActiveIdSnapshot
+    this.promptSplitSnapshot = null
+    this.promptActiveIdSnapshot = null
+    if (activeId === null) return
+    const same =
+      this.split === split ||
+      (this.split !== null &&
+        split !== null &&
+        this.split.aTabId === split.aTabId &&
+        this.split.bTabId === split.bTabId &&
+        this.split.orientation === split.orientation &&
+        this.split.ratio === split.ratio &&
+        this.split.focus === split.focus)
+    if (same && this.activeId === activeId) return
+    this.split = split
+    if (this.tabs.some((t) => t.id === activeId)) this.activeId = activeId
+    this.layout()
+    this.refreshActiveTargets()
+    this.focusActiveView()
+    this.onChanged()
+    this.notifySplitChanged()
   }
 
   /** move a tab to a new index in the strip; Home is pinned at index 0 */
@@ -655,13 +1089,18 @@ export class TabManager {
       }
     }
     if (closeGuard && tab.view) {
-      // Bring the tab into view so the save prompt has visible context.
+      // Bring the tab into view for the prompt — and put the arrangement back
+      // exactly as it was afterwards: the temporarily shown tab was never a
+      // real pane member, so a cancel (or the close itself) must not leave the
+      // split disturbed.
+      this.beginExclusivePrompt()
       if (this.activeId !== id) this.activateTab(id)
       this.closingIds.add(id)
       try {
         if (!(await closeGuard(tab.view.webContents, this.shellWindow))) return
       } finally {
         this.closingIds.delete(id)
+        this.endExclusivePrompt()
       }
     }
     this.removeTab(id)
@@ -688,7 +1127,21 @@ export class TabManager {
     if (idx < 0) return
     if (this.htmlFullScreenId === id) this.htmlFullScreenId = null
     const [removed] = this.tabs.splice(idx, 1)
-    if (this.activeId === id) {
+    const split = this.split
+    const survivor = split ? splitSurvivor(split, id) : null
+    if (survivor !== null) {
+      // removing a pane document drops the split; the other pane's document
+      // takes the whole window (or stays backgrounded under a cover tab)
+      this.split = null
+      if (this.activeId === id && this.tabs.some((t) => t.id === survivor.tabId)) {
+        this.activateTab(survivor.tabId)
+      } else {
+        this.layout()
+        this.refreshActiveTargets()
+        this.onChanged()
+      }
+      this.notifySplitChanged()
+    } else if (this.activeId === id) {
       const fallback = this.tabs[idx - 1] ?? this.tabs[0]
       this.activateTab(fallback.id)
     } else {
@@ -725,7 +1178,21 @@ export class TabManager {
     const view = tab.view
     view.setVisible(false)
     this.shellWindow.contentView.removeChildView(view)
-    if (this.activeId === id) {
+    const split = this.split
+    const survivor = split ? splitSurvivor(split, id) : null
+    if (survivor !== null) {
+      // a pane document leaves for its own window: the split drops and the
+      // remaining pane takes the shell window
+      this.split = null
+      if (this.activeId === id && this.tabs.some((t) => t.id === survivor.tabId)) {
+        this.activateTab(survivor.tabId)
+      } else {
+        this.layout()
+        this.refreshActiveTargets()
+        this.onChanged()
+      }
+      this.notifySplitChanged()
+    } else if (this.activeId === id) {
       const fallback = this.tabs[idx - 1] ?? this.tabs[0]
       this.activateTab(fallback.id)
     } else {
@@ -754,6 +1221,7 @@ export class TabManager {
     this.shellWindow.contentView.addChildView(view)
     view.setVisible(false)
     this.trackHtmlFullScreen(view)
+    this.trackPaneFocus(view)
     const slot =
       index === undefined || !Number.isFinite(index)
         ? this.tabs.length

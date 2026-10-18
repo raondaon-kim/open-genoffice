@@ -59,6 +59,9 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
     if (closePromptInFlight) return
     closePromptInFlight = true
     void (async () => {
+      // activating dirty tabs animates the split layout; the arrangement must
+      // come back whether the close is denied or the settle path runs
+      manager.beginExclusivePrompt()
       try {
         const denied = await (async () => {
           for (const tab of dirtySheets) {
@@ -104,6 +107,7 @@ export function installShellCloseGuard(win: BrowserWindow, manager: TabManager):
         // report it and release the in-flight flag below
         console.error('[shell] window close prompt failed:', err)
       } finally {
+        manager.endExclusivePrompt()
         closePromptInFlight = false
       }
     })()
