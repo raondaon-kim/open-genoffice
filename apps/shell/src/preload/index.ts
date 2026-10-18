@@ -40,6 +40,8 @@ import type {
 } from '../shared/integrations-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
+import { SPLIT_TABS_CHANNELS } from '../shared/split-view-api'
+import type { SplitHint, SplitViewState } from '../shared/split-view-api'
 import {
   QUICK_LOOK_HOME_CHANNELS,
   normalizeQuickLookSettings,
@@ -691,6 +693,22 @@ const tabsApi: TabsApi = {
     const listener = (_event: IpcRendererEvent, tabs: TabSummary[]) => handler(tabs)
     ipcRenderer.on(TABS_CHANNELS.changed, listener)
     return () => ipcRenderer.removeListener(TABS_CHANNELS.changed, listener)
+  },
+  async getSplit() {
+    return (await ipcRenderer.invoke(SPLIT_TABS_CHANNELS.get)) as SplitViewState | null
+  },
+  setSplitRatio(ratio) {
+    ipcRenderer.send(SPLIT_TABS_CHANNELS.setRatio, ratio)
+  },
+  onSplitChanged(handler) {
+    const listener = (_event: IpcRendererEvent, state: SplitViewState | null) => handler(state)
+    ipcRenderer.on(SPLIT_TABS_CHANNELS.changed, listener)
+    return () => ipcRenderer.removeListener(SPLIT_TABS_CHANNELS.changed, listener)
+  },
+  onSplitHint(handler) {
+    const listener = (_event: IpcRendererEvent, hint: SplitHint | null) => handler(hint)
+    ipcRenderer.on(SPLIT_TABS_CHANNELS.hint, listener)
+    return () => ipcRenderer.removeListener(SPLIT_TABS_CHANNELS.hint, listener)
   },
   notifyChromePressed() {
     ipcRenderer.send(TABS_CHANNELS.chromePressed)

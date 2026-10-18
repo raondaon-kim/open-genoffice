@@ -1,3 +1,5 @@
+import type { SplitHint, SplitViewState } from './split-view-api'
+
 export type TabKind = 'home' | 'docs' | 'sheets' | 'slides' | 'pdf' | 'markdown' | 'html' | 'hwp'
 
 /** a tab that holds a document — every kind except the Home screen */
@@ -87,6 +89,14 @@ export interface TabsApi {
   reorder(id: string, toIndex: number): Promise<void>
   /** subscribe to tab list changes (open/close/activate/title updates); returns unsubscribe */
   onChanged(handler: (tabs: TabSummary[]) => void): () => void
+  /** the current two-pane split, or null while the window shows a single tab */
+  getSplit(): Promise<SplitViewState | null>
+  /** move the divider; ratio is the first pane's (a) share, 0 closes a and 1 closes b */
+  setSplitRatio(ratio: number): void
+  /** subscribe to split state changes (including closing a side); returns unsubscribe */
+  onSplitChanged(handler: (state: SplitViewState | null) => void): () => void
+  /** subscribe to the divider drop-hint rectangle; returns unsubscribe */
+  onSplitHint(handler: (hint: SplitHint | null) => void): () => void
   /**
    * fire-and-forget: a pointerdown landed on the shell chrome (tab strip).
    * Document tabs are sibling WebContentsViews that see neither the event nor
