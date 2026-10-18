@@ -1223,8 +1223,11 @@ export class TabManager {
    * mid-gesture) becomes a tab again at `index` — Home stays pinned at 0, an
    * out-of-range or omitted index appends — and is activated. The document,
    * unsaved edits included, is untouched: only the view's parent changes.
+   * With `activate` false the tab comes back quietly for a caller that sets
+   * the state itself (a split drop re-homes the tab into a pane); the strip
+   * is still told about the new tab.
    */
-  attachTab(record: DetachedTab, index?: number): string {
+  attachTab(record: DetachedTab, index?: number, activate = true): string {
     const id = `t${this.nextId++}`
     const { view } = record
     this.shellWindow.contentView.addChildView(view)
@@ -1242,7 +1245,8 @@ export class TabManager {
       title: record.title,
       filePath: record.filePath,
     })
-    this.activateTab(id)
+    if (activate) this.activateTab(id)
+    else this.onChanged()
     return id
   }
 
