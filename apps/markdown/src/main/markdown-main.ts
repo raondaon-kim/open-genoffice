@@ -16,6 +16,7 @@ import type { WebContents } from 'electron'
 import {
   MAX_REMOTE_IMAGE_BYTES,
   configuredDefaultSaveDir,
+  confirmOverwriteIfConflicted,
   fetchRemoteImage,
   readBodyCapped,
   saveImageFromUrl,
@@ -23,13 +24,17 @@ import {
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
+  isPathOpenElsewhere,
+  recordDiskState,
   safeExternalUrl,
+  shouldDeferAutoSave,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
   installRendererProtocol,
   registerRendererScheme,
   rendererUrl,
 } from '@genoffice/electron-utils'
+import type { SaveDiskState } from '@genoffice/electron-utils'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { ImageExportSessions } from './image-export'
@@ -402,6 +407,48 @@ const readTextWaiters = new Map<number, (result: { text: string } | { error: str
 /** one read per tab at a time: concurrent callers share this promise */
 const readTextInFlight = new Map<number, Promise<string>>()
 
+// ── Split-copy save guard (decision 0036): remember the disk state of every
+// read and write per view and path, so that while the same document is open in
+// two panes a save can see the sibling pane's write. A manual save asks before
+// overwriting it; an automatic save defers silently to the next manual one.
+const docDiskStates = new Map<number, Map<string, SaveDiskState>>()
+
+async function rememberDiskState(wcId: number, path: string): Promise<void> {
+  const state = await recordDiskState(path)
+  if (!state) return
+  const states = docDiskStates.get(wcId) ?? new Map<string, SaveDiskState>()
+  states.set(path, state)
+  docDiskStates.set(wcId, states)
+}
+
+function forgetDiskState(wcId: number, path: string): void {
+  const states = docDiskStates.get(wcId)
+  if (!states) return
+  states.delete(path)
+  if (states.size === 0) docDiskStates.delete(wcId)
+}
+
+/** True when this save must stop instead of writing: the sibling copy changed
+ *  the disk since this view's last read or write, and either the automatic
+ *  save defers or the user chose to keep the disk copy. */
+async function conflictStopsSave(
+  contents: WebContents,
+  path: string,
+  auto: boolean,
+): Promise<boolean> {
+  if (!isPathOpenElsewhere(path)) return false
+  const recorded = docDiskStates.get(contents.id)?.get(path)
+  if (auto) return shouldDeferAutoSave(path, recorded)
+  return (
+    (await confirmOverwriteIfConflicted({
+      parent: BrowserWindow.fromWebContents(contents),
+      path,
+      recorded,
+      lang: getUiLang(),
+    })) === 'cancel'
+  )
+}
+
 /** Fired after a save lands on a NEW path (untitled first save / Save As) — the shell syncs tab title, recents, projects */
 let fileSavedHook: ((wc: WebContents, path: string) => void) | null = null
 
@@ -450,6 +497,12 @@ export function markdownFileRenamed(contents: WebContents, oldPath: string, newP
   if (openPathByWc.get(wcId) === oldPath) openPathByWc.set(wcId, newPath)
   const allowed = allowedByWc.get(wcId)
   if (allowed?.has(oldPath)) allowed.add(newPath)
+  const states = docDiskStates.get(wcId)
+  const recorded = states?.get(oldPath)
+  if (states && recorded) {
+    states.delete(oldPath)
+    states.set(newPath, recorded)
+  }
   void renameOwnedAssetDocument(oldPath, newPath).catch((error) => {
     console.warn('[markdown] asset manifest rename sync failed:', error)
   })
@@ -757,7 +810,10 @@ function registerMarkdownIpc(): void {
     if (typeof path !== 'string' || !allowedByWc.get(e.sender.id)?.has(path)) {
       throw new Error('markdown: path not granted to this view')
     }
-    return await readFile(path, 'utf8')
+    const text = await readFile(path, 'utf8')
+    // The reader's copy: this view's save guard compares against this state
+    await rememberDiskState(e.sender.id, path)
+    return text
   })
 
   ipcMain.handle(
@@ -780,7 +836,18 @@ function registerMarkdownIpc(): void {
         return done({ ok: false, error: 'markdown: bad image references' })
       }
       const mode: SaveMode = request.mode === 'saveAs' ? 'saveAs' : 'save'
+      // Request input is untrusted: only an explicit automatic-save flag counts
+      const auto = (request as { auto?: unknown } | null)?.auto === true
       const pathAtRequest = savePathByWc.get(e.sender.id)
+      // A copy pair saving onto the document's own path settles the conflict
+      // before anything is prepared or written
+      if (
+        mode === 'save' &&
+        pathAtRequest &&
+        (await conflictStopsSave(e.sender, pathAtRequest, auto))
+      ) {
+        return done({ ok: false, error: 'external-modified' })
+      }
       const pendingAtRequest = pathAtRequest
         ? await pendingOwnedAssetsForDocument(pathAtRequest)
         : []
@@ -819,6 +886,9 @@ function registerMarkdownIpc(): void {
         allowed.add(target)
         allowedByWc.set(e.sender.id, allowed)
         dirtyByWc.delete(e.sender.id)
+        // Refresh the record for the written bytes; the view no longer edits a moved-away path
+        await rememberDiskState(e.sender.id, target)
+        if (currentPath && currentPath !== target) forgetDiskState(e.sender.id, currentPath)
         const pendingNames = prepared
           ? prepared.created.map((record) => record.name)
           : currentPath && resolve(currentPath) === resolve(target)
@@ -1120,6 +1190,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     allowedByWc.delete(wcId)
     savePathByWc.delete(wcId)
     dirtyByWc.delete(wcId)
+    docDiskStates.delete(wcId)
     closeSaveWaiters.get(wcId)?.(false)
     closeSaveWaiters.delete(wcId)
     saveWaiters.get(wcId)?.(false)

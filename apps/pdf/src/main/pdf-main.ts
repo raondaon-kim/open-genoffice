@@ -17,11 +17,15 @@ import type { WebContents } from 'electron'
 import {
   buildPrintableHtml,
   configuredDefaultSaveDir,
+  confirmOverwriteIfConflicted,
   contextMenuLabels,
   installContextMenu,
   installNavigationGuard,
+  isPathOpenElsewhere,
   printHtmlToPdf,
+  recordDiskState,
   safeExternalUrl,
+  shouldDeferAutoSave,
   showOpenDialogWithMemory,
   installRendererProtocol,
   registerRendererScheme,
@@ -30,6 +34,7 @@ import {
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { generateImageTool, documentMediaRoots } from '@genoffice/ai-search'
 import { PDF_CHANNELS } from '../shared/ipc'
+import type { SaveDiskState } from '@genoffice/electron-utils'
 import { buildExportImagePaths, hasValidExportPageNumbers } from './export-images'
 import type {
   ExportImagesRequest,
@@ -626,6 +631,48 @@ const saveAsTargetByWc = new Map<number, string>()
 /** Only a copy produced by this view may receive subsequent in-place redactions. */
 const redactionPathByWc = new Map<number, string>()
 const redactionFlows = new Set<number>()
+
+// ── Split-copy save guard (decision 0036): remember the disk state of every
+// read and write per view and path, so that while the same document is open in
+// two panes a save can see the sibling pane's write. A manual save asks before
+// overwriting it; an automatic save defers silently to the next manual one.
+const docDiskStates = new Map<number, Map<string, SaveDiskState>>()
+
+async function rememberDiskState(wcId: number, path: string): Promise<void> {
+  const state = await recordDiskState(path)
+  if (!state) return
+  const states = docDiskStates.get(wcId) ?? new Map<string, SaveDiskState>()
+  states.set(path, state)
+  docDiskStates.set(wcId, states)
+}
+
+function forgetDiskState(wcId: number, path: string): void {
+  const states = docDiskStates.get(wcId)
+  if (!states) return
+  states.delete(path)
+  if (states.size === 0) docDiskStates.delete(wcId)
+}
+
+/** True when this save must stop instead of writing: the sibling copy changed
+ *  the disk since this view's last read or write, and either the automatic
+ *  save defers or the user chose to keep the disk copy. */
+async function conflictStopsSave(
+  contents: WebContents,
+  path: string,
+  auto: boolean,
+): Promise<boolean> {
+  if (!isPathOpenElsewhere(path)) return false
+  const recorded = docDiskStates.get(contents.id)?.get(path)
+  if (auto) return shouldDeferAutoSave(path, recorded)
+  return (
+    (await confirmOverwriteIfConflicted({
+      parent: BrowserWindow.fromWebContents(contents),
+      path,
+      recorded,
+      lang: getUiLang(),
+    })) === 'cancel'
+  )
+}
 let pdfRedactionSavedHook: ((wc: WebContents, path: string) => void) | null = null
 
 export function setPdfRedactionSavedHook(hook: (wc: WebContents, path: string) => void): void {
@@ -666,6 +713,12 @@ export function pdfFileRenamed(contents: WebContents, oldPath: string, newPath: 
   if (allowed?.has(oldPath)) allowed.add(newPath)
   if (saveAsTargetByWc.get(wcId) === oldPath) saveAsTargetByWc.set(wcId, newPath)
   if (untitledPdfPaths.delete(oldPath)) untitledPdfPaths.add(newPath)
+  const states = docDiskStates.get(wcId)
+  const recorded = states?.get(oldPath)
+  if (states && recorded) {
+    states.delete(oldPath)
+    states.set(newPath, recorded)
+  }
   if (!contents.isDestroyed()) contents.send(PDF_CHANNELS.fileRenamed, newPath)
 }
 
@@ -969,6 +1022,8 @@ function registerPdfIpc(): void {
       throw new Error('pdf: path not granted to this view')
     }
     const buf = await readFile(path)
+    // The reader's copy: this view's save guard compares against this state
+    await rememberDiskState(e.sender.id, path)
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   })
 
@@ -999,6 +1054,14 @@ function registerPdfIpc(): void {
     const target = typeof request.targetPath === 'string' ? request.targetPath : path
     if (target !== path && saveAsTargetByWc.get(e.sender.id) !== target) {
       return { ok: false, error: 'pdf: target path not granted to this view' }
+    }
+    // A copy pair saving onto the document's own path settles the conflict first.
+    // Request input is untrusted: only an explicit automatic-save flag counts.
+    if (target === path) {
+      const auto = (request as { auto?: unknown } | null)?.auto === true
+      if (await conflictStopsSave(e.sender, path, auto)) {
+        return { ok: false, error: 'external-modified' }
+      }
     }
     if (request.redactions !== undefined) {
       let regions
@@ -1045,12 +1108,16 @@ function registerPdfIpc(): void {
         target,
         request,
       )
+      // Refresh the record for the written bytes
+      await rememberDiskState(e.sender.id, target)
       if (request.redactions !== undefined) {
         // Commit document identity only after the atomic write succeeds. Revoke the
         // source grant so stale renderer requests cannot write back to the original.
         allowedByWc.set(e.sender.id, new Set([target]))
         openPathByWc.set(e.sender.id, target)
         redactionPathByWc.set(e.sender.id, target)
+        // The view's document moved to the redacted copy: the old path's record is dead
+        forgetDiskState(e.sender.id, path)
         try {
           pdfRedactionSavedHook?.(e.sender, target)
         } catch (err) {
@@ -1650,6 +1717,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     redactionFlows.delete(wcId)
     allowedByWc.delete(wcId)
     dirtyByWc.delete(wcId)
+    docDiskStates.delete(wcId)
     saveAsTargetByWc.delete(wcId)
     closeSaveWaiters.get(wcId)?.(false)
     closeSaveWaiters.delete(wcId)
