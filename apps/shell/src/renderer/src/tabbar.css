@@ -398,3 +398,103 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   padding: 1px 4px;
   outline: none;
 }
+
+/* ---- split view: the two panes are WebContentsViews painted above this
+ * document, so the only shell chrome in the content area is the gap between
+ * them — the divider lives exactly there ---- */
+
+.split-divider {
+  position: fixed;
+  z-index: 5;
+  background: var(--surface);
+  touch-action: none;
+  user-select: none;
+}
+
+.split-divider.side {
+  cursor: col-resize;
+}
+
+.split-divider.stack {
+  cursor: row-resize;
+}
+
+/* the gap is a few px wide; a hairline down its middle reads as the seam */
+.split-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border-strong);
+}
+
+.split-divider.stack::before {
+  top: 50%;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
+.split-divider.side:hover::before,
+.split-divider.side:active::before,
+.split-divider.stack:hover::before,
+.split-divider.stack:active::before {
+  background: var(--accent);
+}
+
+/* a tab that sits in a split pane carries a small accent bar under its label:
+ * anchored left for pane a (the first pane) and right for pane b, so both
+ * read apart while the focus pane's tab keeps the ordinary active plate */
+.tab-item.split-a::after,
+.tab-item.split-b::after {
+  content: '';
+  position: absolute;
+  bottom: 8px;
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.tab-item.split-a::after {
+  left: 12px;
+}
+
+.tab-item.split-b::after {
+  right: 8px;
+}
+
+/* drop hint while a dragged tab hovers a split edge; the pane area below is
+ * hidden under the views, so the hint is drawn inside the strip */
+.tab-split-hint {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--color-btn-primary-text);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* right edge zone: hug the strip's right end, clear of the caption buttons */
+.tab-split-hint.for-side {
+  right: calc(8px + (100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
+}
+
+/* bottom edge zone: a bar across the strip's middle */
+.tab-split-hint.for-stack {
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
