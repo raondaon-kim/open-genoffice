@@ -8,6 +8,7 @@ vi.mock('../src/renderer/components/toast-bus', () => ({ showToast: vi.fn() }))
 vi.mock('../src/renderer/i18n/locale', () => ({ t: (k: string) => k }))
 
 import { adoptSavedSlides, save, saveAs } from '../src/renderer/file-actions'
+import { showToast } from '../src/renderer/components/toast-bus'
 import type { ActionCtx } from '../src/renderer/action-context'
 
 function ctx(): ActionCtx {
@@ -154,6 +155,33 @@ describe('slides save serialization', () => {
     await Promise.all([save(getCtx, true), save(getCtx, true)])
 
     expect(seen).toEqual([0, 1])
+
+    vi.unstubAllGlobals()
+  })
+
+  it('passes the auto flag through: false for the user save, true for the AutoSave tick', async () => {
+    const mockSave = vi.fn(async (_auto?: boolean) => ({ ok: true }))
+    vi.stubGlobal('window', { slidesApi: { save: mockSave } })
+
+    await save(() => ctx())
+    await save(() => ctx(), true)
+
+    expect(mockSave.mock.calls.map((call) => call[0])).toEqual([false, true])
+
+    vi.unstubAllGlobals()
+  })
+
+  it('stays quiet when the guard kept the disk copy (external-modified)', async () => {
+    const mockSave = vi.fn(async () => ({ ok: false, reason: 'external-modified' }))
+    vi.stubGlobal('window', { slidesApi: { save: mockSave } })
+    const toast = vi.mocked(showToast)
+    toast.mockClear()
+    const setStatus = vi.fn()
+    const context = { ...ctx(), setStatus } as unknown as ActionCtx
+
+    expect(await save(() => context, true)).toBe(false)
+    expect(toast).not.toHaveBeenCalled()
+    expect(setStatus).not.toHaveBeenCalled()
 
     vi.unstubAllGlobals()
   })

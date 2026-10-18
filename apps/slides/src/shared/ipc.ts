@@ -1693,7 +1693,18 @@ export interface SlidesApi {
   exportPdf: (op: ExportPdfOp) => Promise<ExportPdfResult>
   /** Print (system dialog; cancel counts as ok=false without an error) */
   printSlides: (op: PrintSlidesOp) => Promise<{ ok: boolean; error?: string }>
-  save: () => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>
+  /** Save the deck in place. auto marks the AutoSave timer's own pass: while a
+   *  sibling split-view copy moved the disk past this one, an auto save defers
+   *  silently (`reason: 'external-modified'`) where a user's save asks first. */
+  save: (
+    auto?: boolean,
+  ) => Promise<{
+    ok: boolean
+    path?: string
+    error?: string
+    reason?: 'external-modified'
+    slides?: RenderSlide[]
+  }>
   saveAs: (
     defaultName: string,
   ) => Promise<{ ok: boolean; path?: string; error?: string; slides?: RenderSlide[] }>

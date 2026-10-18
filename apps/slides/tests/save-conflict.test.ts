@@ -1,10 +1,11 @@
 /**
  * The split-view save guard for the slides main process: when the same deck is
  * open in another pane and the disk moved past what this deck last read or
- * wrote, a manual save asks before overwriting (cancel keeps the disk copy and
- * the deck stays dirty), the AutoSave toggle's silent saves defer instead, and
- * a path open nowhere else is not interrupted. Deck files are real (blank pptx
- * bytes); only the overwrite dialog is a controllable stub.
+ * wrote, a save the user asked for asks before overwriting (cancel keeps the
+ * disk copy and the deck stays dirty), the AutoSave timer's own pass (`auto`)
+ * defers silently, and a path open nowhere else is not interrupted. Deck files
+ * are real (blank pptx bytes); only the overwrite dialog is a controllable
+ * stub.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -128,8 +129,9 @@ async function openDeck(path: string): Promise<void> {
   expect(await call('slides:open-path', path, FIT)).not.toBeNull()
 }
 
-async function saveDeck(): Promise<SaveResult> {
-  return (await call('slides:save')) as SaveResult
+/** A save the renderer sends the way its paths do: false = the user's save, true = the AutoSave tick's pass */
+async function saveDeck(auto = false): Promise<SaveResult> {
+  return (await call('slides:save', auto)) as SaveResult
 }
 
 describe('split-view save guard (slides)', () => {
@@ -177,8 +179,23 @@ describe('split-view save guard (slides)', () => {
 
     // the answer that would overwrite must never be consulted
     showMessageBox.mockResolvedValue({ response: 0 })
-    expect(await saveDeck()).toEqual({ ok: false, reason: 'external-modified' })
+    expect(await saveDeck(true)).toEqual({ ok: false, reason: 'external-modified' })
     expect(showMessageBox).not.toHaveBeenCalled()
+    expect(readFileSync(path)).toEqual(externalBytes)
+  })
+
+  it('still asks on the user save while AutoSave is on: the per-save flag decides, not the toggle', async () => {
+    const path = makeDeckFile()
+    await openDeck(path)
+    setOpenPathProbe((p) => p === path)
+    writeFileSync(path, externalBytes)
+    call('slides:autosave-pref', true)
+
+    // the hole this covers: the toggle alone used to route the manual save to
+    // the silent path, so Ctrl+S overwrote a sibling copy without asking
+    showMessageBox.mockResolvedValue({ response: 1 })
+    expect(await saveDeck()).toEqual({ ok: false, reason: 'external-modified' })
+    expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(readFileSync(path)).toEqual(externalBytes)
   })
 
@@ -189,7 +206,7 @@ describe('split-view save guard (slides)', () => {
     call('slides:autosave-pref', true)
     writeFileSync(path, externalBytes)
 
-    expect((await saveDeck()).ok).toBe(true)
+    expect((await saveDeck(true)).ok).toBe(true)
     expect(showMessageBox).not.toHaveBeenCalled()
     expect(readFileSync(path)).not.toEqual(externalBytes)
   })

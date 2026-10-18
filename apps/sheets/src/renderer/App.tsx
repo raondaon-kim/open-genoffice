@@ -65,7 +65,7 @@ import { isNumericIdentifierText } from './cell-warning'
 import { consumePendingUndoCarry, undoStackDepth } from './undo-carry'
 import { shouldRunSaveTick } from './save-scheduler'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useAutoSavePref, type AiScopeQuoteData } from '@genoffice/ui'
+import { useAutoSavePref, useSplitPaneFocusPing, type AiScopeQuoteData } from '@genoffice/ui'
 
 import {
   CellValueType,
@@ -482,6 +482,8 @@ export function App({
 }: {
   queuedWorkbookAtBoot?: boolean
 }): React.JSX.Element {
+  // Split panes: fallback focus reporting for this screen (decision 0036)
+  useSplitPaneFocusPing()
   const adapterRef = useRef(new InMemoryWorkbookAdapter(initialSnapshot))
   const univerRef = useRef<UniverRuntime | null>(null)
   const lazyWorkbookRef = useRef<LazyWorkbookState | null>(null)

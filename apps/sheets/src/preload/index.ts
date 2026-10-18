@@ -1,6 +1,7 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
+import { splitPaneBridge } from '@genoffice/electron-utils/split-pane-bridge'
 
 import type {
   AiChatResponse,
@@ -702,6 +703,8 @@ const projectApi: ProjectApi = {
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+// The shell's split panes: which pane this view is, and focus requests for it
+contextBridge.exposeInMainWorld('aiOfficeSplit', splitPaneBridge(ipcRenderer))
 
 // the work wiki: the attachment card's "add to work material" button (wiki:status / wiki:add-material)
 contextBridge.exposeInMainWorld(

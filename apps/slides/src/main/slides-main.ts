@@ -4462,7 +4462,7 @@ export function registerSlidesIpc(): void {
     )
   })
 
-  ipcMain.handle('slides:save', async (e) => {
+  ipcMain.handle('slides:save', async (e, auto?: unknown) => {
     const session = sessions.get(e.sender.id)
     if (!session) return { ok: false, error: 'no file open' }
     // Untitled (new blank file): the first save lands silently in the drafts folder (Save As keeps its dialog)
@@ -4474,11 +4474,13 @@ export function registerSlidesIpc(): void {
       slidesOpenedHook?.(e.sender, session.path)
     }
     // Split-view copy pair (same deck open in another pane): when the disk
-    // moved past what this copy read, a manual save asks before overwriting
-    // and cancelling keeps the disk copy (the deck stays dirty below); the
-    // AutoSave toggle — the only automatic save source — defers silently.
+    // moved past what this copy read, a save the user asked for asks before
+    // overwriting — cancelling keeps the disk copy (the deck stays dirty
+    // below) — while the AutoSave timer's own pass (auto, the only automatic
+    // save source) defers silently. The flag is the caller's, not the
+    // AutoSave toggle: a manual save with the toggle on still asks.
     // A path open nowhere else skips the guard entirely.
-    if (autoSavePrefByWc.get(e.sender.id) === true) {
+    if (auto === true) {
       if (await shouldDeferAutoSave(session.path, session.diskState)) {
         return { ok: false, reason: 'external-modified' }
       }

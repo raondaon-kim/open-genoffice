@@ -1,6 +1,7 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { splitPaneBridge } from '@genoffice/electron-utils/split-pane-bridge'
 import type { IpcRendererEvent } from 'electron'
 import type { RenderSlide } from '@genoffice/pptx-render'
 import type { ProjectApi } from '@genoffice/project-store'
@@ -347,7 +348,7 @@ const api: SlidesApi = {
   savePicture: (op: SavePictureOp) => ipcRenderer.invoke('slides:save-picture', op),
   exportPdf: (op: ExportPdfOp) => ipcRenderer.invoke('slides:export-pdf', op),
   printSlides: (op: PrintSlidesOp) => ipcRenderer.invoke('slides:print', op),
-  save: () => ipcRenderer.invoke('slides:save'),
+  save: (auto?: boolean) => ipcRenderer.invoke('slides:save', auto === true),
   saveAs: (defaultName: string) => ipcRenderer.invoke('slides:save-as', defaultName),
   onCloseSaveRequest: (handler: () => void) => {
     const listener = () => handler()
@@ -499,6 +500,9 @@ const projectApi: ProjectApi = {
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// The shell's split panes: which pane this view is, and focus requests for it
+contextBridge.exposeInMainWorld('aiOfficeSplit', splitPaneBridge(ipcRenderer))
 
 // open documents dragged from the OS onto this tab as a new shell tab
 installDropOpenBridge()

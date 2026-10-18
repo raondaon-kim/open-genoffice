@@ -87,25 +87,30 @@ async function runSerialized<T>(pass: () => Promise<T>): Promise<T> {
   return current
 }
 
-export async function save(getCtx: () => ActionCtx, quiet = false): Promise<boolean> {
+export async function save(getCtx: () => ActionCtx, auto = false): Promise<boolean> {
   return runSerialized(async () => {
     // resolved only now: a queued pass must remap selection against the tree the prior save adopted
     const ctx = getCtx()
     await flushActiveEdit(ctx)
     await ctx.flushNotes()
-    const r = await window.slidesApi.save()
+    const r = await window.slidesApi.save(auto)
     if (r.ok) {
       if (r.slides) adoptSavedSlides(ctx, r.slides)
       if (r.path) ctx.setPath(r.path)
       ctx.setDirty(false)
       const saved = t('appStatusSaved')
       ctx.setStatus(saved)
-      if (!quiet) showToast(saved)
+      if (!auto) showToast(saved)
+    } else if (r.reason === 'external-modified') {
+      // the split-view guard sat this write out: the AutoSave pass deferred by
+      // itself, or the user cancelled the overwrite prompt. The disk copy
+      // stands, the deck stays dirty, and no banner repeats the question
+      // (docs' save path is the model)
     } else {
       const failed = t('appStatusSaveFailed', { error: r.error ?? t('appErrorCanceled') })
       ctx.setStatus(failed)
-      // quiet suppresses the success toast only — a failed save (incl. the 30s
-      // auto-save) must surface, or edits silently stop reaching disk
+      // a failed save (incl. the 30s auto-save) must surface, or edits silently
+      // stop reaching disk
       showToast(failed, 'error')
     }
     return r.ok

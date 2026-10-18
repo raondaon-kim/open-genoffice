@@ -23,6 +23,7 @@ import {
   rememberAiPanelOpen,
   createZoomWheelClassifier,
   useAutoSavePref,
+  useSplitPaneFocusPing,
 } from '@genoffice/ui'
 import { wordRangeAtCaret } from './editor/comments'
 import { setFieldInstr, toggleAllFieldCodes, type FieldRange } from './editor/field-codes'
@@ -93,6 +94,7 @@ import type { AiDocContent, AiSettings, MenuCommand, OpenDocxResult } from '../s
 import { AI_PROVIDERS } from '../shared/ipc'
 import { ZoteroDocumentController } from './zotero/controller'
 import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
+import { useAiDock } from './ai/use-ai-dock'
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
 import type { AiStyleInfo } from './ai/style-ops'
 import { applyResolvedPageSetup, describeSection, type AiPageSetupAccess } from './ai/page-setup'
@@ -777,6 +779,10 @@ export function App() {
   const [_recent, setRecent] = useState<string[]>([])
   const [settings, setSettings] = useState<AiSettings>(DEFAULT_SETTINGS)
   const [showAi, setShowAi] = useState(() => aiPanelInitiallyOpen('aidocs.showAi'))
+  // Split panes (decision 0036): as the secondary pane this view's panel is
+  // forced to the rail, and the rail's click asks the shell to focus it first.
+  const aiDock = useAiDock(showAi, setShowAi)
+  useSplitPaneFocusPing()
   const [spellcheck, setSpellcheck] = useState(spellcheckEnabled)
   const [largeDocSpellOff, setLargeDocSpellOff] = useState(false)
   const spellcheckActive = spellcheck && !largeDocSpellOff
@@ -6926,7 +6932,7 @@ export function App() {
 
       <div className="app-main">
         {doc && (
-          <div className={`ai-dock${showAi ? '' : ' collapsed'}`}>
+          <div className={`ai-dock${aiDock.open ? '' : ' collapsed'}`}>
             {/* always mounted: collapse must not drop state or in-flight runs */}
             <AiPanel
               key={aiPanelKey}
@@ -6938,8 +6944,8 @@ export function App() {
                 doc.isBlank ? { bullet: BLANK_BULLET_NUM_ID, ordered: BLANK_ORDERED_NUM_ID } : null
               }
               preset={aiPreset}
-              open={showAi}
-              onExpand={() => setShowAi(true)}
+              open={aiDock.open}
+              onExpand={aiDock.onExpand}
               onCollapse={() => setShowAi(false)}
               filePath={doc?.filePath ?? null}
               editQueue={editQueue}

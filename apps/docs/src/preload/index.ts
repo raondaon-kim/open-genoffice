@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
+import { splitPaneBridge } from '@genoffice/electron-utils/split-pane-bridge'
 import type { IpcRendererEvent } from 'electron'
 import { VIEW_IMAGE_CHANNEL } from '../shared/ipc'
 import type { AiPanelPrefs } from '@genoffice/ui'
@@ -259,6 +260,8 @@ contextBridge.exposeInMainWorld(
   createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
 )
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+// The shell's split panes: which pane this view is, and focus requests for it
+contextBridge.exposeInMainWorld('aiOfficeSplit', splitPaneBridge(ipcRenderer))
 
 // open documents dragged from the OS onto this tab as a new shell tab
 installDropOpenBridge()
