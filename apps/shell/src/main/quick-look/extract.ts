@@ -11,7 +11,6 @@ import {
   quickLookFamilyOf,
   type QuickLookDocBlock,
   type QuickLookErrorCode,
-  type QuickLookFamily,
   type QuickLookMindmapSheet,
   type QuickLookPayload,
   type QuickLookSheet,
@@ -145,10 +144,9 @@ export async function extractEmbeddedThumbnail(
   ext: string,
   bytes: Buffer,
 ): Promise<string | undefined> {
-  if ( bytes.length < 4) return undefined
+  if (bytes.length < 4) return undefined
   const isZip = bytes[0] === 0x50 && bytes[1] === 0x4b
-  const isOle =
-    bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
+  const isOle = bytes[0] === 0xd0 && bytes[1] === 0xcf && bytes[2] === 0x11 && bytes[3] === 0xe0
   if (ext === 'hwp' && isOle) {
     return extractHwp5Thumbnail(bytes)
   }
