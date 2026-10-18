@@ -102,3 +102,13 @@ export {
 } from './renderer-scheme'
 export { installRendererProtocol, registerRendererScheme } from './renderer-protocol'
 export { atomicWriteFile, writeJsonAtomic } from './atomic-write'
+export {
+  confirmOverwriteIfConflicted,
+  isModifiedSince,
+  isPathOpenElsewhere,
+  recordDiskState,
+  setOpenPathProbe,
+  shouldDeferAutoSave,
+  type SaveConflictOptions,
+  type SaveDiskState,
+} from './save-conflict'
