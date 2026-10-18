@@ -33,13 +33,18 @@ import { gskApiKey, gskSlideGenerate, setGskProxyUrl } from '@genoffice/ai-searc
 import {
   appMenuLabels,
   configuredDefaultSaveDir,
+  confirmOverwriteIfConflicted,
   contextMenuLabels,
   fetchRemoteImage,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
+  isModifiedSince,
+  isPathOpenElsewhere,
+  recordDiskState,
   safeExternalUrl,
   saveAsSuggestion,
+  shouldDeferAutoSave,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
   helpMenuTemplate,
@@ -493,6 +498,7 @@ export async function saveSessionDeckTo(session: Session, filePath: string): Pro
   await savePptxToFile(session.opened, filePath)
   notifyDocumentSaved(filePath)
   session.path = filePath
+  session.diskState = (await recordDiskState(filePath)) ?? undefined
   autosaveBackoff.delete(filePath)
   // mirror slides:save-as: a saved deck is no longer an unsaved untitled draft
   for (const id of attachedIds(session)) dropUntitledRecovery(id)
@@ -859,6 +865,9 @@ async function openAndBuild(
     }
   }
   const raw = await readFile(path)
+  // the split-view save guard's baseline: the file's disk state as this copy
+  // read it (hashed in parallel; the parse below takes far longer)
+  const diskStatePromise = recordDiskState(path)
   // a 0-byte .pptx is an empty deck, not a corrupt one: open the blank template
   // under the file's own path so Save writes back to it
   const { bytes, recovered } = await maybeRecoverBytes(
@@ -868,6 +877,7 @@ async function openAndBuild(
   await shapedMetricsReady() // Lay out only after complex-script shaped metrics are ready, avoiding an init race falling back to estimation
   const opened = await openPptx(bytes)
   adoptEmbeddedFonts(opened)
+  const diskState = await diskStatePromise
   sessions.set(wc.id, {
     path,
     opened,
@@ -875,6 +885,7 @@ async function openAndBuild(
     undoStack: [],
     redoStack: [],
     ...(recovered ? { metaDirty: true } : {}),
+    ...(diskState === null ? {} : { diskState }),
   })
   scheduleHistoryNotify(sessions.get(wc.id)!)
   await pushRecent(path)
@@ -960,6 +971,7 @@ async function saveDraftAfterGenerate(
 
     await writeFile(draftPath, Buffer.from(bytes))
     session.path = draftPath
+    session.diskState = (await recordDiskState(draftPath)) ?? undefined
     await pushRecent(draftPath)
     slidesOpenedHook?.(wc, draftPath)
   } catch (err) {
@@ -4461,10 +4473,33 @@ export function registerSlidesIpc(): void {
       await pushRecent(session.path)
       slidesOpenedHook?.(e.sender, session.path)
     }
+    // Split-view copy pair (same deck open in another pane): when the disk
+    // moved past what this copy read, a manual save asks before overwriting
+    // and cancelling keeps the disk copy (the deck stays dirty below); the
+    // AutoSave toggle — the only automatic save source — defers silently.
+    // A path open nowhere else skips the guard entirely.
+    if (autoSavePrefByWc.get(e.sender.id) === true) {
+      if (await shouldDeferAutoSave(session.path, session.diskState)) {
+        return { ok: false, reason: 'external-modified' }
+      }
+    } else if (
+      isPathOpenElsewhere(session.path) &&
+      (await isModifiedSince(session.diskState, session.path))
+    ) {
+      const verdict = await confirmOverwriteIfConflicted({
+        parent: dialogParent() ?? null,
+        path: session.path,
+        recorded: session.diskState,
+        lang: getUiLang(),
+      })
+      if (verdict === 'cancel') return { ok: false, reason: 'external-modified' }
+    }
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, session.path)
       notifyDocumentSaved(session.path)
+      // the saved bytes are the new baseline for the split-view guard
+      session.diskState = (await recordDiskState(session.path)) ?? undefined
       autosaveBackoff.delete(session.path)
       void rm(autosavePathFor(session.path), { force: true }).catch(() => {})
       dropUntitledRecovery(e.sender.id)
@@ -4499,6 +4534,7 @@ export function registerSlidesIpc(): void {
       await savePptxToFile(session.opened, r.filePath)
       notifyDocumentSaved(r.filePath)
       session.path = r.filePath
+      session.diskState = (await recordDiskState(r.filePath)) ?? undefined
       autosaveBackoff.delete(r.filePath)
       dropUntitledRecovery(e.sender.id)
       await pushRecent(r.filePath)

@@ -39,13 +39,18 @@ import {
   appMenuLabels,
   buildPrintableHtml,
   configuredDefaultSaveDir,
+  confirmOverwriteIfConflicted,
   contextMenuLabels,
   fetchRemoteImage,
   installContextMenu,
   installNavigationGuard,
   isHeadlessMode,
+  isModifiedSince,
+  isPathOpenElsewhere,
   printHtmlToPdf,
+  recordDiskState,
   safeExternalUrl,
+  shouldDeferAutoSave,
   showOpenDialogWithMemory,
   showSaveDialogWithMemory,
   helpMenuTemplate,
@@ -55,6 +60,7 @@ import {
   registerRendererScheme,
   rendererUrl,
   writeJsonAtomic,
+  type SaveDiskState,
 } from '@genoffice/electron-utils'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
 import { ProjectStore } from '@genoffice/project-store'
@@ -1505,6 +1511,11 @@ interface SessionInfo {
   /// recovery copy, this session still needs its own crash-recovery copy,
   /// keyed by the original.
   readonly emptySource?: boolean
+  /// Split-view save guard (@genoffice/electron-utils/save-conflict): the disk
+  /// snapshot this copy last read or wrote, with the document path it belongs
+  /// to (a CSV session's snapshot is its .csv, not the converted temp copy).
+  /// Recorded at open and after every successful save.
+  readonly diskState?: { readonly path: string; readonly state: SaveDiskState }
 }
 
 // ---- runtime configuration (paths differ when bundled into the shell) ----
@@ -1711,6 +1722,46 @@ async function saveFileDialog(event: IpcMainInvokeEvent, options: SaveDialogOpti
   )
 }
 
+/** Split-view save-guard outcome: 'overwrite' = the user confirmed replacing
+ *  a sibling copy's change on disk, so this write skips the legacy
+ *  external-change check for the document path. */
+type SplitSaveVerdict = 'proceed' | 'cancel' | 'overwrite'
+
+/** The disk snapshot recorded for `path`, or undefined when this session last
+ *  read or wrote another path (a CSV session's state belongs to its .csv). */
+function recordedStateFor(session: SessionInfo, path: string): SaveDiskState | undefined {
+  return session.diskState?.path === path ? session.diskState.state : undefined
+}
+
+/**
+ * The same-document (split view) save guard: when the path is open in another
+ * pane and the disk moved past this copy's recorded state, a background save
+ * (quiet/AutoSave) defers silently — 'cancel' — while a manual save asks
+ * whether to overwrite the sibling's change. Cancelling keeps the disk copy
+ * and leaves this session dirty; 'overwrite' lets the caller skip the legacy
+ * external-change check for this one write. A path open nowhere else skips
+ * the guard entirely, so an ordinary save behaves exactly as before.
+ */
+async function guardSplitSave(options: {
+  path: string
+  recorded: SaveDiskState | undefined
+  quiet: boolean
+  event: IpcMainInvokeEvent
+}): Promise<SplitSaveVerdict> {
+  if (options.quiet) {
+    return (await shouldDeferAutoSave(options.path, options.recorded)) ? 'cancel' : 'proceed'
+  }
+  if (!isPathOpenElsewhere(options.path)) return 'proceed'
+  if (!(await isModifiedSince(options.recorded, options.path))) return 'proceed'
+  const verdict = await confirmOverwriteIfConflicted({
+    parent: dialogParent(options.event) ?? null,
+    path: options.path,
+    recorded: options.recorded,
+    lang: getUiLang(),
+  })
+  return verdict === 'proceed' ? 'overwrite' : 'cancel'
+}
+
 /** Workbook file extensions the open pipeline accepts. Single source for the
  *  picker filters, the merge-source check, and the crash re-open check. */
 const WORKBOOK_EXTS = new Set(['xlsx', 'xlsm', 'xls', 'csv', 'tsv'])
@@ -1807,6 +1858,11 @@ export function sheetsFileRenamed(wc: WebContents, oldPath: string, newPath: str
         retargetUnsavedNewRecovery(session.suggestSaveAs, suggested)
       )
         renamed = { ...renamed, suggestSaveAs: suggested }
+    }
+    // A rename moves the same bytes: the split-view disk snapshot follows the
+    // path so the save guard still judges the right file.
+    if (renamed.diskState?.path === oldPath) {
+      renamed = { ...renamed, diskState: { path: newPath, state: renamed.diskState.state } }
     }
     entry.sessions.set(id, renamed)
     matched = true
@@ -3247,9 +3303,18 @@ export function registerSheetsIpc(): void {
       // Restored crash-recovery copy: the restore prompt was the confirmation,
       // so Save writes straight back to the original — unless someone else
       // changed it since the restore.
-      const currentSha = await sha256File(session.restoreTarget).catch(() => undefined)
-      if (currentSha !== undefined && currentSha !== session.restoreTargetSha) {
-        throw new Error(tm('errDiskChanged'))
+      const verdict = await guardSplitSave({
+        path: session.restoreTarget,
+        recorded: recordedStateFor(session, session.restoreTarget),
+        quiet: request.quiet === true,
+        event,
+      })
+      if (verdict === 'cancel') return { canceled: true }
+      if (verdict !== 'overwrite') {
+        const currentSha = await sha256File(session.restoreTarget).catch(() => undefined)
+        if (currentSha !== undefined && currentSha !== session.restoreTargetSha) {
+          throw new Error(tm('errDiskChanged'))
+        }
       }
       targetPath = session.restoreTarget
     } else {
@@ -3258,18 +3323,38 @@ export function registerSheetsIpc(): void {
       // this guard on purpose — it patches the session snapshot, not the live
       // file, and writes to a path the user just confirmed, so it stays
       // usable as the escape hatch this error message points to. A file that
-      // was deleted on disk is fine: saving recreates it.
-      const currentSha = await sha256File(session.path).catch(() => undefined)
-      if (currentSha !== undefined && currentSha !== session.sha256) {
-        throw new Error(tm('errDiskChanged'))
+      // was deleted on disk is fine: saving recreates it. Split-view copy
+      // pairs are judged first: their confirmed overwrite already covered the
+      // disk change, so the refusal below steps aside for that one write.
+      const verdict = await guardSplitSave({
+        path: session.path,
+        recorded: recordedStateFor(session, session.path),
+        quiet: request.quiet === true,
+        event,
+      })
+      if (verdict === 'cancel') return { canceled: true }
+      if (verdict !== 'overwrite') {
+        const currentSha = await sha256File(session.path).catch(() => undefined)
+        if (currentSha !== undefined && currentSha !== session.sha256) {
+          throw new Error(tm('errDiskChanged'))
+        }
       }
     }
     // The CSV write-back gets the same external-change guard as restoreTarget;
     // a deleted .csv is fine — the write recreates it.
     if (csvInPlace && session.csvSourcePath !== undefined) {
-      const csvSha = await sha256File(session.csvSourcePath).catch(() => undefined)
-      if (csvSha !== undefined && csvSha !== session.csvSourceSha) {
-        throw new Error(tm('errDiskChanged'))
+      const verdict = await guardSplitSave({
+        path: session.csvSourcePath,
+        recorded: recordedStateFor(session, session.csvSourcePath),
+        quiet: request.quiet === true,
+        event,
+      })
+      if (verdict === 'cancel') return { canceled: true }
+      if (verdict !== 'overwrite') {
+        const csvSha = await sha256File(session.csvSourcePath).catch(() => undefined)
+        if (csvSha !== undefined && csvSha !== session.csvSourceSha) {
+          throw new Error(tm('errDiskChanged'))
+        }
       }
     }
 
@@ -4265,21 +4350,26 @@ async function openWorkbookSession(
   // from the same bytes, even if the file on disk changes right after the
   // copy. The digest also describes exactly those bytes.
   const snapshotPath = await snapshotWorkbook(path)
+  // The document path this copy is judged by (split-view save guard): the file
+  // the user sees, not the converted temp copy (CSV) or recovery copy (restore).
+  const diskStatePath = restoreTarget ?? csvSourcePath ?? path
   try {
-    const [opened, digest, snapshotStat, restoreTargetSha, csvSourceSha] = await Promise.all([
-      client
-        .open(snapshotPath, getUiLang(), systemShortDate())
-        .then((result) => sidecarOpenResultSchema.parse(result)),
-      sha256File(snapshotPath),
-      stat(snapshotPath),
-      // Missing original (deleted since the crash) is fine: the write-back recreates it.
-      restoreTarget === undefined
-        ? Promise.resolve(undefined)
-        : sha256File(restoreTarget).catch(() => undefined),
-      csvSourcePath === undefined
-        ? Promise.resolve(undefined)
-        : sha256File(csvSourcePath).catch(() => undefined),
-    ])
+    const [opened, digest, snapshotStat, restoreTargetSha, csvSourceSha, diskState] =
+      await Promise.all([
+        client
+          .open(snapshotPath, getUiLang(), systemShortDate())
+          .then((result) => sidecarOpenResultSchema.parse(result)),
+        sha256File(snapshotPath),
+        stat(snapshotPath),
+        // Missing original (deleted since the crash) is fine: the write-back recreates it.
+        restoreTarget === undefined
+          ? Promise.resolve(undefined)
+          : sha256File(restoreTarget).catch(() => undefined),
+        csvSourcePath === undefined
+          ? Promise.resolve(undefined)
+          : sha256File(csvSourcePath).catch(() => undefined),
+        recordDiskState(diskStatePath),
+      ])
     sessions.set(opened.sessionId, {
       path,
       snapshotPath,
@@ -4295,6 +4385,7 @@ async function openWorkbookSession(
       ...(restoreTargetSha === undefined ? {} : { restoreTargetSha }),
       ...(emptySource ? { emptySource } : {}),
       ...(unsavedNew ? { unsavedNew } : {}),
+      ...(diskState === null ? {} : { diskState: { path: diskStatePath, state: diskState } }),
     })
     unsavedNewWorkbooks.delete(path)
     return workbookFileSchema.parse({

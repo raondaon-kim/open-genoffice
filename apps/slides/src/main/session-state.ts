@@ -7,6 +7,7 @@
 import { BrowserWindow, webContents } from 'electron'
 import type { WebContents } from 'electron'
 import { join } from 'node:path'
+import type { SaveDiskState } from '@genoffice/electron-utils'
 import {
   materializeSlide,
   parseClrMap,
@@ -56,6 +57,10 @@ export interface Session {
   fitWidthPx: number
   undoStack: HistorySnapshot[]
   redoStack: HistorySnapshot[]
+  /** Split-view save guard (@genoffice/electron-utils/save-conflict): the disk
+   *  snapshot of `path` this deck last read or wrote. Recorded at open and
+   *  after every successful save. */
+  diskState?: SaveDiskState
   /** Nested history transaction used to collapse an AI tool/run into one undo step. */
   historyBatch?: {
     depth: number
