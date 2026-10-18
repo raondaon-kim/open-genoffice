@@ -97,6 +97,8 @@ type DirtyKinds = 'sheets' | 'pdf' | 'markdown' | 'html' | 'hwp' | 'slides' | 'd
 function fakeManager(dirty: Partial<Record<DirtyKinds, TabStub[]>> = {}) {
   return {
     activateTab: vi.fn(),
+    beginExclusivePrompt: vi.fn(),
+    endExclusivePrompt: vi.fn(),
     dirtySheetsTabs: () => dirty.sheets ?? [],
     dirtyPdfTabs: () => dirty.pdf ?? [],
     dirtyMarkdownTabs: () => dirty.markdown ?? [],

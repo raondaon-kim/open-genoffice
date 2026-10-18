@@ -761,7 +761,9 @@ export class TabManager {
       }
       case 'replace': {
         if (!this.split) return
-        this.setSplit({ ...this.split, bTabId: tabId }, tabId)
+        // the dropped side becomes the focused pane, like create/reorient:
+        // activeId must stay the focused pane's tab (menus, roles, MCP list)
+        this.setSplit({ ...this.split, bTabId: tabId, focus: 'b' }, tabId)
         return
       }
       case 'reorient': {
@@ -782,9 +784,9 @@ export class TabManager {
       }
       case 'flip': {
         if (!this.split) return
-        this.split = { ...this.split, orientation: intent.orientation }
-        this.layout()
-        this.notifySplitChanged()
+        // setSplit re-clamps the ratio for the new axis (a flip can make the
+        // old share violate the minimum on the other orientation)
+        this.setSplit({ ...this.split, orientation: intent.orientation })
         return
       }
       case 'focus': {
@@ -897,8 +899,15 @@ export class TabManager {
    */
   beginExclusivePrompt(): void {
     if (this.promptDepth === 0) {
-      this.promptSplitSnapshot = this.split ? { ...this.split } : null
-      this.promptActiveIdSnapshot = this.activeId
+      // only a live split needs restoring: without one the existing behavior
+      // stands (the prompt's tab stays active after a cancel)
+      if (this.split) {
+        this.promptSplitSnapshot = { ...this.split }
+        this.promptActiveIdSnapshot = this.activeId
+      } else {
+        this.promptSplitSnapshot = null
+        this.promptActiveIdSnapshot = null
+      }
     }
     this.promptDepth++
   }
