@@ -14,6 +14,7 @@ electron-builder.env
 /scripts/drivers/driver.*.mjs
 /probe*.mjs
 /apps/shell/build/THIRD-PARTY-NOTICES.txt
+/apps/shell/src/main/quick-look/win-quicklook.exe
 /example/
 /.task/
 /docs-archive/

@@ -340,6 +340,13 @@ import { FileIndexStore } from './file-index/store'
 import { normalizeFileSearchSettings, probeDecision, SearchReranker } from './file-index/rerank'
 import { runHeadlessExport, type HeadlessExporters } from './headless-export'
 import { TabManager } from './tab-manager'
+import {
+  configureQuickLookWindow,
+  notifyQuickLookLangOrThemeChanged,
+  shouldKeepQuickLookInTray,
+  stopQuickLookRuntime,
+} from './quick-look/quick-look-window'
+import { normalizeQuickLookSettings } from '../shared/quick-look-home'
 import { installShellCloseGuard } from './window-close-guard'
 import {
   activateDetached,
@@ -4296,6 +4303,7 @@ function registerHomeIpc(): void {
     buildHomeMenu()
     installDockMenu()
     installBackToHomeItems()
+    notifyQuickLookLangOrThemeChanged()
     for (const wc of webContents.getAllWebContents()) wc.send('app:language-changed', lang)
   })
 
@@ -4333,6 +4341,7 @@ function registerHomeIpc(): void {
     writeAppSetting(APP_SETTINGS_PATH(), 'theme', theme)
     nativeTheme.themeSource = theme
     refreshTitleBarOverlay()
+    notifyQuickLookLangOrThemeChanged()
     for (const wc of webContents.getAllWebContents()) wc.send('app:theme-changed', theme)
   })
 
@@ -6140,6 +6149,31 @@ app.whenReady().then(async () => {
     authorizeSave: authorizeMcpSheetWrite,
     abandonBlankTab: (wcId) => abandonBlankSheetsTabForMcp(wcId),
   })
+  configureQuickLookWindow({
+    parentWindow: () => shellWindow,
+    lang: () => currentLang(),
+    theme: () => currentTheme(),
+    trayIcon: () => {
+      try {
+        return menuIcons().home
+      } catch {
+        return null
+      }
+    },
+    readSettings: () => normalizeQuickLookSettings(readAppSettings(APP_SETTINGS_PATH()).quickLook),
+    writeSettings: (next) => writeAppSetting(APP_SETTINGS_PATH(), 'quickLook', next),
+    openInEditor: (filePath) => {
+      revealShellWindow()
+      openDocumentPath(filePath)
+    },
+    showShellWindow: () => {
+      revealShellWindow()
+    },
+    quitApp: () => {
+      stopQuickLookRuntime()
+      app.quit()
+    },
+  })
   configureMcpRuntime({
     version: app.getVersion(),
     defaultSaveDir: () => defaultSaveDir(),
@@ -6258,6 +6292,7 @@ app.on('window-all-closed', () => {
   // A headless export destroys its hidden window between documents; only
   // runHeadlessExportEntry decides when that run is over.
   if (headlessArgv.kind !== 'none') return
+  if (shouldKeepQuickLookInTray()) return
   if (process.platform !== 'darwin') app.quit()
 })
 
@@ -6288,4 +6323,5 @@ app.on('will-quit', () => {
   controlServer?.close()
   // a second instance that lost the lock quits too; it must not delete the running editor's list
   if (ownsOpenDocumentsRegistry) clearOpenDocuments(OPEN_DOCUMENTS_PATH())
+  stopQuickLookRuntime()
 })

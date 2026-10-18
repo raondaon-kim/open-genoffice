@@ -40,6 +40,13 @@ import type {
 } from '../shared/integrations-api'
 import type { TabsApi, TabSummary } from '../shared/tabs-api'
 import { TABS_CHANNELS } from '../shared/tabs-api'
+import {
+  QUICK_LOOK_HOME_CHANNELS,
+  normalizeQuickLookSettings,
+  type QuickLookHomeApi,
+  type QuickLookSettings,
+} from '../shared/quick-look-home'
+import type { QuickLookPayload } from '../shared/quick-look-api'
 
 const UI_LANGUAGES: readonly UiLanguage[] = [
   'zh',
@@ -696,6 +703,50 @@ const tabsApi: TabsApi = {
 }
 
 contextBridge.exposeInMainWorld('aiOfficeTabs', tabsApi)
+
+const quickLookHomeApi: QuickLookHomeApi = {
+  async preview(path: string) {
+    if (typeof path !== 'string' || !path.trim()) {
+      return {
+        ok: false,
+        path: '',
+        name: '',
+        ext: '',
+        family: 'unsupported',
+        sizeBytes: 0,
+        mtimeMs: 0,
+        truncated: false,
+        error: 'unreadable',
+      }
+    }
+    const result = (await ipcRenderer.invoke(
+      QUICK_LOOK_HOME_CHANNELS.preview,
+      path,
+    )) as QuickLookPayload | null
+    return (
+      result ?? {
+        ok: false,
+        path,
+        name: path,
+        ext: '',
+        family: 'unsupported',
+        sizeBytes: 0,
+        mtimeMs: 0,
+        truncated: false,
+        error: 'unreadable',
+      }
+    )
+  },
+  async getSettings() {
+    const raw = await ipcRenderer.invoke(QUICK_LOOK_HOME_CHANNELS.getSettings)
+    return normalizeQuickLookSettings(raw)
+  },
+  async setSettings(settings: Partial<QuickLookSettings>) {
+    const raw = await ipcRenderer.invoke(QUICK_LOOK_HOME_CHANNELS.setSettings, settings)
+    return normalizeQuickLookSettings(raw)
+  },
+}
+contextBridge.exposeInMainWorld('aiOfficeQuickLookHome', quickLookHomeApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()

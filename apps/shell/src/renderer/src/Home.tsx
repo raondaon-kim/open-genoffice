@@ -32,6 +32,11 @@ import { SettingsModal } from './SettingsModal'
 import type { SettingsTarget } from './SettingsModal'
 import { skillUpdateDue } from './IntegrationsPane'
 import { onFilesChanged } from './file-events'
+import './quick-look/globals'
+import './quick-look/quick-look.css'
+import { QuickLookView } from './quick-look/QuickLookView'
+import { quickLookText } from './i18n/strings-quick-look'
+import type { QuickLookPayload } from '../../shared/quick-look-api'
 
 declare global {
   interface Window {
@@ -1822,6 +1827,42 @@ export function Home() {
   const folderAllSelected =
     folderFiles.length > 0 && folderSelectedPaths.length === folderFiles.length
 
+  // ── Quick Look (Spacebar preview) ──
+  const hoveredFilePathRef = useRef<string | null>(null)
+  const [quickLookPath, setQuickLookPath] = useState<string | null>(null)
+  const [quickLookPayload, setQuickLookPayload] = useState<QuickLookPayload | null>(null)
+  const [quickLookLoading, setQuickLookLoading] = useState(false)
+  const [quickLookClosing, setQuickLookClosing] = useState(false)
+  const [quickLookNavDir, setQuickLookNavDir] = useState<'up' | 'down' | 'none'>('none')
+  const quickLookSeqRef = useRef(0)
+  const quickLookCloseTimerRef = useRef<number | null>(null)
+
+  const openQuickLook = (nextPath: string, dir: 'up' | 'down' | 'none' = 'none') => {
+    if (quickLookCloseTimerRef.current !== null) {
+      window.clearTimeout(quickLookCloseTimerRef.current)
+      quickLookCloseTimerRef.current = null
+    }
+    setQuickLookClosing(false)
+    setQuickLookNavDir(dir)
+    setQuickLookPath(nextPath)
+  }
+
+  const closeQuickLook = () => {
+    if (!quickLookPath || quickLookClosing) return
+    setQuickLookClosing(true)
+    if (quickLookCloseTimerRef.current !== null) {
+      window.clearTimeout(quickLookCloseTimerRef.current)
+    }
+    quickLookCloseTimerRef.current = window.setTimeout(() => {
+      quickLookCloseTimerRef.current = null
+      setQuickLookPath(null)
+      setQuickLookPayload(null)
+      setQuickLookLoading(false)
+      setQuickLookClosing(false)
+      setQuickLookNavDir('none')
+    }, 150)
+  }
+
   const changeView = (next: 'recent' | 'starred') => {
     setView(next)
     setSelectedFolder(null)
@@ -2531,6 +2572,12 @@ export function Home() {
           tabIndex={0}
           draggable={!isRenaming && !entry.missing}
           onDragStart={(e) => onRowDragStart(e, dragPathsFor(entry.path, context))}
+          onMouseEnter={() => {
+            if (!entry.missing) hoveredFilePathRef.current = entry.path
+          }}
+          onFocus={() => {
+            if (!entry.missing) hoveredFilePathRef.current = entry.path
+          }}
           onClick={() => {
             if (isRenaming) return
             if (entry.missing) setConfirmMissing(entry)
@@ -2627,6 +2674,17 @@ export function Home() {
                 >
                   {t('open')}
                 </button>
+                {!entry.missing && (
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setRowMenu(null)
+                      openQuickLook(entry.path)
+                    }}
+                  >
+                    {quickLookText(lang, 'windowTitle')}
+                  </button>
+                )}
                 <button
                   role="menuitem"
                   onClick={() => {
@@ -2942,6 +3000,12 @@ export function Home() {
       className="search-row"
       role="button"
       tabIndex={0}
+      onMouseEnter={() => {
+        hoveredFilePathRef.current = hit.path
+      }}
+      onFocus={() => {
+        hoveredFilePathRef.current = hit.path
+      }}
       onClick={() => void window.aiOffice.openPath(hit.path)}
       onKeyDown={(e) => {
         if (e.key === 'Enter') void window.aiOffice.openPath(hit.path)
@@ -3003,6 +3067,130 @@ export function Home() {
     const rank = new Map(rerankApplied.order.map((path, i) => [path, i]))
     return [...hits].sort((a, b) => (rank.get(a.path) ?? Infinity) - (rank.get(b.path) ?? Infinity))
   }
+
+  const visiblePreviewPaths = ((): string[] => {
+    if (searchActive && searchPage) {
+      return orderedSearchHits(searchPage.hits).map((h) => h.path)
+    }
+    if (selectedFolder && rootOf(selectedFolder, roots)?.readable) {
+      const sorted = fileSort === 'oldest' ? [...folderFiles].reverse() : folderFiles
+      return sorted.filter((e) => !e.missing).map((e) => e.path)
+    }
+    const sorted = fileSort === 'oldest' ? [...entries].reverse() : entries
+    return sorted.filter((e) => !e.missing).map((e) => e.path)
+  })()
+
+  useEffect(() => {
+    if (!quickLookPath) {
+      setQuickLookPayload(null)
+      setQuickLookLoading(false)
+      return
+    }
+    const api = window.aiOfficeQuickLookHome
+    if (!api) return
+    const seq = ++quickLookSeqRef.current
+    // Avoid flashing a blank loading state when navigating quickly between files
+    let loadingTimer: number | null = null
+    if (!quickLookPayload) {
+      setQuickLookLoading(true)
+    } else {
+      loadingTimer = window.setTimeout(() => {
+        if (seq === quickLookSeqRef.current) {
+          setQuickLookLoading(true)
+        }
+      }, 85)
+    }
+    void api
+      .preview(quickLookPath)
+      .then((res) => {
+        if (loadingTimer !== null) window.clearTimeout(loadingTimer)
+        if (seq !== quickLookSeqRef.current) return
+        setQuickLookPayload(res)
+        setQuickLookLoading(false)
+      })
+      .catch(() => {
+        if (loadingTimer !== null) window.clearTimeout(loadingTimer)
+        if (seq !== quickLookSeqRef.current) return
+        setQuickLookLoading(false)
+      })
+    return () => {
+      if (loadingTimer !== null) window.clearTimeout(loadingTimer)
+    }
+  }, [quickLookPath])
+
+  useEffect(() => {
+    return () => {
+      if (quickLookCloseTimerRef.current !== null) {
+        window.clearTimeout(quickLookCloseTimerRef.current)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        target?.isContentEditable ||
+        renaming !== null ||
+        folderRenaming !== null ||
+        creating !== null ||
+        confirmDelete !== null ||
+        confirmDeleteFolder !== null ||
+        confirmMissing !== null ||
+        movePicker !== null ||
+        conflict !== null ||
+        document.querySelector('.set-overlay')
+      ) {
+        return
+      }
+
+      if (quickLookPath && !quickLookClosing) {
+        if (event.key === ' ' || event.key === 'Escape') {
+          event.preventDefault()
+          event.stopPropagation()
+          closeQuickLook()
+          return
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          event.stopPropagation()
+          const toOpen = quickLookPath
+          closeQuickLook()
+          void window.aiOffice.openPath(toOpen)
+          return
+        }
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          const idx = visiblePreviewPaths.indexOf(quickLookPath)
+          if (idx !== -1) {
+            const nextIdx = event.key === 'ArrowUp' ? idx - 1 : idx + 1
+            const nextPath = visiblePreviewPaths[nextIdx]
+            if (nextPath) {
+              event.preventDefault()
+              event.stopPropagation()
+              hoveredFilePathRef.current = nextPath
+              openQuickLook(nextPath, event.key === 'ArrowUp' ? 'up' : 'down')
+            }
+          }
+          return
+        }
+      } else if (event.key === ' ') {
+        const checkedPath = selectedFolder ? folderSelectedPaths[0] : selectedPaths[0]
+        const candidate = hoveredFilePathRef.current ?? checkedPath ?? null
+        if (candidate) {
+          event.preventDefault()
+          event.stopPropagation()
+          openQuickLook(candidate, 'none')
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  })
 
   const renderSearchHeading = () => {
     const total = searchPage?.total ?? 0
@@ -3475,6 +3663,50 @@ export function Home() {
         />
       )}
 
+      {quickLookPath && (
+        <div
+          className={`ql-overlay${quickLookClosing ? ' ql-overlay-closing' : ''}`}
+          onClick={closeQuickLook}
+        >
+          <QuickLookView
+            lang={lang}
+            payload={quickLookPayload}
+            loading={quickLookLoading}
+            closing={quickLookClosing}
+            navDirection={quickLookNavDir}
+            canPrev={visiblePreviewPaths.indexOf(quickLookPath) > 0}
+            canNext={
+              visiblePreviewPaths.indexOf(quickLookPath) !== -1 &&
+              visiblePreviewPaths.indexOf(quickLookPath) < visiblePreviewPaths.length - 1
+            }
+            onPrev={() => {
+              const idx = visiblePreviewPaths.indexOf(quickLookPath)
+              if (idx > 0) {
+                const prev = visiblePreviewPaths[idx - 1]!
+                hoveredFilePathRef.current = prev
+                openQuickLook(prev, 'up')
+              }
+            }}
+            onNext={() => {
+              const idx = visiblePreviewPaths.indexOf(quickLookPath)
+              if (idx !== -1 && idx < visiblePreviewPaths.length - 1) {
+                const next = visiblePreviewPaths[idx + 1]!
+                hoveredFilePathRef.current = next
+                openQuickLook(next, 'down')
+              }
+            }}
+            onOpenInEditor={() => {
+              const target = quickLookPath
+              closeQuickLook()
+              void window.aiOffice.openPath(target)
+            }}
+            onRevealInFolder={() => {
+              void window.aiOffice.revealPath(quickLookPath)
+            }}
+            onClose={closeQuickLook}
+          />
+        </div>
+      )}
       <DropToOpenOverlay />
     </div>
   )
