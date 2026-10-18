@@ -77,6 +77,12 @@ export interface SaveMarkdownRequest {
    * Ignored when the document already has a path.
    */
   suggestedName?: string
+  /**
+   * The app's own autosave (30s tick / window blur). On a copy-pair conflict the
+   * main process then defers silently instead of raising the overwrite prompt; a
+   * direct save omits this and asks.
+   */
+  auto?: boolean
 }
 
 export type SaveMarkdownResult =

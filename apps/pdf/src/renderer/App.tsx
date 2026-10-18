@@ -116,9 +116,13 @@ import { platformShortcuts } from '@genoffice/i18n'
 import {
   Dropdown,
   aiPanelInitiallyOpen,
+  effectiveAiPanelOpen,
+  onAiRailClick,
   rememberAiPanelOpen,
   useDismissablePopover,
   useRibbonCollapse,
+  useSplitPaneFocusPing,
+  useSplitPaneRole,
 } from '@genoffice/ui'
 import { useI18n } from './i18n/locale'
 import { useAutosave } from './useAutosave'
@@ -295,6 +299,8 @@ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm'
 
 export default function App() {
   const { lang, t } = useI18n()
+  // Fallback focus ping: the shell is told whenever this window gains focus
+  useSplitPaneFocusPing()
   const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
     collapse: t('ribbonCollapse'),
     expand: t('ribbonExpand'),
@@ -355,6 +361,9 @@ export default function App() {
   const [aiCollapsed, setAiCollapsed] = useState(
     () => !aiPanelInitiallyOpen('genoffice-pdf-show-ai'),
   )
+  // In a split, a secondary pane's panel is forced to the rail; the focus pane keeps its own state
+  const { role: paneRole, requestFocus } = useSplitPaneRole()
+  const aiPanelOpen = effectiveAiPanelOpen(!aiCollapsed, paneRole)
   useEffect(() => {
     rememberAiPanelOpen('genoffice-pdf-show-ai', !aiCollapsed)
   }, [aiCollapsed])
@@ -3538,9 +3547,16 @@ export default function App() {
     inFlightPageMapRef.current = snapshot.pageMap
     const run = (async (): Promise<boolean> => {
       setSaveState('saving')
-      const result = await window.pdfApi.save({ path: filePath, ...editsPayload(edits, noteFlush) })
+      const result = await window.pdfApi.save({
+        path: filePath,
+        ...editsPayload(edits, noteFlush),
+        auto: autosave,
+      })
       if (!result.ok) {
-        opFailed(result.error)
+        // external-modified: the main process already prompted (or the autosave
+        // deferred to a manual save) — stay dirty, no failure badge
+        if (result.error !== 'external-modified') opFailed(result.error)
+        else setSaveState('idle')
         return false
       }
       if (result.skippedTextEdits && result.skippedTextEdits.length > 0) {
@@ -6980,13 +6996,15 @@ export default function App() {
       <div className="app-main">
         {/* dock wrapper animates the width between panel and rail (docs-style 180ms ease);
             the panel stays mounted while collapsed so the chat history survives */}
-        <div className={`ai-dock${aiCollapsed ? ' collapsed' : ''}`}>
-          {aiCollapsed && (
+        <div className={`ai-dock${aiPanelOpen ? '' : ' collapsed'}`}>
+          {!aiPanelOpen && (
             <button
               className="ai-rail"
               data-tip={t('aiOpenAssistant')}
               aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiCollapsed(false)}
+              onClick={() =>
+                onAiRailClick(paneRole, !aiCollapsed, (open) => setAiCollapsed(!open), requestFocus)
+              }
             >
               <GensparkMark size={22} />
             </button>

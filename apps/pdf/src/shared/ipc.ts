@@ -510,6 +510,12 @@ export interface SavePdfRequest {
   /** New page order (array of original page indices, excluding deleted); omitted if unreordered */
   pageOrder?: number[]
   metadata?: MetadataInput
+  /**
+   * The app's own autosave (30s tick / window blur). On a copy-pair conflict the
+   * main process then defers silently instead of raising the overwrite prompt; a
+   * direct save omits this and asks.
+   */
+  auto?: boolean
 }
 
 /** A text edit that could not be matched to the document at save time and was skipped */

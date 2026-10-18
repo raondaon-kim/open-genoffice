@@ -111,6 +111,12 @@ export interface SaveHtmlRequest {
   suggestedName?: string
   /** Default file name offered by the save dialog of an untitled document */
   defaultName?: string
+  /**
+   * The app's own autosave (30s tick / window blur). On a copy-pair conflict the
+   * main process then defers silently instead of raising the overwrite prompt; a
+   * direct save omits this and asks.
+   */
+  auto?: boolean
 }
 
 export type SaveHtmlResult =

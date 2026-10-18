@@ -8,8 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ImageViewer,
   aiPanelInitiallyOpen,
+  effectiveAiPanelOpen,
+  onAiRailClick,
   rememberAiPanelOpen,
   useAutoSavePref,
+  useSplitPaneFocusPing,
+  useSplitPaneRole,
 } from '@genoffice/ui'
 import {
   pollUntilReady,
@@ -131,6 +135,8 @@ export function deriveAutoFileName(editor: Editor): string {
 
 export default function App() {
   const { lang, t } = useI18n()
+  // Fallback focus ping: the shell is told whenever this window gains focus
+  useSplitPaneFocusPing()
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [filePath, setFilePath] = useState<string | null>(null)
   // a .txt/.json has no block document behind it: it is edited as source so
@@ -152,6 +158,9 @@ export default function App() {
   const [fmText, setFmText] = useState('')
   // Persisted so a closed AI panel stays closed on next launch (docs/slides parity)
   const [aiOpen, setAiOpen] = useState(() => aiPanelInitiallyOpen('mdapp.showAi'))
+  // In a split, a secondary pane's panel is forced to the rail; the focus pane keeps its own state
+  const { role: paneRole, requestFocus } = useSplitPaneRole()
+  const aiPanelOpen = effectiveAiPanelOpen(aiOpen, paneRole)
   const [aiPreset, setAiPreset] = useState<AiPreset | null>(null)
   const [editQueue, setEditQueue] = useState<EditQueueItem[]>([])
   const editQueueRef = useRef(editQueue)
@@ -364,7 +373,7 @@ export default function App() {
    * holds it, with the file's own BOM and line endings restored — no markdown
    * serialization, no image extraction, no trailing-newline fixups.
    */
-  const doSaveSource = useCallback(async (mode: SaveMode): Promise<boolean> => {
+  const doSaveSource = useCallback(async (mode: SaveMode, auto = false): Promise<boolean> => {
     if (statusRef.current !== 'ready' || savingRef.current) return false
     savingRef.current = true
     setSaveState('saving')
@@ -374,6 +383,7 @@ export default function App() {
         text: writeSourceText(textAtSave, sourceFormatRef.current),
         imageSources: [],
         mode,
+        auto,
       })
       if (result.ok && 'path' in result) {
         // an edit that landed mid-write is still unsaved
@@ -392,7 +402,9 @@ export default function App() {
         }
         return true
       }
-      setSaveState(result.ok ? 'idle' : 'failed')
+      // external-modified: the main process already prompted (or the autosave
+      // deferred to a manual save) — stay dirty, no failure badge
+      setSaveState(result.ok || result.error === 'external-modified' ? 'idle' : 'failed')
       return false
     } catch (err) {
       console.error('[markdown] save failed:', err)
@@ -474,8 +486,8 @@ export default function App() {
 
   /** Serialize and write to disk; false when canceled/failed (caller keeps the tab open) */
   const doSave = useCallback(
-    async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
-      if (sourceMode) return doSaveSource(mode)
+    async (mode: SaveMode, suggestedName?: string, auto = false): Promise<boolean> => {
+      if (sourceMode) return doSaveSource(mode, auto)
       const current = editorRef.current
       if (!current || statusRef.current !== 'ready' || savingRef.current) return false
       savingRef.current = true
@@ -494,7 +506,13 @@ export default function App() {
           sourceAtSave,
         )
         const imageSources = imageSourcesFromEditor(current)
-        const result = await window.markdownApi.save({ text, imageSources, mode, suggestedName })
+        const result = await window.markdownApi.save({
+          text,
+          imageSources,
+          mode,
+          suggestedName,
+          auto,
+        })
         if (result.ok && 'path' in result) {
           const unchanged =
             editorRef.current?.state.doc === docAtSave &&
@@ -551,7 +569,9 @@ export default function App() {
           }
           return true
         }
-        setSaveState(result.ok ? 'idle' : 'failed')
+        // external-modified: the main process already prompted (or the autosave
+        // deferred to a manual save) — stay dirty, no failure badge
+        setSaveState(result.ok || result.error === 'external-modified' ? 'idle' : 'failed')
         return false
       } catch (err) {
         console.error('[markdown] save failed:', err)
@@ -877,7 +897,7 @@ export default function App() {
     const tick = () => {
       if (!dirtyRef.current) return
       if (editorRef.current?.view.composing) return // don't interrupt IME input
-      void doSave('save')
+      void doSave('save', undefined, true)
     }
     const id = window.setInterval(tick, 30_000)
     window.addEventListener('blur', tick)
@@ -1045,13 +1065,13 @@ export default function App() {
       />
       {status === 'loading' && <div className="center-note">{t('loading')}</div>}
       <div className="app-main" style={status === 'ready' ? undefined : { display: 'none' }}>
-        <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
-          {!aiOpen && (
+        <div className={`ai-dock${aiPanelOpen ? '' : ' collapsed'}`}>
+          {!aiPanelOpen && (
             <button
               className="ai-rail"
               data-tip={t('aiOpenAssistant')}
               aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiOpen(true)}
+              onClick={() => onAiRailClick(paneRole, aiOpen, setAiOpen, requestFocus)}
             >
               <GensparkMark size={22} />
             </button>

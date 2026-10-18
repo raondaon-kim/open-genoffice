@@ -8,7 +8,11 @@ import {
   type FindPanelStrings,
   type FindTarget,
   aiPanelInitiallyOpen,
+  effectiveAiPanelOpen,
+  onAiRailClick,
   rememberAiPanelOpen,
+  useSplitPaneFocusPing,
+  useSplitPaneRole,
 } from '@genoffice/ui'
 import {
   pollUntilReady,
@@ -120,6 +124,8 @@ async function loadImageDataUrl(src: string): Promise<string | null> {
 
 export default function App() {
   const { lang, t } = useI18n()
+  // Fallback focus ping: the shell is told whenever this window gains focus
+  useSplitPaneFocusPing()
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [path, setPath] = useState<string | null>(null)
   const [text, setText] = useState('')
@@ -139,6 +145,9 @@ export default function App() {
   const [draftHtml, setDraftHtml] = useState<string | null>(null)
   const [historyState, setHistoryState] = useState({ undo: false, redo: false })
   const [aiOpen, setAiOpen] = useState(() => aiPanelInitiallyOpen('htmlapp.showAi'))
+  // In a split, a secondary pane's panel is forced to the rail; the focus pane keeps its own state
+  const { role: paneRole, requestFocus } = useSplitPaneRole()
+  const aiPanelOpen = effectiveAiPanelOpen(aiOpen, paneRole)
   const [aiPreset, setAiPreset] = useState<AiPreset | null>(null)
   const [editQueue, setEditQueue] = useState<EditQueueItem[]>([])
   const [askMode, setAskMode] = useState<AskMode | null>(null)
@@ -1097,7 +1106,7 @@ export default function App() {
   }
 
   const doSave = useCallback(
-    async (mode: SaveMode, suggestedName?: string): Promise<boolean> => {
+    async (mode: SaveMode, suggestedName?: string, auto = false): Promise<boolean> => {
       if (statusRef.current !== 'ready') return false
       // uncommitted live style pokes belong to the document being saved
       flushPending()
@@ -1115,6 +1124,7 @@ export default function App() {
           mode,
           suggestedName,
           defaultName: provisionalNameRef.current ?? undefined,
+          auto,
         })
         if (result.ok && 'path' in result) {
           const adopted = adoptImageRewrites(textAtSave, textRef.current, result.imageRewrites)
@@ -1134,7 +1144,9 @@ export default function App() {
           pushPreview(adopted.liveText)
           return true
         }
-        setSaveState(result.ok ? 'idle' : 'failed')
+        // external-modified: the main process already prompted (or the autosave
+        // deferred to a manual save) — stay dirty, no failure badge
+        setSaveState(result.ok || result.error === 'external-modified' ? 'idle' : 'failed')
         return false
       } catch (err) {
         console.error('[html] save failed:', err)
@@ -1372,7 +1384,7 @@ export default function App() {
       if (savingRef.current) return
       flushPending()
       if (textRef.current === savedTextRef.current) return
-      void doSave('save')
+      void doSave('save', undefined, true)
     }
     const id = window.setInterval(tick, 30_000)
     window.addEventListener('blur', tick)
@@ -1509,13 +1521,13 @@ export default function App() {
       />
 
       <div className="app-main">
-        <div className={`ai-dock${aiOpen ? '' : ' collapsed'}`}>
-          {!aiOpen && (
+        <div className={`ai-dock${aiPanelOpen ? '' : ' collapsed'}`}>
+          {!aiPanelOpen && (
             <button
               className="ai-rail"
               data-tip={t('aiOpenAssistant')}
               aria-label={t('aiOpenAssistant')}
-              onClick={() => setAiOpen(true)}
+              onClick={() => onAiRailClick(paneRole, aiOpen, setAiOpen, requestFocus)}
             >
               <GensparkMark size={18} />
             </button>
