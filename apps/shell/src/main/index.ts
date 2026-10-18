@@ -3606,6 +3606,13 @@ function createShellWindow(): void {
       setDockHost(null)
       publishAllOpenDocuments()
     }
+    // the split bookkeeping follows this manager; a rebuilt window restarts
+    // tab ids, so a stale shape must not leak into the next one
+    lastSplitState = null
+    if (splitMemoryTimer) {
+      clearTimeout(splitMemoryTimer)
+      splitMemoryTimer = null
+    }
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -5109,6 +5116,8 @@ function handleSplitChanged(
   if (ratioOnly) {
     splitMemoryTimer = setTimeout(() => {
       splitMemoryTimer = null
+      // the window may have closed mid-drag; its manager must not write
+      if (tabManager !== manager) return
       persistSplitMemory(manager, lastSplitState)
     }, 400)
   } else {

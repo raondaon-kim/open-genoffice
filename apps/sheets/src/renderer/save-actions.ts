@@ -392,7 +392,9 @@ export async function handleSave(
     return { ok: written.ok === true }
   }
   try {
-    ctx.setMessage(t('appSavingEdits', { count: total }))
+    // a quiet (automatic) save leaves the status line alone: a deferral by the
+    // copy-pair guard ends without any message, so "saving" must not be set
+    if (!quiet) ctx.setMessage(t('appSavingEdits', { count: total }))
     const result = await window.desktopApi.saveWorkbookEdits({
       sessionId: state.file.sessionId,
       mode,
