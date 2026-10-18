@@ -26,6 +26,16 @@ export {
   aiPanelWidthAtPointer,
 } from './ai-panel-prefs-store'
 export {
+  SPLIT_PANE_BRIDGE_KEY,
+  effectiveAiPanelOpen,
+  onAiRailClick,
+  useSplitPaneFocusPing,
+  useSplitPaneRole,
+  type SplitPaneBridge,
+  type SplitPaneRole,
+  type SplitPaneRoleController,
+} from './split-pane-role'
+export {
   ColorPicker,
   THEME_COLORS,
   THEME_COLOR_SHADES,
