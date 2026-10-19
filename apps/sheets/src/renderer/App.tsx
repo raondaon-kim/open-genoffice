@@ -446,6 +446,7 @@ import {
 } from './WorkbookVisuals'
 import { ChartFormatPane, SelectDataDialog } from './ChartPanels'
 import { handleSheetsControl, type ControlRequest } from './control'
+import { relayoutEditableHosts } from './editable-relayout'
 
 // Source sheet id of an in-flight copy-sheet command; the next insert-sheet
 // mutation is that copy and must journal as a duplicate, not a blank add.
@@ -655,6 +656,19 @@ export function App({
       queuedWorkbookAtBoot ||
       new URLSearchParams(window.location.search).get('openingWorkbook') === '1',
   )
+  // An open asks for grid focus when it finishes; it is handed over only once the
+  // opening guard (the app shell's inert) is lifted, because focus() on a node
+  // under an inert ancestor does nothing and nothing would ask again.
+  const [gridFocusRequest, setGridFocusRequest] = useState(0)
+  const gridFocusHandledRef = useRef(0)
+  useEffect(() => {
+    if (openingWorkbook || gridFocusRequest === gridFocusHandledRef.current) return
+    gridFocusHandledRef.current = gridFocusRequest
+    // the guard came off in this commit: Univer's editor inputs whose layout was
+    // rebuilt under it stay non-editable until rebuilt again (editable-relayout)
+    relayoutEditableHosts(document)
+    focusSheetGrid()
+  }, [openingWorkbook, gridFocusRequest])
   const [emptyCsvNotice, setEmptyCsvNotice] = useState(false)
   /// Zoom of the active sheet in percent, echoed by the status-bar slider.
   const [zoomPercent, setZoomPercent] = useState(100)
@@ -4248,7 +4262,7 @@ export function App({
     const finishOpening = (): void => {
       workbookOpeningRef.current = false
       setOpeningWorkbook(false)
-      focusSheetGrid()
+      setGridFocusRequest((n) => n + 1)
     }
     try {
       if (!window.desktopApi) {
