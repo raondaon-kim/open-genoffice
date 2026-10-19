@@ -109,17 +109,24 @@ test.describe('docs Simple Markup view', () => {
       const balloon = page.locator('.comment-balloon')
       await expect(balloon).toHaveCount(1)
       await expect(balloon).toHaveAttribute('title', /Ann/)
-      // The node exists, but an unrendered one answers null to boundingBox().
-      // Wait for the layout instead of reading the box the moment the count
-      // settles.
       await expect(balloon).toBeVisible()
-      const paperRight = await page
-        .locator('.ProseMirror')
-        .first()
-        .evaluate((el) => el.getBoundingClientRect().right)
-      const balloonBox = await balloon.boundingBox()
-      expect(balloonBox).not.toBeNull()
-      expect(balloonBox!.x + balloonBox!.width).toBeLessThanOrEqual(paperRight + 1)
+      // The margin overlay is rebuilt wholesale on every pagination remeasure,
+      // and a late remeasure (~0.35s after the first paint on CI) can replace the
+      // balloon between resolving the locator and measuring it: boundingBox()
+      // then answers null for the detached node. Measure the live balloon and the
+      // paper in one page task, and poll until the balloon is laid out.
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const box = document.querySelector('.comment-balloon')?.getBoundingClientRect()
+            const paper = document.querySelector('.ProseMirror')?.getBoundingClientRect()
+            if (!box || !paper || box.width === 0 || box.height === 0) return 'not laid out'
+            return box.right <= paper.right + 1
+              ? 'inside the paper'
+              : `past the paper: ${box.right} > ${paper.right}`
+          }),
+        )
+        .toBe('inside the paper')
 
       // Markup menu in Word's order with the current view ticked
       await page.locator('.ribbon-tab', { hasText: /^Review$/ }).click()
