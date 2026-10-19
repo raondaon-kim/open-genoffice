@@ -1,5 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import '@genoffice/ui/tokens.css'
+import '@genoffice/ui/ai-panel-prefs.css'
+import { applyAiPanelPrefs } from '@genoffice/ui'
 import { App } from './App'
 import './styles.css'
 import type { UiTheme } from '../shared/ipc'
@@ -16,4 +18,13 @@ void window.hwpApi
   .catch(() => undefined)
 window.hwpApi?.onThemeChanged(applyTheme)
 
-createRoot(document.getElementById('root')!).render(<App />)
+void (async () => {
+  // AI panel side and text size come before the first paint (the panel must not jump sides),
+  // and decide whether the panel starts open
+  await window.hwpApi
+    ?.getAiPanelPrefs()
+    .then(applyAiPanelPrefs)
+    .catch(() => undefined)
+  window.hwpApi?.onAiPanelPrefsChanged(applyAiPanelPrefs)
+  createRoot(document.getElementById('root')!).render(<App />)
+})()

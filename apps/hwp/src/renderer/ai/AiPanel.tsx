@@ -3,8 +3,20 @@ import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
 import type { AgentTransport } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
-import { AiComposer, Markdown } from '@genoffice/ui'
+import {
+  AiComposer,
+  AiPanelSideButton,
+  AiTypingIndicator,
+  aiPanelWidthAtPointer,
+  Markdown,
+} from '@genoffice/ui'
 import type { AiConversationIdentity, HwpAttachment, ProjectChatMessage } from '../../shared/ipc'
+import attachIcon from '../assets/attach-icon.png'
+import sendEnterOn from '../assets/send-enter-on.png'
+import sendEnterOff from '../assets/send-enter-off.png'
+import sendStop from '../assets/send-stop.png'
+import { GensparkMark } from './GensparkMark'
+import { ToolSteps } from './ToolSteps'
 import { createHwpAssistantSkill } from './assistant-skill'
 import { HWP_MAX_TURNS } from './hwp-skill'
 import { persistedRunText, runEndText } from './run-notice'
@@ -17,8 +29,9 @@ import { fetchExploreChips } from './tools/read'
 import { HWP_TEMPLATES } from '../templates'
 import type { HwpTemplate } from '../templates'
 
+// the key predates the shared layout: a width the user already chose is kept
 const PANEL_WIDTH_KEY = 'hwp-ai-panel-width'
-const PANEL_WIDTH_DEFAULT = 420
+const PANEL_WIDTH_DEFAULT = 360
 const PANEL_WIDTH_MIN = 280
 
 /** clickable starter prompts for the empty state (fill the input, do not send) */
@@ -38,12 +51,17 @@ const STARTER_PROMPTS: Record<'en' | 'ko', string[]> = {
 }
 
 function clampPanelWidth(w: number): number {
-  return Math.min(Math.max(w, PANEL_WIDTH_MIN), Math.min(720, Math.round(window.innerWidth * 0.6)))
+  // the view can be transiently tiny before the shell lays it out: the ceiling never drops below the minimum
+  const max = Math.max(PANEL_WIDTH_MIN, Math.min(720, Math.round(window.innerWidth * 0.6)))
+  return Math.min(Math.max(w, PANEL_WIDTH_MIN), max)
 }
 
 function loadPanelWidth(): number {
   const saved = Number(localStorage.getItem(PANEL_WIDTH_KEY))
-  return Number.isFinite(saved) && saved > 0 ? clampPanelWidth(saved) : PANEL_WIDTH_DEFAULT
+  // static bounds only: clamping against a transiently small window would shrink the preference
+  return Number.isFinite(saved) && saved > 0
+    ? Math.min(Math.max(saved, PANEL_WIDTH_MIN), 720)
+    : PANEL_WIDTH_DEFAULT
 }
 
 interface ToolActivity {
@@ -79,7 +97,9 @@ export function HwpAiPanel({
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [phase, setPhase] = useState<Phase>('thinking')
-  const [panelWidth, setPanelWidth] = useState(loadPanelWidth)
+  // preferred = the user's chosen width (the only value saved); panelWidth = what fits the window now
+  const preferredWidthRef = useRef(loadPanelWidth())
+  const [panelWidth, setPanelWidth] = useState(() => clampPanelWidth(preferredWidthRef.current))
   const [resizing, setResizing] = useState(false)
   const [routeReady, setRouteReady] = useState(false)
   const [modelNotice, setModelNotice] = useState<string | null>(null)
@@ -324,6 +344,8 @@ export function HwpAiPanel({
   }, [])
 
   useEffect(() => {
+    // the empty state (starters, form templates) is read from the top
+    if (chat.length === 0) return
     if (stickToBottomRef.current) chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight })
   }, [chat, busy])
 
@@ -333,30 +355,64 @@ export function HwpAiPanel({
     stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  const onResizeStart = (event: ReactPointerEvent<HTMLDivElement>): void => {
+  // the dock (owned by the app) takes its width from the panel
+  useEffect(() => {
+    const dock = asideRef.current?.closest('.ai-dock') as HTMLElement | null
+    dock?.style.setProperty('--ai-panel-width', `${panelWidth}px`)
+  }, [panelWidth])
+
+  // re-derive the shown width when the window changes (max is 60% of it); growing back restores the preference
+  useEffect(() => {
+    const onResize = (): void => setPanelWidth(clampPanelWidth(preferredWidthRef.current))
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const resizeCleanupRef = useRef<(() => void) | null>(null)
+  useEffect(() => () => resizeCleanupRef.current?.(), [])
+
+  /** drag the panel's inner edge; the pointer is captured so the drag survives crossing the editor iframe */
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
+    const resizer = event.currentTarget
     setResizing(true)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = (ev: PointerEvent): void => {
+      const width = clampPanelWidth(aiPanelWidthAtPointer(ev.clientX))
+      preferredWidthRef.current = width
+      setPanelWidth(width)
+    }
+    let done = false
+    const cleanup = (): void => {
+      if (done) return
+      done = true
+      resizeCleanupRef.current = null
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', cleanup)
+      window.removeEventListener('pointercancel', cleanup)
+      resizer.removeEventListener('lostpointercapture', cleanup)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      setResizing(false)
+      localStorage.setItem(PANEL_WIDTH_KEY, String(Math.round(preferredWidthRef.current)))
+    }
+    resizeCleanupRef.current = cleanup
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', cleanup)
+    window.addEventListener('pointercancel', cleanup)
+    resizer.addEventListener('lostpointercapture', cleanup)
+    resizer.setPointerCapture(event.pointerId)
   }
 
-  useEffect(() => {
-    if (!resizing) return
-    const onMove = (event: PointerEvent): void => {
-      const rect = asideRef.current?.getBoundingClientRect()
-      if (!rect) return
-      setPanelWidth(clampPanelWidth(rect.right - event.clientX))
-    }
-    const onUp = (): void => setResizing(false)
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-  }, [resizing])
-
-  useEffect(() => {
-    localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth))
-  }, [panelWidth])
+  /** New chat: stop the run and start over; the saved transcript of this file is kept */
+  const newChat = (): void => {
+    loopRef.current?.cancel()
+    loopRef.current?.reset()
+    setBusy(false)
+    setModelNotice(null)
+    setChat([])
+  }
 
   const send = (text: string): void => {
     const instruction = text.trim()
@@ -431,43 +487,56 @@ export function HwpAiPanel({
     }
   }
 
+  const ko = lang === 'ko'
+  const startFromPrompt = (text: string): void => {
+    setPrompt(text)
+    composerRef.current?.focus()
+  }
+
   return (
-    <aside ref={asideRef} className="hwp-ai" style={{ width: panelWidth }}>
+    <aside
+      ref={asideRef}
+      className={`copilot${resizing ? ' ai-panel-resizing' : ''}`}
+      style={{ width: '100%' }}
+    >
       <div
-        className="hwp-ai__resize"
-        onPointerDown={onResizeStart}
+        className="ai-panel-resizer"
+        onPointerDown={startResize}
         role="separator"
         aria-orientation="vertical"
+        aria-label={ko ? 'AI 패널 너비 조절' : 'Resize the AI panel'}
       />
-      <header className="hwp-ai__head">
-        <span className="hwp-ai__title">{lang === 'ko' ? 'AI 도우미' : 'AI assistant'}</span>
-        {undoDepth > 0 && (
+      <header className="ai-panel-header">
+        <span className="ai-panel-title">
+          <GensparkMark size={22} />
+          Genspark
+        </span>
+        <div className="ai-panel-header-actions">
+          <AiPanelSideButton
+            lang={lang}
+            onMove={(side) => window.hwpApi.setAiPanelPrefs({ side })}
+          />
+          {chat.length > 0 && (
+            <button
+              type="button"
+              className="ai-header-btn ai-panel-new-chat"
+              onClick={newChat}
+              data-tip={ko ? '새 대화' : 'New chat'}
+              aria-label={ko ? '새 대화' : 'New chat'}
+            >
+              <IconNewChat />
+            </button>
+          )}
           <button
             type="button"
-            className="hwp-ai__undo"
-            disabled={busy}
-            title={lang === 'ko' ? '마지막 AI 편집 되돌리기' : 'Undo the last AI edit'}
-            onClick={() => void undoLast()}
+            className="ai-header-btn ai-panel-collapse"
+            onClick={onCollapse}
+            data-tip={ko ? 'AI 패널 접기' : 'Collapse the AI panel'}
+            aria-label={ko ? 'AI 패널 접기' : 'Collapse the AI panel'}
           >
-            {lang === 'ko' ? `↶ AI 편집 되돌리기 (${undoDepth})` : `↶ Undo AI edit (${undoDepth})`}
+            <IconCollapse />
           </button>
-        )}
-        <button
-          type="button"
-          className="hwp-ai__collapse"
-          aria-label="Collapse AI panel"
-          onClick={onCollapse}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M6 3l5 5-5 5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              fill="none"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+        </div>
       </header>
 
       {modelNotice && (
@@ -476,45 +545,46 @@ export function HwpAiPanel({
         </p>
       )}
 
-      <div ref={chatRef} className="hwp-ai__chat" onScroll={onChatScroll}>
-        {!routeReady && <div className="hwp-ai__empty">Loading AI…</div>}
+      <div ref={chatRef} className="ai-chat" onScroll={onChatScroll}>
+        {!routeReady && (
+          <div className="ai-chat-empty">
+            <div className="ai-chat-empty-body">{ko ? 'AI 준비 중…' : 'Loading AI…'}</div>
+          </div>
+        )}
         {routeReady && chat.length === 0 && (
-          <div className="hwp-ai__empty">
-            <p>
-              {lang === 'ko'
+          <div className="ai-chat-empty">
+            <div className="ai-chat-empty-title">
+              {ko ? '무엇을 도와드릴까요?' : 'How can I help?'}
+            </div>
+            <div className="ai-chat-empty-body">
+              {ko
                 ? '문서에 대해 물어보세요 — 요약, 누름틀 작성, 표 정리, 서식 변경을 도와드립니다.'
                 : 'Ask about this document — summarize it, fill its form fields, or format it.'}
-            </p>
+            </div>
             {chips.length > 0 && (
               <div
-                className="hwp-ai__starter-list"
-                aria-label={lang === 'ko' ? '이 문서로 할 수 있는 일' : 'What this document offers'}
+                className="ai-starter-list"
+                aria-label={ko ? '이 문서로 할 수 있는 일' : 'What this document offers'}
               >
                 {chips.map((chip) => (
                   <button
                     key={chip}
                     type="button"
-                    className="hwp-ai__starter hwp-ai__starter--chip"
-                    onClick={() => {
-                      setPrompt(chip)
-                      composerRef.current?.focus()
-                    }}
+                    className="ai-starter hwp-ai__starter--chip"
+                    onClick={() => startFromPrompt(chip)}
                   >
                     {chip}
                   </button>
                 ))}
               </div>
             )}
-            <div className="hwp-ai__starter-list">
+            <div className="ai-starter-list">
               {STARTER_PROMPTS[lang].map((starter) => (
                 <button
                   key={starter}
                   type="button"
-                  className="hwp-ai__starter"
-                  onClick={() => {
-                    setPrompt(starter)
-                    composerRef.current?.focus()
-                  }}
+                  className="ai-starter"
+                  onClick={() => startFromPrompt(starter)}
                 >
                   {starter}
                 </button>
@@ -523,7 +593,7 @@ export function HwpAiPanel({
             {HWP_TEMPLATES.length > 0 && (
               <div className="hwp-ai__templates">
                 <div className="hwp-ai__templates-title">
-                  {lang === 'ko' ? '문서 양식으로 바로 만들기' : 'Start from a school form'}
+                  {ko ? '문서 양식으로 바로 만들기' : 'Start from a school form'}
                 </div>
                 {HWP_TEMPLATES.map((template) => (
                   <button
@@ -540,102 +610,170 @@ export function HwpAiPanel({
             )}
           </div>
         )}
-        {chat.map((entry, index) => (
-          <div key={index} className={`hwp-ai__msg hwp-ai__msg--${entry.role}`}>
-            {entry.role === 'assistant' &&
-              entry.streaming &&
-              !entry.text &&
-              !entry.tools?.length && (
-                <div className="hwp-ai__phase">
-                  {phase === 'working'
-                    ? 'Working…'
-                    : phase === 'replying'
-                      ? 'Writing…'
-                      : 'Thinking…'}
-                </div>
-              )}
-            {entry.tools?.map((tool, toolIndex) => (
-              <details
-                key={toolIndex}
-                className={`hwp-ai__tool${tool.isError ? ' hwp-ai__tool--error' : ''}`}
-              >
-                <summary>
-                  <span className="hwp-ai__tool-name">{tool.name}</span>
-                  <span className="hwp-ai__tool-summary">{tool.summary}</span>
-                </summary>
-                {tool.output && <pre>{tool.output}</pre>}
-              </details>
-            ))}
-            {entry.text &&
-              (entry.role === 'assistant' ? (
-                <div className="hwp-ai__markdown">
-                  <Markdown text={entry.text} />
-                </div>
+        {chat.map((entry, index) => {
+          if (entry.role === 'user') {
+            return (
+              <div key={index} className="ai-msg ai-msg-user">
+                <span dir="auto">{entry.text}</span>
+              </div>
+            )
+          }
+          const hasTools = (entry.tools?.length ?? 0) > 0
+          if (!entry.text && !entry.streaming && !hasTools) return null
+          return (
+            <div
+              key={index}
+              className={`ai-msg ai-msg-assistant${entry.isError ? ' ai-msg-error' : ''}${entry.streaming ? ' ai-msg-streaming' : ''}`}
+            >
+              {!entry.text && entry.streaming ? (
+                <span className="ai-typing-row">
+                  <AiTypingIndicator
+                    label={
+                      phase === 'working' || hasTools
+                        ? ko
+                          ? '작업 중'
+                          : 'Working'
+                        : ko
+                          ? '생각 중'
+                          : 'Thinking'
+                    }
+                  />
+                </span>
               ) : (
-                <p>{entry.text}</p>
-              ))}
-          </div>
-        ))}
+                entry.text && (
+                  <div dir="auto">
+                    <Markdown text={entry.text} />
+                  </div>
+                )
+              )}
+              {hasTools && (
+                <ToolSteps tools={entry.tools!} running={!!entry.streaming} lang={lang} />
+              )}
+            </div>
+          )
+        })}
       </div>
 
-      <AiComposer
-        header={
-          attachments.length > 0 ? (
-            <div className="hwp-ai__attachments">
-              {attachments.map((a) => (
-                <span key={a.path} className="hwp-ai__attachment" title={a.path}>
-                  {a.name}
-                  <button
-                    type="button"
-                    aria-label={lang === 'ko' ? '첨부 제거' : 'Remove attachment'}
-                    disabled={busy}
-                    onClick={() => setAttachments((prev) => prev.filter((x) => x.path !== a.path))}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          ) : undefined
-        }
-        footerStart={
+      {undoDepth > 0 && (
+        <div className="hwp-ai__undo-row">
           <button
             type="button"
-            className="hwp-ai__attach"
+            className="hwp-ai__undo"
             disabled={busy}
-            title={
-              lang === 'ko'
-                ? '파일 첨부 (제안요청서, 참고 문서: hwp·pdf·docx …)'
-                : 'Attach files (an RFP, reference documents: hwp, pdf, docx …)'
-            }
-            onClick={() =>
-              void window.hwpApi
-                .pickAttachments()
-                .then((picked) =>
-                  setAttachments((prev) => [
-                    ...prev,
-                    ...picked.filter((p) => !prev.some((x) => x.path === p.path)),
-                  ]),
-                )
-                .catch(() => undefined)
-            }
+            title={ko ? '마지막 AI 편집 되돌리기' : 'Undo the last AI edit'}
+            onClick={() => void undoLast()}
           >
-            📎
+            {ko ? `↶ AI 편집 되돌리기 (${undoDepth})` : `↶ Undo AI edit (${undoDepth})`}
           </button>
-        }
-        value={prompt}
-        busy={busy}
-        placeholder="Ask about this document…"
-        ariaLabel="Message the assistant"
-        textareaRef={composerRef}
-        hintIdle="Enter to send"
-        hintBusy="Generating…"
-        sendLabel="Send"
-        stopLabel="Stop"
-        onChange={setPrompt}
-        onSend={() => send(prompt)}
-        onStop={() => loopRef.current?.cancel()}
-      />
+        </div>
+      )}
+
+      <div className="ai-composer">
+        <AiComposer
+          header={
+            attachments.length > 0 ? (
+              <div className="hwp-ai__attachments">
+                {attachments.map((a) => (
+                  <span key={a.path} className="hwp-ai__attachment" title={a.path}>
+                    {a.name}
+                    <button
+                      type="button"
+                      aria-label={ko ? '첨부 제거' : 'Remove attachment'}
+                      disabled={busy}
+                      onClick={() =>
+                        setAttachments((prev) => prev.filter((x) => x.path !== a.path))
+                      }
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : undefined
+          }
+          footerStart={
+            <button
+              type="button"
+              className="ai-attach-btn"
+              disabled={busy}
+              title={
+                ko
+                  ? '파일 첨부 (제안요청서, 참고 문서: hwp·pdf·docx …)'
+                  : 'Attach files (an RFP, reference documents: hwp, pdf, docx …)'
+              }
+              onClick={() =>
+                void window.hwpApi
+                  .pickAttachments()
+                  .then((picked) =>
+                    setAttachments((prev) => [
+                      ...prev,
+                      ...picked.filter((p) => !prev.some((x) => x.path === p.path)),
+                    ]),
+                  )
+                  .catch(() => undefined)
+              }
+            >
+              <img src={attachIcon} alt="" aria-hidden />
+            </button>
+          }
+          value={prompt}
+          busy={busy}
+          placeholder={ko ? '이 문서에 대해 물어보세요…' : 'Ask about this document…'}
+          ariaLabel={ko ? 'AI 도우미에게 메시지 보내기' : 'Message the assistant'}
+          textareaRef={composerRef}
+          hintIdle={ko ? 'Enter로 보내기' : 'Enter to send'}
+          hintBusy={ko ? '작성 중…' : 'Generating…'}
+          sendLabel={ko ? '보내기' : 'Send'}
+          stopLabel={ko ? '멈추기' : 'Stop'}
+          iconOnly
+          sendIconEnabled={<img src={sendEnterOn} alt="" aria-hidden />}
+          sendIconDisabled={<img src={sendEnterOff} alt="" aria-hidden />}
+          stopIcon={<img src={sendStop} alt="" aria-hidden />}
+          onChange={setPrompt}
+          onSend={() => send(prompt)}
+          onStop={() => loopRef.current?.cancel()}
+        />
+      </div>
     </aside>
+  )
+}
+
+function IconNewChat(): ReactElement {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <path
+        d="M13.5 7.2v-3A1.7 1.7 0 0 0 11.8 2.5H4.2a1.7 1.7 0 0 0-1.7 1.7v6.1a1.7 1.7 0 0 0 1.7 1.7h1.1v2l2.6-2h1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M12.2 9.4v4M10.2 11.4h4" />
+    </svg>
+  )
+}
+
+function IconCollapse(): ReactElement {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+      aria-hidden
+    >
+      <rect x="1.5" y="2.5" width="13" height="11" rx="1" />
+      <path d="M5.5 2.5v11" />
+      <path d="M12.5 8H8.1M9.8 5.9 7.7 8l2.1 2.1" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
   )
 }

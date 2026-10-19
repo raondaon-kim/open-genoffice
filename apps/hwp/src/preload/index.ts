@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
-import { AI_CHANNELS, HWP_CHANNELS, PROJECT_CHANNELS, THEME_CHANNELS } from '../shared/ipc'
+import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
+import {
+  AI_CHANNELS,
+  AI_PANEL_PREFS_CHANNELS,
+  HWP_CHANNELS,
+  PROJECT_CHANNELS,
+  THEME_CHANNELS,
+} from '../shared/ipc'
 import type { HwpApi, UiTheme } from '../shared/ipc'
 
 const api: HwpApi = {
@@ -34,6 +41,13 @@ const api: HwpApi = {
     const listener = (_e: Electron.IpcRendererEvent, theme: UiTheme) => handler(theme)
     ipcRenderer.on(THEME_CHANNELS.themeChanged, listener)
     return () => ipcRenderer.removeListener(THEME_CHANNELS.themeChanged, listener)
+  },
+  getAiPanelPrefs: () => ipcRenderer.invoke(AI_PANEL_PREFS_CHANNELS.get),
+  setAiPanelPrefs: (patch) => ipcRenderer.invoke(AI_PANEL_PREFS_CHANNELS.set, patch),
+  onAiPanelPrefsChanged: (handler) => {
+    const listener = (_e: Electron.IpcRendererEvent, prefs: AiPanelPrefs) => handler(prefs)
+    ipcRenderer.on(AI_PANEL_PREFS_CHANNELS.changed, listener)
+    return () => ipcRenderer.removeListener(AI_PANEL_PREFS_CHANNELS.changed, listener)
   },
   getAiSettings: () => ipcRenderer.invoke(AI_CHANNELS.getSettings),
   aiStream: (request) => ipcRenderer.invoke(AI_CHANNELS.stream, request),

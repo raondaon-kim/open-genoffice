@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 // Use each app's production styles in a minimal editor layout. Browser geometry
 // catches grid/flex ordering and resize handles that jsdom cannot measure.
-for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html']) {
+for (const app of ['docs', 'sheets', 'slides', 'pdf', 'markdown', 'html', 'hwp']) {
   test(`${app}: switching AI panel sides preserves navigation and the collapsed rail`, async () => {
     const browser = await chromium.launch()
     try {

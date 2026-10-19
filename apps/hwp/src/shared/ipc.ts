@@ -1,4 +1,5 @@
 import type { Lang } from '@genoffice/i18n'
+import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type { DocStyle } from './doc-style'
 import type { AiSettings, AiStreamChunk, AiStreamRequest } from '@genoffice/ai-provider'
 import type {
@@ -57,6 +58,13 @@ export type UiTheme = 'light' | 'dark' | 'system'
 export const THEME_CHANNELS = {
   getTheme: 'app:get-theme',
   themeChanged: 'app:theme-changed',
+} as const
+
+/** AI panel side / text size (Settings): app-wide, the shell answers and broadcasts them to every tab */
+export const AI_PANEL_PREFS_CHANNELS = {
+  get: 'app:get-ai-panel-prefs',
+  set: 'app:set-ai-panel-prefs',
+  changed: 'app:ai-panel-prefs-changed',
 } as const
 
 /** AI channels are app-wide shared ipcMain handlers (the shell registers them); pass-through only */
@@ -200,6 +208,10 @@ export interface HwpApi {
   /** text of an attached file, in chunks */
   readAttachment(path: string, offset: number, maxChars: number): Promise<HwpAttachmentRead>
   onThemeChanged(handler: (theme: UiTheme) => void): () => void
+  /** AI panel side and text size, shared by every editor */
+  getAiPanelPrefs(): Promise<AiPanelPrefs>
+  setAiPanelPrefs(patch: Partial<AiPanelPrefs>): Promise<AiPanelPrefs>
+  onAiPanelPrefsChanged(handler: (prefs: AiPanelPrefs) => void): () => void
   // ---- AI ----
   getAiSettings(): Promise<AiSettings>
   aiStream(request: AiStreamRequest): Promise<void>

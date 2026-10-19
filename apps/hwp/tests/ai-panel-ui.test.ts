@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@genoffice/ui', () => ({
   AiComposer: () => React.createElement('div', { 'data-testid': 'composer' }),
   Markdown: ({ text }: { text: string }) => React.createElement('div', null, text),
+  AiTypingIndicator: () => React.createElement('span'),
+  AiPanelSideButton: () => React.createElement('button'),
+  aiPanelWidthAtPointer: (x: number) => x,
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'
@@ -127,7 +130,7 @@ describe('HWP AI panel — engine-suggested chips', () => {
       { seq: 1, ts: 't', role: 'assistant', text: 'answer' },
     ])
     await render(true)
-    const texts = [...container.querySelectorAll('.hwp-ai__msg')].map((m) => m.textContent)
+    const texts = [...container.querySelectorAll('.ai-msg')].map((m) => m.textContent)
     expect(texts).toEqual(['question', 'answer'])
     expect(api.getAiSettings).toHaveBeenCalled()
   })

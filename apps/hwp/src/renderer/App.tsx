@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor } from '@rhwp/editor'
 import type { RhwpEditor } from '@rhwp/editor'
+import { aiPanelInitiallyOpen, rememberAiPanelOpen } from '@genoffice/ui'
 import { HwpAiPanel } from './ai/AiPanel'
+import { HwpAiDock } from './ai/AiDock'
 import { SnapshotStack } from './ai/snapshots'
 import type { HwpAiDeps } from './ai/context'
 import type { HwpApi, HwpSaveMode } from '../shared/ipc'
@@ -18,6 +20,9 @@ type Phase = 'booting' | 'loading' | 'ready' | 'error'
 const STUDIO_TIMEOUT_MS = 45_000
 
 const UNTITLED_NAME = 'Untitled HWP'
+
+/** remembered AI panel open state (Settings › AI panel: open in new documents) */
+const AI_OPEN_KEY = 'hwp.showAi'
 
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -58,7 +63,8 @@ export function App() {
   const aiStackRef = useRef<SnapshotStack | null>(null)
   if (!aiStackRef.current) aiStackRef.current = new SnapshotStack()
   aiDirtyRef.current = aiDirty
-  const [aiOpen, setAiOpen] = useState(true)
+  const [aiOpen, setAiOpen] = useState(() => aiPanelInitiallyOpen(AI_OPEN_KEY))
+  const [lang, setLang] = useState<'en' | 'ko'>('en')
   const [docName, setDocName] = useState(UNTITLED_NAME)
   /** saved/opened path used to (re)bootstrap the AI conversation identity */
   const [aiPath, setAiPath] = useState<string | null>(null)
@@ -143,6 +149,23 @@ export function App() {
       disposed = true
       editorRef.current?.destroy()
       editorRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    rememberAiPanelOpen(AI_OPEN_KEY, aiOpen)
+  }, [aiOpen])
+
+  useEffect(() => {
+    let cancelled = false
+    void window.hwpApi
+      ?.getLanguage()
+      .then((l) => {
+        if (!cancelled) setLang(l === 'ko' ? 'ko' : 'en')
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -255,16 +278,19 @@ export function App() {
           {dirty ? ' · unsaved changes' : ''}
         </span>
         <span className="hwp-statusbar__status">{status}</span>
-        <button
-          type="button"
-          className="hwp-statusbar__ai-toggle"
-          aria-pressed={aiOpen}
-          onClick={() => setAiOpen((open) => !open)}
-        >
-          AI
-        </button>
       </div>
-      <div className="hwp-body">
+      {/* the AI dock comes first: left by default, Settings › AI panel side moves it (CSS order) */}
+      <div className="app-main">
+        {phase !== 'error' && (
+          <HwpAiDock open={aiOpen} lang={lang} onOpen={() => setAiOpen(true)}>
+            <HwpAiPanel
+              deps={aiDeps}
+              filePath={aiPath}
+              documentReady={phase === 'ready'}
+              onCollapse={() => setAiOpen(false)}
+            />
+          </HwpAiDock>
+        )}
         <div className="hwp-editor-host">
           {phase === 'error' && <div className="hwp-message hwp-message--error">{error}</div>}
           {(phase === 'booting' || phase === 'loading') && (
@@ -276,14 +302,6 @@ export function App() {
             style={phase === 'error' ? { visibility: 'hidden' } : undefined}
           />
         </div>
-        {aiOpen && phase !== 'error' && (
-          <HwpAiPanel
-            deps={aiDeps}
-            filePath={aiPath}
-            documentReady={phase === 'ready'}
-            onCollapse={() => setAiOpen(false)}
-          />
-        )}
       </div>
     </div>
   )
