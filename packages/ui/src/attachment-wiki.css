@@ -1,0 +1,51 @@
+/* "Add to work material" on an AI-chat attachment card (Docs, Slides, Sheets, HTML, Hangul):
+   an icon button inside the card's right edge, like the panel's other icon buttons */
+.ai-attachment-card:has(.ai-attachment-wiki-btn) {
+  padding-right: 36px;
+}
+
+.ai-attachment-wiki-btn {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.ai-attachment-wiki-btn:hover:not(:disabled) {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-primary);
+}
+
+.ai-attachment-wiki-btn:focus-visible {
+  outline: 2px solid var(--color-brand-secondary);
+  outline-offset: 1px;
+}
+
+.ai-attachment-wiki-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.ai-attachment-wiki-btn[data-state='added'],
+.ai-attachment-wiki-btn[data-state='duplicate'] {
+  color: var(--color-brand-secondary);
+  cursor: default;
+}
+
+.ai-attachment-wiki-btn[data-state='failed'] {
+  color: var(--danger);
+}

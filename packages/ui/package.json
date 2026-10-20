@@ -10,6 +10,7 @@
     "./ai-panel-prefs": "./src/ai-panel-prefs.ts",
     "./ai-panel-prefs.css": "./src/ai-panel-prefs.css",
     "./ai-scope-quote.css": "./src/ai-scope-quote.css",
+    "./attachment-wiki.css": "./src/attachment-wiki.css",
     "./color-picker.css": "./src/color-picker.css",
     "./dropdown.css": "./src/dropdown.css",
     "./find-panel.css": "./src/find-panel.css",
@@ -35,6 +36,7 @@
   },
   "dependencies": {
     "@genoffice/i18n": "*",
-    "@genoffice/pptx-render": "*"
+    "@genoffice/pptx-render": "*",
+    "@genoffice/work-wiki": "*"
   }
 }

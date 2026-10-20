@@ -1,4 +1,7 @@
 export { AiPanelSideButton } from './AiPanelSideButton'
+export { AttachmentWikiButton, resetAttachmentWikiStatus } from './AttachmentWikiButton'
+export { ATTACHMENT_WIKI_LABELS } from './strings-attachment-wiki'
+export type { AttachmentWikiLabels } from './strings-attachment-wiki'
 export { AiComposer } from './AiComposer'
 export { AiScopeQuote, type AiScopeQuoteData } from './AiScopeQuote'
 export {
