@@ -468,7 +468,8 @@ export class TabManager {
     wc.reload()
   }
 
-  openMarkdownTab(openPath?: string): string {
+  /** `activate: false` (a PDF note taking "Add to note") adds the tab behind the current one */
+  openMarkdownTab(openPath?: string, options?: { activate?: boolean }): string {
     const view = createMarkdownView(openPath)
     const id = `t${this.nextId++}`
     this.shellWindow.contentView.addChildView(view)
@@ -482,7 +483,8 @@ export class TabManager {
       title: openPath ? basename(openPath) : this.untitled('markdown', 'AI Markdown'),
       filePath: openPath,
     })
-    this.activateTab(id)
+    if (options?.activate === false) this.onChanged()
+    else this.activateTab(id)
     return id
   }
 

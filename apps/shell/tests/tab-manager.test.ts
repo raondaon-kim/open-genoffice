@@ -279,6 +279,30 @@ describe('opening tabs', () => {
   })
 })
 
+describe('a Markdown tab opened without activation (a PDF note taking "Add to note")', () => {
+  it('adds the tab but keeps the current tab active', () => {
+    const pdf = manager.openPdfTab('/docs/paper.pdf')
+    const note = manager.openMarkdownTab('/docs/paper note.md', { activate: false })
+    const list = manager.list()
+    expect(list.find((t) => t.id === note)).toMatchObject({ kind: 'markdown', active: false })
+    expect(list.find((t) => t.id === pdf)?.active).toBe(true)
+  })
+
+  it('leaves a live split as it was', () => {
+    const a = manager.openPdfTab('/docs/a.pdf')
+    const b = manager.openDocsTab('/docs/b.docx')
+    manager.beginSplit(a, b, 'side', 0.5, 'a')
+    const before = manager.splitState()
+    manager.openMarkdownTab('/docs/a note.md', { activate: false })
+    expect(manager.splitState()).toEqual(before)
+  })
+
+  it('activates by default, as before', () => {
+    const note = manager.openMarkdownTab('/docs/n.md')
+    expect(manager.list().find((t) => t.id === note)?.active).toBe(true)
+  })
+})
+
 describe('split copy of a sheets tab', () => {
   it('opens the same workbook again for a saved file', () => {
     const id = manager.openSheetsTab('/docs/budget.xlsx')

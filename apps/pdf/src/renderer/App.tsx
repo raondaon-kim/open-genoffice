@@ -205,6 +205,14 @@ import { labelWithKey, selectionBarKey, selectionEnd } from './selection-shortcu
 import { AnnotPanelHost } from './annot-panel/AnnotPanelHost'
 import { AnnotFlash, useAnnotFlash } from './annot-panel/AnnotFlash'
 import { activateAnnotItem, type AnnotItem } from './annot-panel/items'
+import {
+  NoteOpenBar,
+  NoteOpenRibbonButton,
+  noteInsertAction,
+  useNoteActions,
+  type NoteAction,
+} from './notes/NoteActions'
+import { annotNoteRequest } from './notes/note-requests'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -828,6 +836,8 @@ export default function App() {
   const [saveError, setSaveError] = useState('')
   /** Transient message toast (save failures, skipped/rejected text edits) */
   const [notice, setNotice] = useState<string | null>(null)
+  /** an action button on the notice (Open note after "Added to the note") */
+  const [noticeAction, setNoticeAction] = useState<NoteAction | null>(null)
   const noticeTimerRef = useRef<number | null>(null)
   /** Autosave gate: this file was saved explicitly at least once */
   const savedOnceRef = useRef(false)
@@ -3451,11 +3461,20 @@ export default function App() {
   }
 
   /** Show a transient toast; the save-failure badge alone hides the actual reason */
-  const showNotice = (msg: string) => {
+  const showNotice = (msg: string, action?: NoteAction) => {
     if (noticeTimerRef.current !== null) window.clearTimeout(noticeTimerRef.current)
     setNotice(msg)
+    setNoticeAction(action ?? null)
     noticeTimerRef.current = window.setTimeout(() => setNotice(null), 8000)
   }
+
+  // the note of each PDF: no path crosses, the main process knows both the PDF and its note
+  const noteActions = useNoteActions({
+    filePath,
+    title: (metadata ?? docInfo).title?.trim() || '',
+    t,
+    onNotice: showNotice,
+  })
 
   useEffect(() => {
     if (!formHasXfa || !filePath || warnedXfaPathRef.current === filePath) return
@@ -6300,6 +6319,7 @@ export default function App() {
           </span>
           {t('apPanel')}
         </button>
+        <NoteOpenRibbonButton actions={noteActions} t={t} />
         {searchBtn}
         <button
           className={`rb-big${spread === 2 ? ' active' : ''}`}
@@ -7104,6 +7124,10 @@ export default function App() {
                 onActivate={activateAnnot}
                 onClose={() => setSidebar(null)}
                 onNotice={showNotice}
+                headerExtra={<NoteOpenBar actions={noteActions} t={t} />}
+                renderItemActions={(item) =>
+                  noteInsertAction(noteActions, annotNoteRequest(item), t, 'pdf-modal-btn')
+                }
               />
             )}
             {sidebar === 'outline' && outline && (
@@ -8762,6 +8786,17 @@ export default function App() {
             {notice && (
               <div className="pdf-toast pdf-toast-notice" role="status">
                 <span>{notice}</span>
+                {noticeAction && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNotice(null)
+                      void noticeAction.run()
+                    }}
+                  >
+                    {noticeAction.label}
+                  </button>
+                )}
                 <button type="button" onClick={() => setNotice(null)}>
                   {t('ok')}
                 </button>

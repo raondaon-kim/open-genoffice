@@ -47,6 +47,8 @@ export interface AnnotPanelProps {
   facets?: readonly AnnotFacet[]
   /** extra buttons under an item (e.g. "Add to note") */
   renderItemActions?: (item: AnnotItem) => ReactNode
+  /** content between the header and the filters (e.g. the Open note bar) */
+  headerExtra?: ReactNode
 }
 
 const MARKUP_KINDS = new Set(['highlight', 'underline', 'strikeout'])
@@ -197,6 +199,8 @@ export function AnnotPanel(props: AnnotPanelProps) {
           </button>
         </span>
       </div>
+
+      {props.headerExtra}
 
       <div className="pdf-annot-filters">
         <input

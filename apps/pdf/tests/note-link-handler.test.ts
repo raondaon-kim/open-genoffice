@@ -228,3 +228,14 @@ describe('preload: note calls', () => {
     expect(await api.noteOpen()).toEqual({ ok: false, reason: 'unavailable' })
   })
 })
+
+describe('the redacted copy', () => {
+  it('shares the note of the document it was made from', async () => {
+    const { readFileSync: read } = await import('node:fs')
+    const main = read(join(__dirname, '../src/main/pdf-main.ts'), 'utf8')
+    const block = main.slice(main.indexOf('if (request.redactions !== undefined) {'))
+    expect(block.slice(0, block.indexOf('pdfRedactionSavedHook?.('))).toMatch(
+      /void copyPdfNoteLink\(path, target\)/,
+    )
+  })
+})

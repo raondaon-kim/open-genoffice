@@ -1195,6 +1195,8 @@ function registerPdfIpc(): void {
         redactionPathByWc.set(e.sender.id, target)
         // The view's document moved to the redacted copy: the old path's record is dead
         forgetDiskState(e.sender.id, path)
+        // the redacted copy shares the note of the document it was made from
+        void copyPdfNoteLink(path, target)
         try {
           pdfRedactionSavedHook?.(e.sender, target)
         } catch (err) {

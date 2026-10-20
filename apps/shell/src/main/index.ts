@@ -209,8 +209,10 @@ import {
 } from '../../../slides/src/main/slides-main'
 import {
   configurePdfRuntime,
+  copyPdfNoteLink,
   flushPdfSave,
   markPdfUntitledPath,
+  movePdfNoteLink,
   pdfFileRenamed,
   pdfIsDirty,
   requestPdfSaveAs,
@@ -220,6 +222,7 @@ import {
   setPdfSaveAsInFlight,
 } from '../../../pdf/src/main/pdf-main'
 import { PDF_CHANNELS } from '../../../pdf/src/shared/ipc'
+import { insertIntoNoteTab, openNoteTab, type NoteTabHost } from './pdf-note-tabs'
 import { convertPdfFileToDocxLocalWithPrompt, PdfLoadError } from './pdf2docx-local'
 import { convertPdfFileToPptxLocalWithPrompt } from './pdf2pptx-local'
 import { convertPdfFileToXlsxLocalWithPrompt } from './pdf2xlsx-local'
@@ -529,12 +532,42 @@ configureSlidesRuntime({
   openGeneratedPath: (path) => openGeneratedDocument(path),
   docStylesDir: HWP_DOC_STYLES_DIR,
 })
+/**
+ * A PDF's note: its Markdown tab or detached window, else a new tab. Open note brings it
+ * forward; Add to note leaves the current tab (and any split) as it is.
+ */
+const noteTabHost: NoteTabHost = {
+  find: (path) => {
+    const detached = findDetachedTabByPath(path)
+    if (detached?.kind === 'markdown') return detached.webContents
+    const id = tabManager?.findMarkdownTabByPath(path)
+    return id ? tabManager?.webContentsForTab(id) : undefined
+  },
+  focus: (path) => {
+    const detached = findDetachedTabByPath(path)
+    if (detached?.kind === 'markdown' && focusDetachedByPath(path)) return detached.webContents
+    const id = tabManager?.findMarkdownTabByPath(path)
+    if (!tabManager || !id) return undefined
+    revealShellWindow()
+    tabManager.activateTab(id)
+    return tabManager.webContentsForTab(id)
+  },
+  openNew: (path, activate) => {
+    if (!tabManager) return undefined
+    if (activate) revealShellWindow()
+    recordRecentFile(path)
+    return tabManager.webContentsForTab(tabManager.openMarkdownTab(path, { activate }))
+  },
+}
+
 configurePdfRuntime({
   preloadPath: join(PDF_OUT, 'preload', 'index.js'),
   rendererUrl: process.env.PDF_RENDERER_URL,
   rendererFile: join(PDF_OUT, 'renderer', 'index.html'),
   openGeneratedPath: (path) => openGeneratedDocument(path),
   createDocument: createAiDocument,
+  openNote: (path) => openNoteTab(noteTabHost, path) !== null,
+  insertIntoNote: (path, text) => insertIntoNoteTab(noteTabHost, path, text),
 })
 configureMarkdownRuntime({
   preloadPath: join(MARKDOWN_OUT, 'preload', 'index.js'),
@@ -3224,6 +3257,8 @@ function applyPendingDir(wcId: number, filePath: string): string {
  */
 function afterFileMoved(oldPath: string, newPath: string): void {
   replaceRecentFile(oldPath, newPath)
+  // a PDF keeps its note, a moved note keeps its PDFs
+  void movePdfNoteLink(oldPath, newPath)
   projectFileRenamed(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
   const affected = tabManager?.renameTabFile(oldPath, newPath) ?? []
@@ -3570,6 +3605,7 @@ function createShellWindow(): void {
   })
   // pdf content-derived auto-rename: the file moved on disk, follow it everywhere
   setPdfRenamedHook((wc, oldPath, newPath) => {
+    void movePdfNoteLink(oldPath, newPath)
     manager.setTabFileFor(wc.id, newPath)
     detachedSetFileFor(wc.id, newPath)
     replaceRecentFile(oldPath, newPath)
@@ -5934,6 +5970,8 @@ async function savePdfAs(): Promise<void> {
       // No pending edits → a byte-identical copy
       await atomicCopyFile(tab.filePath, target)
     }
+    // the Save As copy shares the original's note
+    void copyPdfNoteLink(tab.filePath, target)
     openDocumentPath(target)
   } catch (err) {
     console.error('[shell] pdf save as failed:', err)
