@@ -151,6 +151,17 @@ describe('Hangul same-document save guard', () => {
     expect(showMessageBox).not.toHaveBeenCalled()
   })
 
+  it("keeps the user's original in the .bak when the second copy overwrites too", async () => {
+    writeFileSync(docPath, 'original')
+    const first = await openView(docPath)
+    const second = await openView(docPath)
+    setOpenPathProbe((path) => path === docPath)
+    expect((await save(first, SAVED_BYTES)).ok).toBe(true)
+    showMessageBox.mockResolvedValue({ response: 0 })
+    expect((await save(second, Uint8Array.from([...SAVED_BYTES, 0x66]))).ok).toBe(true)
+    expect(readFileSync(`${docPath}.bak`, 'utf8')).toBe('original')
+  })
+
   it('asks the second copy after the first copy saved', async () => {
     writeFileSync(docPath, 'v1')
     const first = await openView(docPath)

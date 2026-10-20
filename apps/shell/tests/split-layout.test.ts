@@ -151,6 +151,13 @@ describe('drop zones', () => {
     expect(splitDropZone(W - SPLIT_EDGE_ZONE_PX, 400, W, H)).toBe('side')
     expect(splitDropZone(Number.NaN, 400, W, H)).toBeNull()
   })
+
+  it('is no zone outside the window (a tear-off dropped past an edge stays a window)', () => {
+    expect(splitDropZone(W + 50, 400, W, H)).toBeNull()
+    expect(splitDropZone(600, H + 50, W, H)).toBeNull()
+    expect(splitDropZone(W + 5, H + 5, W, H)).toBeNull()
+    expect(splitDropZone(-20, 400, W, H)).toBeNull()
+  })
 })
 
 describe('decideSplitDrop', () => {

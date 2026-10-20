@@ -101,8 +101,10 @@ const requestSheetsClose = vi.fn(() => Promise.resolve(true))
 const setActiveSheetsWebContents = vi.fn()
 const setSheetsNewBlank = vi.fn()
 const sheetsPendingEditCount = vi.fn(() => 0)
+const sheetsPathIsUnsavedNew = vi.fn((_path: string) => false)
 
 vi.mock('../../sheets/src/main/sheets-main', () => ({
+  sheetsPathIsUnsavedNew: (path: string) => sheetsPathIsUnsavedNew(path),
   createSheetsView: (...args: unknown[]) => createSheetsView(...(args as [])),
   nudgeQueuedWorkbook: (...args: unknown[]) => nudgeQueuedWorkbook(...args),
   queueWorkbookForView: (...args: unknown[]) => queueWorkbookForView(...args),
@@ -274,6 +276,29 @@ describe('opening tabs', () => {
     expect(markDocsNewBlank).toHaveBeenCalledTimes(1)
     manager.openSheetsTab(undefined, { newBlank: true })
     expect(setSheetsNewBlank).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('split copy of a sheets tab', () => {
+  it('opens the same workbook again for a saved file', () => {
+    const id = manager.openSheetsTab('/docs/budget.xlsx')
+    queueWorkbookForView.mockClear()
+    const copy = manager.openDuplicatePaneTab(id)
+    expect(copy).not.toBeNull()
+    expect(queueWorkbookForView).toHaveBeenCalledWith(expect.anything(), '/docs/budget.xlsx')
+  })
+
+  it('gives a never-saved new workbook a blank sheet, never its temp backing file', () => {
+    const backing = '/tmp/genoffice-imports/u1/Untitled.xlsx'
+    sheetsPathIsUnsavedNew.mockImplementation((path) => path === backing)
+    const id = manager.openSheetsTab(backing)
+    queueWorkbookForView.mockClear()
+    setSheetsNewBlank.mockClear()
+    const copy = manager.openDuplicatePaneTab(id)
+    expect(copy).not.toBeNull()
+    expect(queueWorkbookForView).not.toHaveBeenCalled()
+    expect(setSheetsNewBlank).toHaveBeenCalledTimes(1)
+    expect(manager.list().find((t) => t.id === copy)?.filePath).toBeUndefined()
   })
 })
 

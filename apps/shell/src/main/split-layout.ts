@@ -95,6 +95,8 @@ export function splitDropZone(
   height: number,
 ): SplitOrientation | null {
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+  // outside the window (another monitor, below the window) a torn tab stays a window
+  if (x < 0 || x > width || y > height) return null
   if (y < TAB_STRIP_HEIGHT) return null
   const fromRight = width - x
   const fromBottom = height - y

@@ -44,6 +44,7 @@ import {
   requestSheetsClose,
   setActiveSheetsWebContents,
   setSheetsNewBlank,
+  sheetsPathIsUnsavedNew,
   sheetsPendingEditCount,
 } from '../../../sheets/src/main/sheets-main'
 import {
@@ -875,7 +876,11 @@ export class TabManager {
       case 'docs':
         return this.openDocsTab(path, path ? undefined : { newBlank: true })
       case 'sheets':
-        return this.openSheetsTab(path, path ? undefined : { newBlank: true })
+        // a never-saved "New spreadsheet" lives in a temp backing file: its copy is
+        // a blank workbook, as for any document without a file
+        return path && !sheetsPathIsUnsavedNew(path)
+          ? this.openSheetsTab(path)
+          : this.openSheetsTab(undefined, { newBlank: true })
       case 'slides':
         return this.openSlidesTab(path)
       case 'pdf':

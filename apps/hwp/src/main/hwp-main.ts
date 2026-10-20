@@ -408,8 +408,12 @@ export function configureHwpRuntime(paths: RuntimePaths): void {
 const intents = new HwpIntentStore()
 /** File paths granted to each view — readFile/save only allow these */
 const allowedByWc = new Map<number, Set<string>>()
-/** Paths each view has already written this session: its first overwrite of a file keeps a .bak of the original */
-const writtenByWc = new Map<number, Set<string>>()
+/**
+ * Paths the app has already written this session, by any view: the first overwrite of a
+ * file keeps a .bak of the user's original. Shared across views so a split-pane copy of
+ * the same document does not replace that .bak with the other copy's save.
+ */
+const writtenThisSession = new Set<string>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
 const dirtyByWc = new Set<number>()
 const saveWaiters = new Map<number, (ok: boolean) => void>()
@@ -616,9 +620,7 @@ function registerHwpIpc(): void {
       })
       if (verdict === 'cancel') return { ok: false, canceled: true }
       // the user's original is kept as <name>.bak before the app's first overwrite of it
-      const written = writtenByWc.get(e.sender.id) ?? new Set<string>()
-      writtenByWc.set(e.sender.id, written)
-      const backupPath = await backupBeforeOverwrite(path, written)
+      const backupPath = await backupBeforeOverwrite(path, writtenThisSession)
       // Temp file + rename for atomic replace; a mid-write crash won't corrupt the original
       const tmp = `${path}.gensave-${process.pid}.tmp`
       await writeFile(tmp, bytes)
@@ -913,7 +915,6 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
   wc.once('destroyed', () => {
     intents.forget(wcId)
     allowedByWc.delete(wcId)
-    writtenByWc.delete(wcId)
     diskStatesByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)

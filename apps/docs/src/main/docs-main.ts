@@ -67,6 +67,7 @@ import {
   MAX_REMOTE_IMAGE_BYTES,
   readBodyCapped,
   writeJsonAtomic,
+  pathOpenInOtherView,
 } from '@genoffice/electron-utils'
 import { configureMetricsCache, familyVerticalMetrics } from '@genoffice/font-metrics'
 import { createI18n, getUiLang, normalizeLang, setUiLang } from '@genoffice/i18n'
@@ -3447,7 +3448,9 @@ export function teardownDocsRenderer(contents: WebContents): void {
   // Sweep recovery copies for this renderer's documents: every non-crash close
   // either saved (docs:save already cleared it) or explicitly discarded, so a
   // copy still on disk here is a leftover from an in-flight recovery write.
-  for (const p of docWritablePaths.get(contents.id) ?? []) clearRecoveryCopy(p)
+  // A split-view copy still open on the same path keeps writing that recovery copy.
+  for (const p of docWritablePaths.get(contents.id) ?? [])
+    if (!pathOpenInOtherView(openDocByWc, contents.id, p)) clearRecoveryCopy(p)
   // reclaim every per-wcId grant, not just doc saves — the orphaned renderer
   // must also lose its dialog-authorized PDF targets and disk-state cache
   docWritablePaths.delete(contents.id)
@@ -3567,7 +3570,11 @@ async function loadDocx(
   // reopen with the user's password), so a bad save never loses the source file
   const hash = lazy?.hash ?? sha256Hex(original)
   await archiveOriginal(filePath, hash, size)
-  const recovery = await maybeRecoverDocBytes(filePath, plainBytes)
+  // a split-view copy of an open document: the recovery copy belongs to the view
+  // that already has it open, so this one neither offers nor discards it
+  const recovery = pathOpenInOtherView(openDocByWc, wcId, filePath)
+    ? { bytes: plainBytes, recovered: false }
+    : await maybeRecoverDocBytes(filePath, plainBytes)
   let bytes = recovery.bytes
   let recovered = recovery.recovered
   // recovery copies of a protected document are themselves encrypted (see

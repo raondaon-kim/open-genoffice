@@ -60,6 +60,7 @@ import {
   registerRendererScheme,
   rendererUrl,
   writeJsonAtomic,
+  pathOpenInOtherView,
   type SaveDiskState,
 } from '@genoffice/electron-utils'
 import { createI18n, getUiLang, type Lang, normalizeLang, setUiLang } from '@genoffice/i18n'
@@ -1663,6 +1664,15 @@ const MAX_REMOTE_IMAGE_BYTES = 20 * 1024 * 1024
 const MAX_DELIMITED_IMPORT_BYTES = 32 * 1024 * 1024
 
 const sheetsTabs = new Map<number, SheetsTabSession>()
+
+/** Whether a sheets view other than `contents` has a session on `path` (a split-view copy). */
+function sheetsPathOpenInOtherView(contents: WebContents | undefined, path: string): boolean {
+  const open: Array<[number, string]> = []
+  for (const [wcId, tab] of sheetsTabs)
+    for (const session of tab.sessions.values()) open.push([wcId, session.path])
+  return pathOpenInOtherView(open, contents?.id ?? -1, path)
+}
+
 let activeSheetsWebContents: WebContents | null = null
 let pastedTempCleanupStarted = false
 
@@ -1909,6 +1919,20 @@ export function markSheetsUnsavedNew(
   tempDir: string,
 ): void {
   unsavedNewWorkbooks.set(openPath, { suggestSaveAs, tempDir })
+}
+
+/**
+ * shell: whether a path is the temp backing file of a never-saved "New spreadsheet"
+ * (pending, or open in a session that has not been saved yet). A split-view copy of
+ * such a tab must be a blank workbook: reopening the backing file would treat it as
+ * the user's file, and its temp directory goes away with the first tab.
+ */
+export function sheetsPathIsUnsavedNew(path: string): boolean {
+  if (unsavedNewWorkbooks.has(path)) return true
+  for (const tab of sheetsTabs.values())
+    for (const session of tab.sessions.values())
+      if (session.unsavedNew && session.path === path) return true
+  return false
 }
 
 /** shell: the backing workbook could not be written, release its name */
@@ -4506,7 +4530,12 @@ async function prepareWorkbookForOpen(
     // prompt (which spells out the overwrite) was the confirmation.
     // Merge sources are read-only picks: never surface (or worse, discard)
     // another workbook's crash recovery from here.
-    const recovery = options?.skipRecoveryPrompt ? undefined : pendingRecoveryFor(path)
+    // a split-view copy of an open workbook: the recovery copy belongs to the view
+    // that already has it open, so this one neither offers nor discards it
+    const recovery =
+      options?.skipRecoveryPrompt || sheetsPathOpenInOtherView(contents, path)
+        ? undefined
+        : pendingRecoveryFor(path)
     if (recovery) {
       const choice =
         contents && !contents.isDestroyed()

@@ -112,3 +112,4 @@ export {
   type SaveConflictOptions,
   type SaveDiskState,
 } from './save-conflict'
+export { pathOpenInOtherView } from './open-elsewhere'
