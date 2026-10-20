@@ -97,6 +97,10 @@ The fork's material changes on top of upstream:
   target the Sheets sidecar is taken from (for example the MSVC target on a
   build machine without the GNU toolchain).
 
+- **Home Quick Look** (ported from IeumOffice, Apache-2.0): Space on a Home file row shows a
+  preview (thumbnail, structured text, tables, slides, images); ↑/↓ step, Enter opens. Its
+  Explorer/desktop keyboard hook, the C# helper and the tray mode are not included.
+
 Features of the August fork that upstream now provides itself (bring-your-own-
 key providers including DeepSeek, GLM, Kimi, MiniMax, OpenRouter and a custom
 endpoint, Codex, DeepSeek V4 names) use upstream's implementation. Not carried

@@ -1,12 +1,11 @@
-import { existsSync, statSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { BrowserWindow, Menu, Tray, app, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, ipcMain, shell } from 'electron'
 import type { IpcMainInvokeEvent, NativeImage } from 'electron'
 import type { Lang } from '@genoffice/i18n'
 import { safeExternalUrl } from '@genoffice/electron-utils'
 import {
   QUICK_LOOK_WINDOW_CHANNELS,
-  isQuickLookSupportedPath,
   type QuickLookInit,
   type QuickLookPayload,
   type QuickLookTheme,
@@ -18,7 +17,6 @@ import {
 } from '../../shared/quick-look-home'
 import { quickLookText } from '../../renderer/src/i18n/strings-quick-look'
 import { clearQuickLookCache, extractQuickLook } from './extract'
-import { WinExplorerQuickLookHook } from './win-explorer-hook'
 
 export interface QuickLookWindowDeps {
   parentWindow(): BrowserWindow | null
@@ -34,11 +32,9 @@ export interface QuickLookWindowDeps {
 
 let deps: QuickLookWindowDeps | null = null
 let win: BrowserWindow | null = null
-let tray: Tray | null = null
 let ipcRegistered = false
 let currentFilePath: string | null = null
 let currentPayload: QuickLookPayload | null = null
-let explorerHook: WinExplorerQuickLookHook | null = null
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 
 const EXIT_ANIMATION_MS = 155
@@ -73,93 +69,18 @@ function fromParentOrAnyShellWindow(event: IpcMainInvokeEvent): boolean {
   return senderWin !== null && !senderWin.isDestroyed()
 }
 
-function isPreviewableRegularFile(filePath: string): boolean {
-  if (!filePath || !isQuickLookSupportedPath(filePath)) return false
-  try {
-    const st = statSync(filePath)
-    return st.isFile()
-  } catch {
-    return false
-  }
-}
-
-function syncTrayMenu(): void {
-  if (!tray || !deps) return
-  const lang = deps.lang()
-  const appTitle = app.getName()
-  tray.setToolTip(`${appTitle} — ${quickLookText(lang, 'windowTitle')}`)
-  const menu = Menu.buildFromTemplate([
-    {
-      label: quickLookText(lang, 'trayOpen'),
-      click: () => deps?.showShellWindow(),
-    },
-    { type: 'separator' },
-    {
-      label: quickLookText(lang, 'trayQuit'),
-      click: () => deps?.quitApp(),
-    },
-  ])
-  tray.setContextMenu(menu)
-}
-
-export function syncQuickLookRuntime(): void {
-  if (!deps) return
-  const settings = deps.readSettings()
-
-  if (process.platform === 'win32') {
-    if (!explorerHook) {
-      explorerHook = new WinExplorerQuickLookHook({
-        onSpace: (filePath) => {
-          void handleExplorerSpace(filePath)
-        },
-        onNavigate: (filePath) => {
-          void handleExplorerNavigate(filePath)
-        },
-        onEscape: () => {
-          closeQuickLookWindow()
-        },
-      })
-    }
-    explorerHook.setEnabled(settings.explorerSpacePreview)
-    if (!settings.explorerSpacePreview) {
-      destroyQuickLookWindow()
-    }
-
-    const wantTray = settings.explorerSpacePreview && settings.keepInTray
-    if (wantTray && !tray) {
-      const icon = deps.trayIcon()
-      if (icon) {
-        try {
-          tray = new Tray(icon)
-          tray.on('click', () => deps?.showShellWindow())
-          tray.on('double-click', () => deps?.showShellWindow())
-          syncTrayMenu()
-        } catch {
-          tray = null
-        }
-      }
-    } else if (!wantTray && tray) {
-      tray.destroy()
-      tray = null
-    } else if (tray) {
-      syncTrayMenu()
-    }
-  }
-}
+/**
+ * IeumOffice also previews from Windows Explorer and the desktop through a system-wide
+ * keyboard hook (a C# helper) and can keep the app in the tray for it. This build leaves
+ * both out: Quick Look is Home's own overlay, so there is no runtime to start or stop.
+ */
+export function syncQuickLookRuntime(): void {}
 
 export function shouldKeepQuickLookInTray(): boolean {
-  if (process.platform !== 'win32' || !deps) return false
-  const settings = deps.readSettings()
-  return settings.explorerSpacePreview && settings.keepInTray
+  return false
 }
 
 export function stopQuickLookRuntime(): void {
-  explorerHook?.stop()
-  explorerHook = null
-  if (tray) {
-    tray.destroy()
-    tray = null
-  }
   destroyQuickLookWindow()
   clearQuickLookCache()
 }
@@ -181,40 +102,6 @@ export function closeQuickLookWindow(): void {
       targetWin.hide()
     }
   }, EXIT_ANIMATION_MS)
-}
-
-async function handleExplorerSpace(rawPath: string): Promise<void> {
-  if (!deps) return
-  const resolved = resolve(rawPath)
-  if (!isPreviewableRegularFile(resolved)) return
-
-  if (
-    win &&
-    !win.isDestroyed() &&
-    win.isVisible() &&
-    hideTimer === null &&
-    currentFilePath === resolved
-  ) {
-    closeQuickLookWindow()
-    return
-  }
-
-  await showQuickLookWindowForPath(resolved)
-}
-
-async function handleExplorerNavigate(rawPath: string): Promise<void> {
-  if (!deps || !win || win.isDestroyed() || !win.isVisible() || hideTimer !== null) return
-  const resolved = resolve(rawPath)
-  if (currentFilePath === resolved || !isPreviewableRegularFile(resolved)) return
-
-  currentFilePath = resolved
-  const payload = await extractQuickLook(resolved)
-  if (currentFilePath !== resolved) return
-  currentPayload = payload
-  if (win && !win.isDestroyed()) {
-    win.setTitle(`${payload.name} — ${quickLookText(deps.lang(), 'windowTitle')}`)
-    win.webContents.send(QUICK_LOOK_WINDOW_CHANNELS.update, payload)
-  }
 }
 
 export async function showQuickLookWindowForPath(filePath: string): Promise<void> {
@@ -290,7 +177,6 @@ export async function showQuickLookWindowForPath(filePath: string): Promise<void
 }
 
 export function notifyQuickLookLangOrThemeChanged(): void {
-  syncTrayMenu()
   if (!deps || !win || win.isDestroyed()) return
   win.webContents.send(QUICK_LOOK_WINDOW_CHANNELS.langChanged, deps.lang())
   win.webContents.send(QUICK_LOOK_WINDOW_CHANNELS.themeChanged, deps.theme())

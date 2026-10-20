@@ -35,3 +35,8 @@ document-style wiki, and in-house model routing on top of upstream GenOffice.
 Open GenOffice is not affiliated with or endorsed by Mainfunc or Genspark.
 Questions and bug reports about this fork belong in the Open GenOffice
 repository; upstream-only issues should be reported to the upstream project.
+
+Home's Quick Look (Space on a file row previews it) comes from
+[IeumOffice](https://github.com/pblsketch/openoffice) by pblsketch (Apache-2.0), another fork of
+GenOffice. Its commits were cherry-picked with their authorship kept; this build leaves out its
+Windows Explorer / desktop keyboard hook and the tray mode that serves it.
