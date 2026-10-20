@@ -4,10 +4,7 @@ import { join } from 'node:path'
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LANGS } from '@genoffice/i18n'
-import {
-  isQuickLookSupportedPath,
-  quickLookFamilyOf,
-} from '../src/shared/quick-look-api'
+import { isQuickLookSupportedPath, quickLookFamilyOf } from '../src/shared/quick-look-api'
 import {
   DEFAULT_QUICK_LOOK_SETTINGS,
   normalizeQuickLookSettings,
@@ -126,6 +123,28 @@ describe('Quick Look structured parsers', () => {
         notes: [],
       },
     ])
+  })
+
+  it('skips ### Comments blocks instead of folding them into notes or bullets', () => {
+    const raw = [
+      '## Slide 1',
+      'Quarterly Review',
+      '### Notes',
+      'Mention regional breakdown',
+      '### Comments',
+      '- Alice (2026-01-01T00:00:00.000Z): Tighten the intro',
+      '## Slide 2',
+      'Next Steps',
+    ].join('\n')
+
+    const { slides } = parseSlidesFromText(raw)
+    expect(slides[0]).toEqual({
+      number: 1,
+      title: 'Quarterly Review',
+      bullets: [],
+      notes: ['Mention regional breakdown'],
+    })
+    expect(slides[1]).toEqual({ number: 2, title: 'Next Steps', bullets: [], notes: [] })
   })
 
   it('parses mindmap outline into sheets and depth-indented nodes', () => {
