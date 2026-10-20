@@ -10,7 +10,7 @@ import {
 } from 'node:fs'
 import { readFile as readFileAsync, stat as statAsync } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import {
   BrowserWindow,
   Menu,
@@ -239,7 +239,6 @@ import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hw
 import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
-import { quickLook } from './quick-look'
 import { firstRunAiSettings, orgDefaultsView, readOrgDefaults } from './org-defaults'
 import { registerCodexIpc, stopCodexLoginForQuit } from './codex-connection'
 import {
@@ -4104,12 +4103,6 @@ function registerHomeIpc(): void {
   ipcMain.handle(HOME_CHANNELS.toggleStar, (_event, path: unknown) => {
     if (typeof path === 'string') toggleStarredFile(path)
   })
-
-  ipcMain.handle(HOME_CHANNELS.quickLook, (_event, path: unknown) =>
-    typeof path === 'string' && path.length > 0 && path.length <= 4096 && isAbsolute(path)
-      ? quickLook(path)
-      : { ok: false, path: String(path ?? ''), name: '', error: 'unreadable' },
-  )
 
   ipcMain.handle(HOME_CHANNELS.openPath, (_event, path: unknown) => {
     if (typeof path !== 'string' || !path || path.length > 4096) return

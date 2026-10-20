@@ -240,8 +240,6 @@ export interface HomeApi {
   toggleStar(path: string): Promise<void>
   /** open an existing file, routing to the right module by extension */
   openPath(path: string): Promise<void>
-  /** Quick Look (Space on a Home row): thumbnail, start of the text, or the image */
-  quickLook(path: string): Promise<QuickLookPayload>
   /** file picker accepting every supported extension, then routes */
   browse(): Promise<void>
   /** open a docs window at its start screen; `dir` = folder the first save should land in */
@@ -550,25 +548,6 @@ export interface MoveResult {
   failed: Array<{ path: string; error: string }>
 }
 
-/** what Home's Quick Look shows for one file */
-export type QuickLookPayload =
-  | {
-      ok: true
-      path: string
-      name: string
-      /** lowercase, without the dot */
-      ext: string
-      sizeBytes: number
-      mtimeMs: number
-      /** data: URL — the image file itself, or the thumbnail the document carries */
-      image?: string
-      /** start of the document's text, whitespace-tidied */
-      text?: string
-      /** the text was cut at the preview limit */
-      truncated: boolean
-    }
-  | { ok: false; path: string; name: string; error: 'missing' | 'too-large' | 'unreadable' }
-
 export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
@@ -591,7 +570,6 @@ export const HOME_CHANNELS = {
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
   openPath: 'home:open-path',
-  quickLook: 'home:quick-look',
   browse: 'home:browse',
   newDoc: 'home:new-doc',
   newSheet: 'home:new-sheet',
