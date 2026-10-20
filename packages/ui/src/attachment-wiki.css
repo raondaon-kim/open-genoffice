@@ -25,8 +25,13 @@
     color var(--transition-fast);
 }
 
-.ai-attachment-wiki-btn:hover:not(:disabled) {
+/* hover feedback only where a click still does something: idle adds, failed retries;
+   an added or duplicate check is a status, not a button to press again */
+.ai-attachment-wiki-btn:not([data-state='added'], [data-state='duplicate']):hover:not(:disabled) {
   background: var(--color-bg-subtle);
+}
+
+.ai-attachment-wiki-btn[data-state='idle']:hover {
   color: var(--color-text-primary);
 }
 

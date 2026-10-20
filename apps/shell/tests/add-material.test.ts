@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -99,6 +99,29 @@ describe('addMaterial', () => {
       { path: a, status: 'added' },
     ])
     expect(existsSync(join(rawSources, 'rfp.pdf'))).toBe(true)
+  })
+
+  it('runs overlapping adds one at a time: no lost index entries, no double copies', async () => {
+    const { rawSources, indexPath, src } = setup()
+    const hwp = src('보고서.hwp', 'HWPBYTES')
+    const pdf = src('rfp.pdf', 'PDFBYTES')
+    // the Hangul conversion is a child process: slow enough for another add to start meanwhile
+    const slowText = () => new Promise<string>((r) => setTimeout(() => r('본문'), 150))
+    const [a, b, c] = await Promise.all([
+      addMaterial({ files: [hwp], rawSources, extractText: slowText, indexPath }),
+      addMaterial({ files: [pdf], rawSources, extractText: slowText, indexPath }),
+      addMaterial({ files: [hwp], rawSources, extractText: slowText, indexPath }),
+    ])
+    expect([a, b, c]).toEqual([
+      [{ path: hwp, status: 'added' }],
+      [{ path: pdf, status: 'added' }],
+      [{ path: hwp, status: 'duplicate' }],
+    ])
+    // both entries survived: the pdf again is a duplicate, not "rfp (2).pdf"
+    expect(await addMaterial({ files: [pdf], rawSources, extractText: none, indexPath })).toEqual([
+      { path: pdf, status: 'duplicate' },
+    ])
+    expect(readdirSync(rawSources).sort()).toEqual(['rfp.pdf', '보고서.md'])
   })
 
   it('dedupes Hangul by the source file, and survives a broken index', async () => {

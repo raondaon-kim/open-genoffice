@@ -39,7 +39,7 @@ function readIndex(indexPath: string | undefined): Record<string, string> {
  * copied again, unless its earlier copy was deleted from the wiki. One result per input file, in
  * input order.
  */
-export async function addMaterial(opts: {
+async function addMaterialNow(opts: {
   files: string[]
   rawSources: string
   extractText: (path: string) => Promise<string | null>
@@ -103,4 +103,21 @@ export async function addMaterial(opts: {
     writeFileSync(opts.indexPath, JSON.stringify(index), 'utf8')
   }
   return results
+}
+
+/** one add at a time: the index is read, extended and written per call, and a Hangul conversion
+ *  (a child process) can take seconds, so overlapping adds (two chips, two tabs, Home's dialog)
+ *  would otherwise drop each other's entries and copy the same content twice */
+let queue: Promise<unknown> = Promise.resolve()
+
+/**
+ * Put the user's files into raw/sources for LLM Wiki to learn (see addMaterialNow). Calls run one
+ * at a time, in the order they were made.
+ */
+export function addMaterial(
+  opts: Parameters<typeof addMaterialNow>[0],
+): Promise<WikiMaterialResult[]> {
+  const run = queue.then(() => addMaterialNow(opts))
+  queue = run.catch(() => undefined)
+  return run
 }
