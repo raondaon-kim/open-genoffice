@@ -381,7 +381,8 @@ export function parseDocBlocksFromText(text: string): {
   docBlocks: QuickLookDocBlock[]
   truncated: boolean
 } {
-  const lines = text.split(/\r?\n/)
+  // this app's Hangul (rhwp) and PDF extraction mark pages with "[page N]" lines: not content
+  const lines = text.split(/\r?\n/).filter((line) => !/^\[page \d+\]\s*$/.test(line))
   const blocks: QuickLookDocBlock[] = []
   let tableRows: string[][] | null = null
   let codeLines: string[] | null = null

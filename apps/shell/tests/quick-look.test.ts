@@ -163,6 +163,17 @@ describe('Quick Look structured parsers', () => {
     ])
   })
 
+  // this app's Hangul (rhwp) and PDF text extraction mark pages with "[page N]" lines
+  it('does not show page markers as document text', () => {
+    const { docBlocks } = parseDocBlocksFromText(
+      '[page 1]\n회사 소개서\n회사 개요\n\n[page 2]\n연락처',
+    )
+    const shown = JSON.stringify(docBlocks)
+    expect(shown).not.toContain('[page')
+    expect(shown).toContain('회사 소개서')
+    expect(shown).toContain('연락처')
+  })
+
   it('parses document blocks including headings, bullet items, tables, and fenced code', () => {
     const raw = [
       '# Title',
