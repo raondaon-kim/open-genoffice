@@ -397,7 +397,7 @@ export async function addMaterial(opts: {
 `indexPath: join(stateDirFor(s.folder), 'material-index.json')`; counts
 `added = r.filter(status==='added').length`; lines for the rest use new `MATERIAL_TEXT` keys
 (zh/en/ko): `materialDuplicate` ("이미 업무 위키에 있습니다" / "already in the work wiki" /
-"已在工作维基中") and one key per reason (`reason_unsupported`, `reason_too-large`,
+its Chinese equivalent) and one key per reason (`reason_unsupported`, `reason_too-large`,
 `reason_no-text`, `reason_unreadable`, `reason_too-many`, the last two never shown here but kept
 for completeness); return `{ added, skipped: total - added, canceled: false }`.
 
@@ -970,57 +970,17 @@ function IconWarn() {
 ```
 
 Labels (`strings-attachment-wiki.ts`) — `Record<Lang, { add; adding; added; duplicate; failed;
-reasons: Record<WikiMaterialSkip, string> }>` with these values:
+reasons: Record<WikiMaterialSkip, string> }>`, all 21 locales. The translated values live in
+`packages/ui/src/strings-attachment-wiki.ts` (docs stay English-only); English reference:
 
-| lang  | add                                                                         | adding                               | added                                                                       | duplicate                          | failed                                             |
-| ----- | --------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------- |
-| ko    | 업무 자료로 추가 — 이후 작업에서도 AI가 참고합니다                          | 업무 자료에 추가하는 중…             | 업무 자료에 추가됨 — 정리가 끝나면 AI가 참고합니다                          | 이미 업무 자료에 있습니다          | 업무 자료에 추가하지 못했습니다                    |
-| en    | Add to work material — the AI will use it in later work                     | Adding to work material…             | Added to work material — the AI will use it once it is organized            | Already in work material           | Could not add to work material                     |
-| zh    | 添加为工作资料 — AI 会在之后的工作中参考                                    | 正在添加为工作资料…                  | 已添加为工作资料 — 整理完成后 AI 会参考                                     | 已在工作资料中                     | 无法添加为工作资料                                 |
-| zh-TW | 新增為工作資料 — AI 會在之後的工作中參考                                    | 正在新增為工作資料…                  | 已新增為工作資料 — 整理完成後 AI 會參考                                     | 已在工作資料中                     | 無法新增為工作資料                                 |
-| ja    | 業務資料に追加 — 以降の作業でも AI が参照します                             | 業務資料に追加しています…            | 業務資料に追加しました — 整理が終わると AI が参照します                     | すでに業務資料にあります           | 業務資料に追加できませんでした                     |
-| fr    | Ajouter aux documents de travail — l’IA s’en servira pour la suite          | Ajout aux documents de travail…      | Ajouté aux documents de travail — l’IA s’en servira une fois classé         | Déjà dans les documents de travail | Impossible d’ajouter aux documents de travail      |
-| de    | Zu Arbeitsmaterial hinzufügen – die KI nutzt es bei späteren Aufgaben       | Wird zu Arbeitsmaterial hinzugefügt… | Zu Arbeitsmaterial hinzugefügt – die KI nutzt es, sobald es eingeordnet ist | Bereits im Arbeitsmaterial         | Konnte nicht zu Arbeitsmaterial hinzugefügt werden |
-| es    | Añadir al material de trabajo: la IA lo usará en tareas posteriores         | Añadiendo al material de trabajo…    | Añadido al material de trabajo: la IA lo usará cuando esté organizado       | Ya está en el material de trabajo  | No se pudo añadir al material de trabajo           |
-| pt    | Adicionar ao material de trabalho — a IA o usará em tarefas futuras         | Adicionando ao material de trabalho… | Adicionado ao material de trabalho — a IA o usará quando estiver organizado | Já está no material de trabalho    | Não foi possível adicionar ao material de trabalho |
-| it    | Aggiungi al materiale di lavoro — l’IA lo userà nelle attività successive   | Aggiunta al materiale di lavoro…     | Aggiunto al materiale di lavoro — l’IA lo userà una volta organizzato       | Già nel materiale di lavoro        | Impossibile aggiungere al materiale di lavoro      |
-| ru    | Добавить в рабочие материалы — ИИ будет использовать их в следующих задачах | Добавление в рабочие материалы…      | Добавлено в рабочие материалы — ИИ использует их после обработки            | Уже есть в рабочих материалах      | Не удалось добавить в рабочие материалы            |
-| pl    | Dodaj do materiałów roboczych — AI użyje ich w kolejnych zadaniach          | Dodawanie do materiałów roboczych…   | Dodano do materiałów roboczych — AI użyje ich po uporządkowaniu             | Już w materiałach roboczych        | Nie udało się dodać do materiałów roboczych        |
-| cs    | Přidat do pracovních materiálů — AI je použije v dalších úkolech            | Přidávání do pracovních materiálů…   | Přidáno do pracovních materiálů — AI je použije po zpracování               | Už je v pracovních materiálech     | Nepodařilo se přidat do pracovních materiálů       |
-| nl    | Toevoegen aan werkmateriaal — de AI gebruikt het bij volgende taken         | Toevoegen aan werkmateriaal…         | Toegevoegd aan werkmateriaal — de AI gebruikt het zodra het is verwerkt     | Staat al in het werkmateriaal      | Kon niet worden toegevoegd aan werkmateriaal       |
-| th    | เพิ่มเป็นเอกสารงาน — AI จะใช้อ้างอิงในงานต่อไป                              | กำลังเพิ่มเป็นเอกสารงาน…             | เพิ่มเป็นเอกสารงานแล้ว — AI จะใช้อ้างอิงเมื่อจัดระเบียบเสร็จ                | อยู่ในเอกสารงานแล้ว                | เพิ่มเป็นเอกสารงานไม่ได้                           |
-| id    | Tambahkan ke materi kerja — AI akan memakainya di pekerjaan berikutnya      | Menambahkan ke materi kerja…         | Ditambahkan ke materi kerja — AI akan memakainya setelah dirapikan          | Sudah ada di materi kerja          | Tidak dapat menambahkan ke materi kerja            |
-| ms    | Tambah ke bahan kerja — AI akan menggunakannya dalam kerja seterusnya       | Menambah ke bahan kerja…             | Ditambah ke bahan kerja — AI akan menggunakannya selepas disusun            | Sudah ada dalam bahan kerja        | Tidak dapat menambah ke bahan kerja                |
-| vi    | Thêm vào tài liệu công việc — AI sẽ tham khảo trong các việc sau            | Đang thêm vào tài liệu công việc…    | Đã thêm vào tài liệu công việc — AI sẽ tham khảo khi sắp xếp xong           | Đã có trong tài liệu công việc     | Không thể thêm vào tài liệu công việc              |
-| ar    | إضافة إلى مواد العمل — سيستخدمها الذكاء الاصطناعي في الأعمال اللاحقة        | جارٍ الإضافة إلى مواد العمل…         | أُضيف إلى مواد العمل — سيستخدمه الذكاء الاصطناعي بعد تنظيمه                 | موجود بالفعل في مواد العمل         | تعذّرت الإضافة إلى مواد العمل                      |
-| he    | הוספה לחומרי העבודה — הבינה המלאכותית תשתמש בהם במשימות הבאות               | מוסיף לחומרי העבודה…                 | נוסף לחומרי העבודה — הבינה המלאכותית תשתמש בו לאחר הארגון                   | כבר נמצא בחומרי העבודה             | לא ניתן להוסיף לחומרי העבודה                       |
-| hi    | कार्य सामग्री में जोड़ें — AI आगे के कामों में इसका उपयोग करेगा             | कार्य सामग्री में जोड़ा जा रहा है…   | कार्य सामग्री में जोड़ा गया — व्यवस्थित होने के बाद AI इसका उपयोग करेगा     | पहले से कार्य सामग्री में है       | कार्य सामग्री में नहीं जोड़ा जा सका                |
-
-Reasons (unsupported, too-large, no-text, unreadable, too-many, wiki-off, not-attached):
-
-| lang  | values                                                                                                                                                                                                                                                              |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ko    | 추가할 수 없는 형식입니다 · 파일이 100MB보다 큽니다 · 파일에서 읽을 수 있는 글자가 없습니다 · 파일을 읽지 못했습니다 · 한 번에 너무 많은 파일입니다 · 업무 위키가 꺼져 있습니다 · 이 문서에 첨부한 파일이 아닙니다                                                  |
-| en    | this format cannot be added · the file is larger than 100 MB · no readable text in the file · the file could not be read · too many files at once · the work wiki is off · this file was not attached here                                                          |
-| zh    | 无法添加此格式 · 文件大于 100 MB · 文件中没有可读取的文字 · 无法读取文件 · 一次添加的文件过多 · 工作维基已关闭 · 此文件不是在这里附加的                                                                                                                             |
-| zh-TW | 無法新增此格式 · 檔案大於 100 MB · 檔案中沒有可讀取的文字 · 無法讀取檔案 · 一次新增的檔案過多 · 工作維基已關閉 · 此檔案不是在這裡附加的                                                                                                                             |
-| ja    | この形式は追加できません · ファイルが 100 MB を超えています · ファイルに読み取れるテキストがありません · ファイルを読み取れませんでした · 一度に追加するファイルが多すぎます · 業務ウィキがオフです · このファイルはここで添付されたものではありません              |
-| fr    | ce format ne peut pas être ajouté · le fichier dépasse 100 Mo · aucun texte lisible dans le fichier · le fichier n’a pas pu être lu · trop de fichiers à la fois · le wiki de travail est désactivé · ce fichier n’a pas été joint ici                              |
-| de    | dieses Format kann nicht hinzugefügt werden · die Datei ist größer als 100 MB · kein lesbarer Text in der Datei · die Datei konnte nicht gelesen werden · zu viele Dateien auf einmal · das Arbeits-Wiki ist ausgeschaltet · diese Datei wurde hier nicht angehängt |
-| es    | este formato no se puede añadir · el archivo supera los 100 MB · el archivo no tiene texto legible · no se pudo leer el archivo · demasiados archivos a la vez · la wiki de trabajo está desactivada · este archivo no se adjuntó aquí                              |
-| pt    | este formato não pode ser adicionado · o arquivo tem mais de 100 MB · o arquivo não tem texto legível · não foi possível ler o arquivo · arquivos demais de uma vez · a wiki de trabalho está desativada · este arquivo não foi anexado aqui                        |
-| it    | questo formato non può essere aggiunto · il file supera i 100 MB · nessun testo leggibile nel file · impossibile leggere il file · troppi file alla volta · il wiki di lavoro è disattivato · questo file non è stato allegato qui                                  |
-| ru    | этот формат нельзя добавить · файл больше 100 МБ · в файле нет читаемого текста · не удалось прочитать файл · слишком много файлов за раз · рабочая вики выключена · этот файл прикреплён не здесь                                                                  |
-| pl    | tego formatu nie można dodać · plik jest większy niż 100 MB · w pliku nie ma czytelnego tekstu · nie udało się odczytać pliku · za dużo plików naraz · wiki robocze jest wyłączone · ten plik nie został tu załączony                                               |
-| cs    | tento formát nelze přidat · soubor je větší než 100 MB · v souboru není čitelný text · soubor se nepodařilo přečíst · příliš mnoho souborů najednou · pracovní wiki je vypnutá · tento soubor tu nebyl přiložen                                                     |
-| nl    | dit formaat kan niet worden toegevoegd · het bestand is groter dan 100 MB · geen leesbare tekst in het bestand · het bestand kon niet worden gelezen · te veel bestanden tegelijk · de werkwiki staat uit · dit bestand is hier niet bijgevoegd                     |
-| th    | ไม่สามารถเพิ่มรูปแบบนี้ได้ · ไฟล์ใหญ่กว่า 100 MB · ไม่มีข้อความที่อ่านได้ในไฟล์ · อ่านไฟล์ไม่ได้ · ไฟล์มากเกินไปในครั้งเดียว · วิกิงานปิดอยู่ · ไฟล์นี้ไม่ได้แนบไว้ที่นี่                                                                                           |
-| id    | format ini tidak dapat ditambahkan · file lebih besar dari 100 MB · tidak ada teks yang dapat dibaca di file · file tidak dapat dibaca · terlalu banyak file sekaligus · wiki kerja dimatikan · file ini tidak dilampirkan di sini                                  |
-| ms    | format ini tidak boleh ditambah · fail lebih besar daripada 100 MB · tiada teks yang boleh dibaca dalam fail · fail tidak dapat dibaca · terlalu banyak fail sekali gus · wiki kerja dimatikan · fail ini tidak dilampirkan di sini                                 |
-| vi    | không thể thêm định dạng này · tệp lớn hơn 100 MB · tệp không có văn bản đọc được · không đọc được tệp · quá nhiều tệp cùng lúc · wiki công việc đang tắt · tệp này không được đính kèm ở đây                                                                       |
-| ar    | لا يمكن إضافة هذا التنسيق · الملف أكبر من 100 ميغابايت · لا يوجد نص قابل للقراءة في الملف · تعذّرت قراءة الملف · ملفات كثيرة جدًا دفعة واحدة · ويكي العمل متوقف · لم يُرفق هذا الملف هنا                                                                            |
-| he    | לא ניתן להוסיף פורמט זה · הקובץ גדול מ־100 MB · אין בקובץ טקסט קריא · לא ניתן לקרוא את הקובץ · יותר מדי קבצים בבת אחת · ויקי העבודה כבוי · הקובץ הזה לא צורף כאן                                                                                                    |
-| hi    | यह फ़ॉर्मैट नहीं जोड़ा जा सकता · फ़ाइल 100 MB से बड़ी है · फ़ाइल में पढ़ने योग्य टेक्स्ट नहीं है · फ़ाइल पढ़ी नहीं जा सकी · एक बार में बहुत अधिक फ़ाइलें · कार्य विकि बंद है · यह फ़ाइल यहाँ संलग्न नहीं की गई थी                                                   |
+- add: "Add to work material — the AI will use it in later work"
+- adding: "Adding to work material…"
+- added: "Added to work material — the AI will use it once it is organized"
+- duplicate: "Already in work material"
+- failed: "Could not add to work material"
+- reasons: "this format cannot be added", "the file is larger than 100 MB", "no readable text in
+  the file", "the file could not be read", "too many files at once", "the work wiki is off",
+  "this file was not attached here"
 
 CSS (`attachment-wiki.css`):
 
