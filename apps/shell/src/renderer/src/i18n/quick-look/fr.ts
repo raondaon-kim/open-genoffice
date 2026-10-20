@@ -24,7 +24,8 @@ export const fr = {
   setQuickLookTitle: 'Aperçu rapide (Barre d’espace)',
   setQuickLookHint:
     'Appuyez sur Espace sur un fichier dans GenOffice pour prévisualiser son contenu sans ouvrir d’onglet.',
-  setExplorerSpace: 'Prévisualiser avec la barre d’espace dans l’Explorateur Windows et sur le Bureau',
+  setExplorerSpace:
+    'Prévisualiser avec la barre d’espace dans l’Explorateur Windows et sur le Bureau',
   setExplorerSpaceDesc:
     'Appuyez sur Espace sur un fichier sélectionné dans l’Explorateur ou sur le Bureau pour afficher l’aperçu.',
   setKeepInTray: 'Garder dans la barre d’état système à la fermeture de la fenêtre',

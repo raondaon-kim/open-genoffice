@@ -24,7 +24,8 @@ export const ja = {
   setQuickLookTitle: 'クイックルック（スペースキー）',
   setQuickLookHint:
     'GenOffice のファイル一覧でファイルを選びスペースキーを押すと、タブを開かずに内容をプレビューします。',
-  setExplorerSpace: 'Windows エクスプローラー・デスクトップでスペースキーによるプレビューを有効にする',
+  setExplorerSpace:
+    'Windows エクスプローラー・デスクトップでスペースキーによるプレビューを有効にする',
   setExplorerSpaceDesc:
     'エクスプローラーやデスクトップでファイルを選択してスペースキーを押すと、クイックルックを表示します。',
   setKeepInTray: 'ウィンドウを閉じてもシステムトレイに常駐してプレビューを維持する',

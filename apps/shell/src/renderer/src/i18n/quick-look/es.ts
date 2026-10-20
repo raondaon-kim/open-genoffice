@@ -24,7 +24,8 @@ export const es = {
   setQuickLookTitle: 'Vista rápida (Barra espaciadora)',
   setQuickLookHint:
     'Pulse Espacio sobre cualquier archivo en las listas de GenOffice para previsualizar su contenido sin abrir una pestaña.',
-  setExplorerSpace: 'Previsualizar archivos con Espacio en el Explorador de Windows y el Escritorio',
+  setExplorerSpace:
+    'Previsualizar archivos con Espacio en el Explorador de Windows y el Escritorio',
   setExplorerSpaceDesc:
     'Pulse Espacio sobre un archivo seleccionado en el Explorador o el Escritorio para abrir la vista rápida.',
   setKeepInTray: 'Mantener en la bandeja del sistema al cerrar la ventana',

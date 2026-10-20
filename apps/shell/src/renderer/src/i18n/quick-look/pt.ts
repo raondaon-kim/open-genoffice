@@ -24,7 +24,8 @@ export const pt = {
   setQuickLookTitle: 'Visualização Rápida (Barra de espaço)',
   setQuickLookHint:
     'Pressione Espaço em qualquer arquivo nas listas do GenOffice para visualizar seu conteúdo sem abrir uma guia.',
-  setExplorerSpace: 'Visualizar arquivos com Espaço no Explorador de Arquivos do Windows e Área de Trabalho',
+  setExplorerSpace:
+    'Visualizar arquivos com Espaço no Explorador de Arquivos do Windows e Área de Trabalho',
   setExplorerSpaceDesc:
     'Pressione Espaço em um arquivo selecionado no Explorador de Arquivos ou na Área de Trabalho para abrir a Visualização Rápida.',
   setKeepInTray: 'Manter em execução na bandeja do sistema ao fechar a janela',
