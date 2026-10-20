@@ -1,4 +1,4 @@
-import { aiPanelWidthAtPointer, AiPanelSideButton } from '@genoffice/ui'
+import { aiPanelWidthAtPointer, AiPanelSideButton, AttachmentWikiButton } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
@@ -1624,6 +1624,17 @@ export function AiPanel({
                               {formatAttachmentSize(a.sizeBytes)}
                             </span>
                           </span>
+                          <AttachmentWikiButton
+                            path={a.path}
+                            name={a.name}
+                            lang={lang}
+                            api={window.workWiki}
+                            onResult={(_r, failure) => {
+                              if (!failure) return
+                              setAttachNotice(failure)
+                              window.setTimeout(() => setAttachNotice(null), 5000)
+                            }}
+                          />
                           <button
                             className="ai-attachment-thumb-remove"
                             onClick={() => removeAttachment(a.path)}
