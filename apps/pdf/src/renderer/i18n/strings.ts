@@ -338,6 +338,8 @@ export const strings = {
     pwShow: '显示密码',
     pwHide: '隐藏密码',
     roEncrypted: '加密文档仅支持查看',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label}（{key}）',
     extractRangeTitle: '抽取页面为 PDF',
     extractRangeHint: '页码或范围，如 1-3,5（共 {total} 页）',
     ok: '确定',
@@ -671,6 +673,8 @@ export const strings = {
     pwShow: 'Show password',
     pwHide: 'Hide password',
     roEncrypted: 'Encrypted document is view-only',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Extract Pages as PDF',
     extractRangeHint: 'Pages or ranges, e.g. 1-3,5 (of {total})',
     ok: 'OK',
@@ -1012,6 +1016,8 @@ export const strings = {
     pwShow: 'Hiện mật khẩu',
     pwHide: 'Ẩn mật khẩu',
     roEncrypted: 'Tài liệu đã mã hóa chỉ có thể xem',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Trích xuất các trang thành PDF',
     extractRangeHint: 'Các trang hoặc phạm vi, ví dụ: 1-3,5 (trên {total})',
     ok: 'OK',
@@ -1352,6 +1358,8 @@ export const strings = {
     pwShow: 'パスワードを表示',
     pwHide: 'パスワードを非表示',
     roEncrypted: '暗号化文書は閲覧のみ',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label}（{key}）',
     extractRangeTitle: 'ページを PDF として抽出',
     extractRangeHint: 'ページ番号、例 1-3,5（全 {total} ページ）',
     ok: 'OK',
@@ -1692,6 +1700,8 @@ export const strings = {
     pwShow: '암호 표시',
     pwHide: '암호 숨기기',
     roEncrypted: '암호화 문서는 보기 전용입니다',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: '페이지를 PDF로 추출',
     extractRangeHint: '페이지 또는 범위, 예 1-3,5 (총 {total}쪽)',
     ok: '확인',
@@ -2034,6 +2044,8 @@ export const strings = {
     pwShow: 'Afficher le mot de passe',
     pwHide: 'Masquer le mot de passe',
     roEncrypted: 'Document chiffré en lecture seule',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Extraire les pages en PDF',
     extractRangeHint: 'Pages ou plages, ex. 1-3,5 (sur {total})',
     ok: 'OK',
@@ -2381,6 +2393,8 @@ export const strings = {
     pwShow: 'Kennwort anzeigen',
     pwHide: 'Kennwort ausblenden',
     roEncrypted: 'Verschlüsseltes Dokument ist schreibgeschützt',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Seiten als PDF extrahieren',
     extractRangeHint: 'Seiten oder Bereiche, z. B. 1-3,5 (von {total})',
     ok: 'OK',
@@ -2726,6 +2740,8 @@ export const strings = {
     pwShow: 'Mostrar contraseña',
     pwHide: 'Ocultar contraseña',
     roEncrypted: 'El documento cifrado es de solo lectura',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Extraer páginas como PDF',
     extractRangeHint: 'Páginas o rangos, p. ej. 1-3,5 (de {total})',
     ok: 'Aceptar',
@@ -3070,6 +3086,8 @@ export const strings = {
     pwShow: 'แสดงรหัสผ่าน',
     pwHide: 'ซ่อนรหัสผ่าน',
     roEncrypted: 'เอกสารที่เข้ารหัสดูได้อย่างเดียว',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'แยกหน้าเป็น PDF',
     extractRangeHint: 'หน้าหรือช่วง เช่น 1-3,5 (จาก {total} หน้า)',
     ok: 'ตกลง',
@@ -3410,6 +3428,8 @@ export const strings = {
     pwShow: 'Tampilkan kata sandi',
     pwHide: 'Sembunyikan kata sandi',
     roEncrypted: 'Dokumen terenkripsi hanya bisa dilihat',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Ekstrak halaman sebagai PDF',
     extractRangeHint: 'Halaman atau rentang, mis. 1-3,5 (dari {total})',
     ok: 'OK',
@@ -3753,6 +3773,8 @@ export const strings = {
     pwShow: 'Показать пароль',
     pwHide: 'Скрыть пароль',
     roEncrypted: 'Зашифрованный документ только для просмотра',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Извлечь страницы в PDF',
     extractRangeHint: 'Страницы или диапазоны, напр. 1-3,5 (из {total})',
     ok: 'ОК',
@@ -4094,6 +4116,8 @@ export const strings = {
     pwShow: 'إظهار كلمة المرور',
     pwHide: 'إخفاء كلمة المرور',
     roEncrypted: 'المستند المشفّر للعرض فقط',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'استخراج الصفحات كملف PDF',
     extractRangeHint: 'صفحات أو نطاقات، مثل 1-3,5 (من {total})',
     ok: 'موافق',
@@ -4435,6 +4459,8 @@ export const strings = {
     pwShow: 'Mostrar senha',
     pwHide: 'Ocultar senha',
     roEncrypted: 'Documento criptografado é somente leitura',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Extrair páginas como PDF',
     extractRangeHint: 'Páginas ou intervalos, ex. 1-3,5 (de {total})',
     ok: 'OK',
@@ -4781,6 +4807,8 @@ export const strings = {
     pwShow: 'Mostra password',
     pwHide: 'Nascondi password',
     roEncrypted: 'Il documento crittografato è di sola lettura',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Estrai pagine come PDF',
     extractRangeHint: 'Pagine o intervalli, es. 1-3,5 (di {total})',
     ok: 'OK',
@@ -5126,6 +5154,8 @@ export const strings = {
     pwShow: 'Pokaż hasło',
     pwHide: 'Ukryj hasło',
     roEncrypted: 'Zaszyfrowany dokument jest tylko do odczytu',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Wyodrębnij strony jako PDF',
     extractRangeHint: 'Strony lub zakresy, np. 1-3,5 (z {total})',
     ok: 'OK',
@@ -5468,6 +5498,8 @@ export const strings = {
     pwShow: 'Zobrazit heslo',
     pwHide: 'Skrýt heslo',
     roEncrypted: 'Šifrovaný dokument je pouze pro čtení',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Extrahovat stránky jako PDF',
     extractRangeHint: 'Stránky nebo rozsahy, např. 1-3,5 (z {total})',
     ok: 'OK',
@@ -5811,6 +5843,8 @@ export const strings = {
     pwShow: 'Wachtwoord tonen',
     pwHide: 'Wachtwoord verbergen',
     roEncrypted: 'Versleuteld document is alleen-lezen',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: "Pagina's extraheren als PDF",
     extractRangeHint: "Pagina's of bereiken, bijv. 1-3,5 (van {total})",
     ok: 'OK',
@@ -6153,6 +6187,8 @@ export const strings = {
     pwShow: 'Tunjukkan kata laluan',
     pwHide: 'Sembunyikan kata laluan',
     roEncrypted: 'Dokumen yang disulitkan hanya boleh dilihat',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'Ekstrak halaman sebagai PDF',
     extractRangeHint: 'Halaman atau julat, cth. 1-3,5 (daripada {total})',
     ok: 'OK',
@@ -6493,6 +6529,8 @@ export const strings = {
     pwShow: 'הצג סיסמה',
     pwHide: 'הסתר סיסמה',
     roEncrypted: 'מסמך מוצפן ניתן לצפייה בלבד',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'חילוץ עמודים כ-PDF',
     extractRangeHint: 'עמודים או טווחים, למשל 1-3,5 (מתוך {total})',
     ok: 'אישור',
@@ -6827,6 +6865,8 @@ export const strings = {
     pwShow: 'पासवर्ड दिखाएँ',
     pwHide: 'पासवर्ड छिपाएँ',
     roEncrypted: 'एन्क्रिप्टेड दस्तावेज़ केवल देखने के लिए है',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label} ({key})',
     extractRangeTitle: 'पृष्ठों को PDF के रूप में निकालें',
     extractRangeHint: 'पृष्ठ या श्रेणियाँ, जैसे 1-3,5 (कुल {total})',
     ok: 'ठीक है',
@@ -7165,6 +7205,8 @@ export const strings = {
     pwShow: '顯示密碼',
     pwHide: '隱藏密碼',
     roEncrypted: '加密文件僅支援檢視',
+    /** a tooltip with its selection-bar key, e.g. "Highlight (H)" */
+    selWithKey: '{label}（{key}）',
     extractRangeTitle: '擷取頁面為 PDF',
     extractRangeHint: '頁碼或範圍，如 1-3,5（共 {total} 頁）',
     ok: '確定',

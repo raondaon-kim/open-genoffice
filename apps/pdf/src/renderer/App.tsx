@@ -201,6 +201,7 @@ import type { LocalTextEdit, LocalTextInsert, TextDraft } from './text-edit-prev
 import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
+import { labelWithKey, selectionBarKey, selectionEnd } from './selection-shortcuts'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -2329,6 +2330,34 @@ export default function App() {
     setSelPopup(null)
     setAskPop({ rect, excerpt: aiSelection?.text ?? sel?.toString() ?? '' })
   }
+
+  /** The bar's memo: an empty note at the end of the selection, its card open (the note tool's draft) */
+  const openSelectionNote = () => {
+    const end = selPopup ? selectionEnd(selPopup.quads) : null
+    if (!end) return
+    setSelPopup(null)
+    setActiveNote(null)
+    setNoteDraft(end)
+  }
+
+  // Selection-bar shortcuts H/U/S/N, only while the bar is up (judged by KeyboardEvent.code)
+  useEffect(() => {
+    if (!selPopup) return
+    const onKey = (e: KeyboardEvent) => {
+      const verdict = selectionBarKey(e, { visible: true, readOnly })
+      if (!verdict) return
+      e.preventDefault()
+      if ('blocked' in verdict) {
+        // the same reason the hidden markup buttons stand for
+        showNotice(t('roEncrypted'))
+        return
+      }
+      if (verdict.action === 'note') openSelectionNote()
+      else applyMarkup(verdict.action)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
 
   /** Markup types the whole current selection already carries — shown as pressed
       buttons in the bar (clicking one removes the markup) */
@@ -8435,10 +8464,14 @@ export default function App() {
                       type="button"
                       className={activeMarkupTypes.has('highlight') ? 'is-active' : undefined}
                       data-tip={
-                        activeMarkupTypes.has('highlight') ? t('removeMarkup') : t('highlight')
+                        activeMarkupTypes.has('highlight')
+                          ? labelWithKey(t, t('removeMarkup'), 'highlight')
+                          : labelWithKey(t, t('highlight'), 'highlight')
                       }
                       aria-label={
-                        activeMarkupTypes.has('highlight') ? t('removeMarkup') : t('highlight')
+                        activeMarkupTypes.has('highlight')
+                          ? labelWithKey(t, t('removeMarkup'), 'highlight')
+                          : labelWithKey(t, t('highlight'), 'highlight')
                       }
                       onClick={() => applyMarkup('highlight')}
                     >
@@ -8451,10 +8484,14 @@ export default function App() {
                       type="button"
                       className={activeMarkupTypes.has('underline') ? 'is-active' : undefined}
                       data-tip={
-                        activeMarkupTypes.has('underline') ? t('removeMarkup') : t('underline')
+                        activeMarkupTypes.has('underline')
+                          ? labelWithKey(t, t('removeMarkup'), 'underline')
+                          : labelWithKey(t, t('underline'), 'underline')
                       }
                       aria-label={
-                        activeMarkupTypes.has('underline') ? t('removeMarkup') : t('underline')
+                        activeMarkupTypes.has('underline')
+                          ? labelWithKey(t, t('removeMarkup'), 'underline')
+                          : labelWithKey(t, t('underline'), 'underline')
                       }
                       onClick={() => applyMarkup('underline')}
                     >
@@ -8464,14 +8501,27 @@ export default function App() {
                       type="button"
                       className={activeMarkupTypes.has('strikeout') ? 'is-active' : undefined}
                       data-tip={
-                        activeMarkupTypes.has('strikeout') ? t('removeMarkup') : t('strikeout')
+                        activeMarkupTypes.has('strikeout')
+                          ? labelWithKey(t, t('removeMarkup'), 'strikeout')
+                          : labelWithKey(t, t('strikeout'), 'strikeout')
                       }
                       aria-label={
-                        activeMarkupTypes.has('strikeout') ? t('removeMarkup') : t('strikeout')
+                        activeMarkupTypes.has('strikeout')
+                          ? labelWithKey(t, t('removeMarkup'), 'strikeout')
+                          : labelWithKey(t, t('strikeout'), 'strikeout')
                       }
                       onClick={() => applyMarkup('strikeout')}
                     >
                       <span className="sel-swatch sel-swatch-st">S</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="pdf-sel-note"
+                      data-tip={labelWithKey(t, t('drawNote'), 'note')}
+                      aria-label={labelWithKey(t, t('drawNote'), 'note')}
+                      onClick={openSelectionNote}
+                    >
+                      <IconNote />
                     </button>
                     <span className="pdf-sel-popup-sep" aria-hidden />
                   </>

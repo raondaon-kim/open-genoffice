@@ -655,6 +655,12 @@ button {
   text-decoration: line-through;
 }
 
+/* Memo on the selection bar: the note tool's icon at swatch scale */
+.pdf-sel-popup button.pdf-sel-note svg {
+  width: 18px;
+  height: 18px;
+}
+
 /* ── Unsaved markup overlay ── */
 
 /* pointer-events: none so the text underneath stays selectable (stacking more
