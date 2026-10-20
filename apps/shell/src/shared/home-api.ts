@@ -548,6 +548,25 @@ export interface MoveResult {
   failed: Array<{ path: string; error: string }>
 }
 
+/** what Home's Quick Look shows for one file */
+export type QuickLookPayload =
+  | {
+      ok: true
+      path: string
+      name: string
+      /** lowercase, without the dot */
+      ext: string
+      sizeBytes: number
+      mtimeMs: number
+      /** data: URL — the image file itself, or the thumbnail the document carries */
+      image?: string
+      /** start of the document's text, whitespace-tidied */
+      text?: string
+      /** the text was cut at the preview limit */
+      truncated: boolean
+    }
+  | { ok: false; path: string; name: string; error: 'missing' | 'too-large' | 'unreadable' }
+
 export const HOME_CHANNELS = {
   recents: 'home:recents',
   searchFiles: 'home:search-files',
