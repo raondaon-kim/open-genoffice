@@ -31,7 +31,7 @@ import { backupBeforeOverwrite, bytesMatchPath } from './save-guard'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
 import { buildStyledDocument } from './styled-document'
-import { registerHwpAttachmentIpc } from './attachments'
+import { registerHwpAttachmentIpc, trackHwpAttachmentView } from './attachments'
 import { StyledDrafts } from './styled-drafts'
 import type { DraftBlock } from './styled-drafts'
 import type { StaticRoot } from './static-server'
@@ -959,6 +959,7 @@ export function createHwpView(openPath?: string | null): WebContentsView {
     },
   })
   grantAndTrack(view.webContents, openPath)
+  trackHwpAttachmentView(view.webContents)
   void rendererLoadUrl()
     .then((url) => {
       if (!view.webContents.isDestroyed()) void view.webContents.loadURL(url)

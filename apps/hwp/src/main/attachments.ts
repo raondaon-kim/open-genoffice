@@ -1,6 +1,7 @@
 import { statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
+import type { WebContents } from 'electron'
 import { parseFileToText } from '@genoffice/file-parse'
 import { HWP_CHANNELS } from '../shared/ipc'
 import type { HwpAttachment, HwpAttachmentRead } from '../shared/ipc'
@@ -33,6 +34,23 @@ const CACHE_LIMIT = 8
 /** files granted per view (webContents id) */
 const granted = new Map<number, Set<string>>()
 const textCache = new Map<string, { stamp: string; text: string }>()
+/** Hangul views (webContents ids): the wiki's add-material only takes their own attachments */
+const hwpViews = new Set<number>()
+
+export function trackHwpAttachmentView(contents: WebContents): void {
+  const id = contents.id
+  hwpViews.add(id)
+  contents.once('destroyed', () => {
+    hwpViews.delete(id)
+    granted.delete(id)
+  })
+}
+
+/** null: not a Hangul view (no gate); else whether `path` was attached in that view */
+export function hwpAttachmentGate(webContentsId: number, path: string): boolean | null {
+  if (!hwpViews.has(webContentsId)) return null
+  return granted.get(webContentsId)?.has(path) === true
+}
 
 export function attachmentFromPath(path: string): HwpAttachment | null {
   const name = basename(path)

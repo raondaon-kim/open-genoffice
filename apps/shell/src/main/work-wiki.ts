@@ -11,7 +11,9 @@ import { WIKI_CHANNELS, WIKI_UNAVAILABLE } from '@genoffice/work-wiki'
 import { WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
+import { hwpAttachmentGate } from '../../../hwp/src/main/attachments'
 import { addMaterial } from './add-material'
+import { handleWikiMaterialRequest } from './wiki-material-request'
 import { CodexBridge } from './codex-bridge'
 import { readAppSettings, writeAppSetting } from './app-settings'
 import {
@@ -415,6 +417,18 @@ export function registerWorkWikiIpc(): void {
     )
     void engine.runDue()
     return r
+  })
+  const wikiOn = (): boolean => readWorkWikiSettings().enabled && engine?.enabled === true
+  ipcMain.handle(WIKI_CHANNELS.status, () => ({ enabled: wikiOn() }))
+  ipcMain.handle(WIKI_CHANNELS.addMaterial, (e, input: unknown) => {
+    const s = readWorkWikiSettings()
+    return handleWikiMaterialRequest(input, {
+      enabled: wikiOn(),
+      rawSources: join(s.folder, 'raw', 'sources'),
+      indexPath: join(stateDirFor(s.folder), 'material-index.json'),
+      extractText,
+      gate: (p) => hwpAttachmentGate(e.sender.id, p),
+    }).catch(() => [])
   })
   ipcMain.handle(HOME_CHANNELS.addWikiMaterial, (e) =>
     addWikiMaterialFromDialog(BrowserWindow.fromWebContents(e.sender)),
