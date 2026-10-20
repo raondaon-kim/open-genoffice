@@ -105,6 +105,12 @@ The fork's material changes on top of upstream:
   for the focused pane, a prompt before a save overwrites what the other copy of the same file
   saved, and the arrangement restored on the next launch. The Hangul editor's part is
   re-implemented for this app's editor; IeumOffice's mind map and help-tab parts are not included.
+- **PDF annotation list, selection shortcuts and per-PDF notes** (ported from IeumOffice,
+  Apache-2.0): H/U/S/N on the selection bar (plus a memo button), an Annotations sidebar view
+  listing saved and unsaved marks with the text under them (filters, Markdown/Word export), and
+  a Markdown note per PDF that list items can be added to without leaving the PDF. The link
+  between a PDF and its note is kept by path in this app; IeumOffice's reading assistant (AI
+  highlights, passage cards, side-by-side translation) is not included.
 
 Features of the August fork that upstream now provides itself (bring-your-own-
 key providers including DeepSeek, GLM, Kimi, MiniMax, OpenRouter and a custom

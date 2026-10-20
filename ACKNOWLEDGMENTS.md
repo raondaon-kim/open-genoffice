@@ -44,3 +44,7 @@ Windows Explorer / desktop keyboard hook and the tray mode that serves it.
 The split view (two documents side by side, with the same-document save guard) also comes from
 IeumOffice, cherry-picked the same way. Its Hangul editor part was re-implemented here after
 IeumOffice's design, because this app's Hangul editor is different code.
+
+The PDF annotation list, the selection-bar shortcuts and the per-PDF Markdown notes are also
+IeumOffice's: its code was brought over file by file (each file names its source commit), without
+the parts that depend on its reading assistant.

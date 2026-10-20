@@ -91,7 +91,7 @@ GNU 툴체인이 없는 PC에서는 `OPEN_GENOFFICE_WIN_SIDECAR_TARGET=x86_64-pc
 - 함께 설치되는 프로그램은 각자의 라이선스를 따르며, 설치 폴더에 라이선스와 소스 위치(`SOURCE.txt`)가 함께 들어갑니다.
   - LLM Wiki: GPL-3.0. 이 포크의 수정본은 [raondaon-kim/llm_wiki](https://github.com/raondaon-kim/llm_wiki)에 있습니다.
   - Codex CLI: Apache-2.0 ([openai/codex](https://github.com/openai/codex)), 수정하지 않았습니다.
-- 홈 화면 빠른 미리보기(스페이스바)와 두 문서 나란히 보기(분할 화면)는 [이음오피스](https://github.com/pblsketch/openoffice)(Apache-2.0, 같은 GenOffice의 포크)에서 가져왔습니다.
+- 홈 화면 빠른 미리보기(스페이스바), 두 문서 나란히 보기(분할 화면), PDF 주석 목록·선택 단축키(H/U/S/N)·PDF별 노트는 [이음오피스](https://github.com/pblsketch/openoffice)(Apache-2.0, 같은 GenOffice의 포크)에서 가져왔습니다.
 - GenOffice와 Genspark 이름과 로고는 Mainfunc, Inc.의 상표이며, 이 포크는 Mainfunc나 Genspark와 관계가 없습니다.
 
 도움을 받은 프로젝트는 [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md)에 정리했습니다.
