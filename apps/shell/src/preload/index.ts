@@ -30,6 +30,7 @@ import type {
   CodexStatusView,
   LlmWikiStatusView,
   WorkWikiSettings,
+  QuickLookPayload,
 } from '../shared/home-api'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { INTEGRATIONS_CHANNELS } from '../shared/integrations-api'
@@ -182,6 +183,9 @@ const homeApi: HomeApi = {
   async toggleStar(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')
     await ipcRenderer.invoke(HOME_CHANNELS.toggleStar, path)
+  },
+  async quickLook(path) {
+    return (await ipcRenderer.invoke(HOME_CHANNELS.quickLook, path)) as QuickLookPayload
   },
   async openPath(path) {
     if (typeof path !== 'string' || !path) throw new Error('Invalid path.')

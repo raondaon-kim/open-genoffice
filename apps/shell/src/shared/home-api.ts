@@ -240,6 +240,8 @@ export interface HomeApi {
   toggleStar(path: string): Promise<void>
   /** open an existing file, routing to the right module by extension */
   openPath(path: string): Promise<void>
+  /** Quick Look (Space on a Home row): thumbnail, start of the text, or the image */
+  quickLook(path: string): Promise<QuickLookPayload>
   /** file picker accepting every supported extension, then routes */
   browse(): Promise<void>
   /** open a docs window at its start screen; `dir` = folder the first save should land in */
@@ -589,6 +591,7 @@ export const HOME_CHANNELS = {
   statPaths: 'home:stat-paths',
   toggleStar: 'home:toggle-star',
   openPath: 'home:open-path',
+  quickLook: 'home:quick-look',
   browse: 'home:browse',
   newDoc: 'home:new-doc',
   newSheet: 'home:new-sheet',
