@@ -33,7 +33,6 @@
     "@genoffice/i18n": "*",
     "@genoffice/pptx-render": "*",
     "@genoffice/ui": "*",
-    "@genoffice/work-wiki": "*",
     "@genoffice/xlsx-gateway": "*",
     "@univerjs/core": "^0.25.1",
     "@univerjs/data-validation": "^0.25.1",
@@ -60,6 +59,7 @@
   },
   "devDependencies": {
     "@genoffice/project-store": "*",
+    "@genoffice/work-wiki": "*",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

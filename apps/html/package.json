@@ -29,6 +29,7 @@
     "@genoffice/i18n": "*",
     "@genoffice/project-store": "*",
     "@genoffice/ui": "*",
+    "@genoffice/work-wiki": "*",
     "@lezer/highlight": "^1.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -44,7 +45,5 @@
     "vitest": "^4.1.11"
   },
   "author": "GenOffice",
-  "dependencies": {
-    "@genoffice/work-wiki": "*"
-  }
+  "dependencies": {}
 }

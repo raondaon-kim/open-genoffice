@@ -1069,6 +1069,8 @@ body {
 /* fixed-width bordered card: type icon tile, name and size, remove badge on the corner */
 .ai-attachment-card {
   position: relative;
+  /* the other editors size the card with border-box (their global rule); this page has none */
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 10px;
