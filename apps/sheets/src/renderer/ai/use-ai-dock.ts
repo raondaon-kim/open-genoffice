@@ -13,10 +13,7 @@ export interface AiDockState {
   onExpand: () => void
 }
 
-export function useAiDock(
-  localOpen: boolean,
-  setLocalOpen: (open: boolean) => void,
-): AiDockState {
+export function useAiDock(localOpen: boolean, setLocalOpen: (open: boolean) => void): AiDockState {
   const { role, requestFocus } = useSplitPaneRole()
   return {
     open: effectiveAiPanelOpen(localOpen, role),

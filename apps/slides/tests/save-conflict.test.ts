@@ -38,8 +38,7 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: (channel: string, fn: (...args: never[]) => unknown) =>
       hoisted.handlers.set(channel, fn),
-    on: (channel: string, fn: (...args: never[]) => unknown) =>
-      hoisted.handlers.set(channel, fn),
+    on: (channel: string, fn: (...args: never[]) => unknown) => hoisted.handlers.set(channel, fn),
     removeHandler: () => {},
   },
   BrowserWindow: class {

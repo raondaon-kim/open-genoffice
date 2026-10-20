@@ -1696,9 +1696,7 @@ export interface SlidesApi {
   /** Save the deck in place. auto marks the AutoSave timer's own pass: while a
    *  sibling split-view copy moved the disk past this one, an auto save defers
    *  silently (`reason: 'external-modified'`) where a user's save asks first. */
-  save: (
-    auto?: boolean,
-  ) => Promise<{
+  save: (auto?: boolean) => Promise<{
     ok: boolean
     path?: string
     error?: string
