@@ -93,6 +93,8 @@ export interface SaveHwpResult {
   error?: string
   /** the user's original, kept as <name>.bak by this save (the first overwrite of a file in a session) */
   backupPath?: string
+  /** the user chose to keep the disk copy a sibling split-pane copy wrote: a quiet cancel, not a failure */
+  canceled?: boolean
 }
 
 export interface CreateDocumentResult {

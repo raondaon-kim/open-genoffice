@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createEditor } from '@rhwp/editor'
 import type { RhwpEditor } from '@rhwp/editor'
-import { aiPanelInitiallyOpen, rememberAiPanelOpen } from '@genoffice/ui'
+import { aiPanelInitiallyOpen, rememberAiPanelOpen, useSplitPaneFocusPing } from '@genoffice/ui'
 import { HwpAiPanel } from './ai/AiPanel'
 import { HwpAiDock } from './ai/AiDock'
 import { SnapshotStack } from './ai/snapshots'
 import type { HwpAiDeps } from './ai/context'
 import type { HwpApi, HwpSaveMode } from '../shared/ipc'
 import { formCopyNames } from '../shared/form-names'
+import { saveFailedStatus } from './save-status'
 
 declare global {
   interface Window {
@@ -152,6 +153,9 @@ export function App() {
     }
   }, [])
 
+  // the shell's split panes: tell it whenever this pane gains focus
+  useSplitPaneFocusPing()
+
   useEffect(() => {
     rememberAiPanelOpen(AI_OPEN_KEY, aiOpen)
   }, [aiOpen])
@@ -209,8 +213,7 @@ export function App() {
               : undefined
           const picked = await window.hwpApi.saveAs(suggested)
           if (!picked.ok || !picked.path) {
-            if (!picked.canceled) setStatus(`Save failed: ${picked.error ?? 'unknown error'}`)
-            else setStatus('')
+            setStatus(saveFailedStatus(picked))
             return false
           }
           path = picked.path
@@ -223,7 +226,8 @@ export function App() {
         const copy = new Uint8Array(bytes)
         const result = await window.hwpApi.save({ path, data: copy.buffer })
         if (!result.ok) {
-          setStatus(`Save failed: ${result.error ?? 'unknown error'}`)
+          // a declined same-document overwrite keeps the edits unsaved without an error
+          setStatus(saveFailedStatus(result))
           return false
         }
         try {

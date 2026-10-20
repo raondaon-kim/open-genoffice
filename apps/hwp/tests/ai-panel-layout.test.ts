@@ -6,7 +6,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('@genoffice/ui', () => ({
+vi.mock('@genoffice/ui', async () => ({
+  // the dock's split-pane role helpers are the real ones (no bridge here: no split)
+  ...(await vi.importActual<object>('../../../packages/ui/src/split-pane-role')),
   AiComposer: () => React.createElement('div', { 'data-testid': 'composer' }),
   Markdown: ({ text }: { text: string }) => React.createElement('div', null, text),
   AiTypingIndicator: ({ label }: { label: string }) =>

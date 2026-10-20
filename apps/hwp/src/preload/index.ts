@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
+import { splitPaneBridge } from '@genoffice/electron-utils/split-pane-bridge'
 import type { AiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import {
   AI_CHANNELS,
@@ -70,3 +71,5 @@ contextBridge.exposeInMainWorld(
   'workWiki',
   createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
 )
+// The shell's split panes: this view's pane role, and its way to ask for focus
+contextBridge.exposeInMainWorld('aiOfficeSplit', splitPaneBridge(ipcRenderer))

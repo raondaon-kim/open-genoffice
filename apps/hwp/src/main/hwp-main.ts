@@ -3,7 +3,13 @@ import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promise
 import { dirname, join, resolve } from 'node:path'
 import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell } from 'electron'
 import type { WebContents } from 'electron'
-import { installNavigationGuard, safeExternalUrl } from '@genoffice/electron-utils'
+import {
+  confirmOverwriteIfConflicted,
+  installNavigationGuard,
+  recordDiskState,
+  safeExternalUrl,
+} from '@genoffice/electron-utils'
+import type { SaveDiskState } from '@genoffice/electron-utils'
 import { createI18n, getUiLang } from '@genoffice/i18n'
 import { HWP_CHANNELS } from '../shared/ipc'
 import type { HwpSaveMode, SaveHwpRequest, SaveHwpResult, StudioUrlResult } from '../shared/ipc'
@@ -407,6 +413,21 @@ const writtenByWc = new Map<number, Set<string>>()
 /** Unsaved-changes flags mirrored from the renderer; drives the save prompt before closing a tab/window */
 const dirtyByWc = new Set<number>()
 const saveWaiters = new Map<number, (ok: boolean) => void>()
+/**
+ * What each view last read or wrote of a path. While the same document is open as a
+ * split-pane copy pair, a save compares this with the disk to tell whether the sibling
+ * copy changed the file (see save-conflict in @genoffice/electron-utils).
+ */
+const diskStatesByWc = new Map<number, Map<string, SaveDiskState>>()
+
+/** Record what the file holds now; an unreadable file leaves no record and no conflict. */
+async function rememberDiskState(wcId: number, path: string): Promise<void> {
+  const state = await recordDiskState(path)
+  if (!state) return
+  const states = diskStatesByWc.get(wcId) ?? new Map<string, SaveDiskState>()
+  states.set(path, state)
+  diskStatesByWc.set(wcId, states)
+}
 
 /** Mark the view as a fresh blank document instead of a file-backed one. */
 export function markHwpNewBlank(webContentsId: number): void {
@@ -559,6 +580,7 @@ function registerHwpIpc(): void {
       throw new Error('hwp: path not granted to this view')
     }
     const buf = await readFile(path)
+    await rememberDiskState(e.sender.id, path)
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   })
 
@@ -583,6 +605,16 @@ function registerHwpIpc(): void {
         }
         bytes = legacy.bytes
       }
+      // split-pane copy pair: when the sibling copy changed the file after this copy read
+      // or wrote it, ask before overwriting; a file open nowhere else saves as before.
+      // This runs before the backup and the write, so neither happens when declined.
+      const verdict = await confirmOverwriteIfConflicted({
+        parent: BrowserWindow.fromWebContents(e.sender) ?? BrowserWindow.getFocusedWindow(),
+        path,
+        recorded: diskStatesByWc.get(e.sender.id)?.get(path),
+        lang: getUiLang(),
+      })
+      if (verdict === 'cancel') return { ok: false, canceled: true }
       // the user's original is kept as <name>.bak before the app's first overwrite of it
       const written = writtenByWc.get(e.sender.id) ?? new Set<string>()
       writtenByWc.set(e.sender.id, written)
@@ -591,6 +623,7 @@ function registerHwpIpc(): void {
       const tmp = `${path}.gensave-${process.pid}.tmp`
       await writeFile(tmp, bytes)
       await rename(tmp, path)
+      await rememberDiskState(e.sender.id, path)
       // first save of an untitled doc / title + recent-file updates
       runtime.onSaved?.(e.sender.id, path)
       return backupPath ? { ok: true, backupPath } : { ok: true }
@@ -881,6 +914,7 @@ function grantAndTrack(wc: WebContents, openPath?: string | null): void {
     intents.forget(wcId)
     allowedByWc.delete(wcId)
     writtenByWc.delete(wcId)
+    diskStatesByWc.delete(wcId)
     dirtyByWc.delete(wcId)
     saveWaiters.get(wcId)?.(false)
     saveWaiters.delete(wcId)
