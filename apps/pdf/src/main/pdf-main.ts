@@ -12,7 +12,15 @@ import {
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { userInfo } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, WebContentsView, app, dialog, ipcMain, shell, webContents } from 'electron'
+import {
+  createNoteLinkService,
+  noteDialogText,
+  parseNoteInsertRequest,
+  parseNoteOpenRequest,
+} from './note-link'
+import { createNoteLinkStore, type NoteLinkStore } from './note-links'
+import type { PdfNoteResult } from '../shared/ipc'
 import type { WebContents } from 'electron'
 import {
   buildPrintableHtml,
@@ -523,6 +531,10 @@ interface RuntimePaths {
   openGeneratedPath?: (path: string) => boolean
   /** Host-owned cross-app document creator (the shell routes DOCX into Docs). */
   createDocument?: (request: CreateDocumentRequest) => Promise<CreateDocumentResult>
+  /** The shell opens (or brings forward) a PDF's note in a Markdown tab */
+  openNote?: (path: string) => boolean | Promise<boolean>
+  /** The shell puts text at the end of the note's tab without activating it; the file is not written */
+  insertIntoNote?: (path: string, text: string) => boolean | Promise<boolean>
 }
 
 let runtime: RuntimePaths = { preloadPath: '' }
@@ -692,6 +704,54 @@ export function clearPdfDirty(webContentsId: number): void {
 
 /** Paths of shell-created blank PDFs still carrying their untitled name; only these may auto-rename */
 const untitledPdfPaths = new Set<string>()
+
+// ── The note of each PDF: the view's own document, a dialog-picked Markdown note ──
+let noteStore: NoteLinkStore | null = null
+const noteLinkStore = (): NoteLinkStore =>
+  (noteStore ??= createNoteLinkStore(join(app.getPath('userData'), 'pdf-note-links.json')))
+
+const noteLinks = createNoteLinkService({
+  store: noteLinkStore,
+  isUntitled: (path) => untitledPdfPaths.has(path),
+  pickNotePath: async (owner, defaultPath) => {
+    const sender = webContents.fromId(owner)
+    const parent =
+      (sender && BrowserWindow.fromWebContents(sender)) ?? BrowserWindow.getFocusedWindow()
+    const lang = getUiLang()
+    const options = {
+      title: noteDialogText(lang, 'dialogTitle'),
+      defaultPath,
+      filters: [{ name: noteDialogText(lang, 'filterMarkdown'), extensions: ['md'] }],
+      properties: ['createDirectory' as const],
+    }
+    const picked = parent
+      ? await dialog.showSaveDialog(parent, options)
+      : await dialog.showSaveDialog(options)
+    return picked.canceled || !picked.filePath ? null : picked.filePath
+  },
+  noteWord: () => noteDialogText(getUiLang(), 'noteWord'),
+  host: () => ({ openNote: runtime.openNote, insertIntoNote: runtime.insertIntoNote }),
+})
+
+/** shell: a copy of `from` (Save As, a redacted or signed copy) shares its note */
+export async function copyPdfNoteLink(from: string, to: string): Promise<void> {
+  if (!/\.pdf$/i.test(to)) return
+  try {
+    await noteLinkStore().copy(from, to)
+  } catch (err) {
+    console.warn('[pdf] note link copy failed:', err)
+  }
+}
+
+/** shell: an in-app move or rename; a PDF keeps its note, a moved note keeps its PDFs */
+export async function movePdfNoteLink(oldPath: string, newPath: string): Promise<void> {
+  try {
+    if (/\.pdf$/i.test(newPath)) await noteLinkStore().movePdf(oldPath, newPath)
+    else if (/\.md$/i.test(newPath)) await noteLinkStore().moveNote(oldPath, newPath)
+  } catch (err) {
+    console.warn('[pdf] note link move failed:', err)
+  }
+}
 /** Shell hook fired after an auto-rename so the tab title / recents / project mapping follow the file */
 let pdfRenamedHook: ((wc: WebContents, oldPath: string, newPath: string) => void) | null = null
 
@@ -1025,6 +1085,23 @@ function registerPdfIpc(): void {
     // The reader's copy: this view's save guard compares against this state
     await rememberDiskState(e.sender.id, path)
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  })
+
+  // the note of each PDF: only the view's own document; the request carries text parts,
+  // never a path (a note path comes from the main process's save dialog or the link store)
+  ipcMain.handle(PDF_CHANNELS.noteOpen, (e, request: unknown): Promise<PdfNoteResult> => {
+    if (!allowedByWc.has(e.sender.id)) return Promise.resolve({ ok: false, reason: 'failed' })
+    return noteLinks.open(
+      e.sender.id,
+      openPathByWc.get(e.sender.id) ?? null,
+      parseNoteOpenRequest(request),
+    )
+  })
+  ipcMain.handle(PDF_CHANNELS.noteInsert, (e, request: unknown): Promise<PdfNoteResult> => {
+    if (!allowedByWc.has(e.sender.id)) return Promise.resolve({ ok: false, reason: 'failed' })
+    const parsed = parseNoteInsertRequest(request)
+    if (!parsed) return Promise.resolve({ ok: false, reason: 'failed', message: 'invalid request' })
+    return noteLinks.insert(e.sender.id, openPathByWc.get(e.sender.id) ?? null, parsed)
   })
 
   ipcMain.handle(

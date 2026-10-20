@@ -30,6 +30,9 @@ export const PDF_CHANNELS = {
   exportImages: 'pdf:export-images',
   convertOffice: 'pdf:convert-office',
   createDocument: 'pdf:create-document',
+  // the note of each PDF: the view's own PDF, no path from the renderer
+  noteOpen: 'pdf:note-open',
+  noteInsert: 'pdf:note-insert',
   generateImage: 'pdf:generate-image',
   listSignatures: 'pdf:list-signatures',
   addSignature: 'pdf:add-signature',
@@ -703,6 +706,39 @@ export interface ImageSearchResponse {
 }
 
 /** API exposed by preload to the renderer (window.pdfApi) */
+/** "Open note": the title heads a note made now */
+export interface PdfNoteOpenRequest {
+  /** the PDF's title ('' or absent: the file name) */
+  title?: string
+}
+
+/**
+ * "Add to note": text parts only. The main process knows the view's PDF and its linked
+ * note, and builds the inserted Markdown (quote, page link, body).
+ */
+export interface PdfNoteInsertRequest {
+  kind: 'quote'
+  /** the marked text ('' for an item without text) */
+  excerpt: string
+  /** 1-based page of the PDF file on disk */
+  page: number
+  /** a memo's text; omitted when empty */
+  body?: string
+  title?: string
+}
+
+/**
+ * unsaved: the PDF has no saved path yet; unavailable: no shell to open the note in
+ * (standalone); cancelled: the save dialog was closed; busy: this view's dialog is open
+ */
+export type PdfNoteResult =
+  | { ok: true }
+  | {
+      ok: false
+      reason: 'unsaved' | 'unavailable' | 'cancelled' | 'busy' | 'failed'
+      message?: string
+    }
+
 export interface PdfApi {
   /** Take the pdf path pending for this view (queued at tab creation); null if none */
   consumePending(): Promise<string | null>
@@ -760,6 +796,10 @@ export interface PdfApi {
   convertOffice(format: PdfConvertFormat): Promise<void>
   /** AI create_document: build a new standalone file in the default folder and open it in a new tab */
   createDocument(request: CreateDocumentRequest): Promise<CreateDocumentResult>
+  /** open (or first make) the Markdown note linked to this view's PDF in a Markdown tab */
+  noteOpen(request?: PdfNoteOpenRequest): Promise<PdfNoteResult>
+  /** put text at the end of that note's tab (never written to the file directly) */
+  noteInsert(request: PdfNoteInsertRequest): Promise<PdfNoteResult>
   /** Web image search for AI tools (app-wide ai:image-search handler) */
   imageSearch(query: string, maxResults?: number): Promise<ImageSearchResponse>
   /** Download an image URL in the main process (SSRF-guarded, avoids CORS); null on failure */

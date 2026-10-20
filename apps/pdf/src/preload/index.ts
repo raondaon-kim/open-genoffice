@@ -5,7 +5,7 @@ import type { AiStreamChunk } from '@genoffice/ai-provider'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import { splitPaneBridge } from '@genoffice/electron-utils/split-pane-bridge'
 import { AI_CHANNELS, PDF_CHANNELS } from '../shared/ipc'
-import type { PdfApi, UiTheme } from '../shared/ipc'
+import type { PdfApi, PdfNoteResult, UiTheme } from '../shared/ipc'
 
 const api: PdfApi = {
   consumePending: () => ipcRenderer.invoke(PDF_CHANNELS.consumePending),
@@ -36,6 +36,15 @@ const api: PdfApi = {
   exportImages: (request) => ipcRenderer.invoke(PDF_CHANNELS.exportImages, request),
   convertOffice: (format) => ipcRenderer.invoke(PDF_CHANNELS.convertOffice, format),
   createDocument: (request) => ipcRenderer.invoke(PDF_CHANNELS.createDocument, request),
+  // no path crosses: the main process uses the view's own PDF and its linked note
+  noteOpen: (request) =>
+    (
+      ipcRenderer.invoke(PDF_CHANNELS.noteOpen, { title: request?.title }) as Promise<PdfNoteResult>
+    ).catch((): PdfNoteResult => ({ ok: false, reason: 'unavailable' })),
+  noteInsert: (request) =>
+    (ipcRenderer.invoke(PDF_CHANNELS.noteInsert, request) as Promise<PdfNoteResult>).catch(
+      (): PdfNoteResult => ({ ok: false, reason: 'unavailable' }),
+    ),
   imageSearch: (query, maxResults) =>
     ipcRenderer.invoke(AI_CHANNELS.imageSearch, query, maxResults),
   fetchImage: (url) => ipcRenderer.invoke(AI_CHANNELS.fetchImage, url),
