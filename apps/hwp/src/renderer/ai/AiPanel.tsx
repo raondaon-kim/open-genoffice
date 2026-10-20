@@ -15,6 +15,7 @@ import attachIcon from '../assets/attach-icon.png'
 import sendEnterOn from '../assets/send-enter-on.png'
 import sendEnterOff from '../assets/send-enter-off.png'
 import sendStop from '../assets/send-stop.png'
+import { AttachmentCard } from './AttachmentCard'
 import { GensparkMark } from './GensparkMark'
 import { ToolSteps } from './ToolSteps'
 import { createHwpAssistantSkill } from './assistant-skill'
@@ -672,21 +673,19 @@ export function HwpAiPanel({
         <AiComposer
           header={
             attachments.length > 0 ? (
-              <div className="hwp-ai__attachments">
+              <div className="ai-attachments">
                 {attachments.map((a) => (
-                  <span key={a.path} className="hwp-ai__attachment" title={a.path}>
-                    {a.name}
-                    <button
-                      type="button"
-                      aria-label={ko ? '첨부 제거' : 'Remove attachment'}
-                      disabled={busy}
-                      onClick={() =>
-                        setAttachments((prev) => prev.filter((x) => x.path !== a.path))
-                      }
-                    >
-                      ×
-                    </button>
-                  </span>
+                  <AttachmentCard
+                    key={a.path}
+                    attachment={a}
+                    lang={lang}
+                    removeLabel={ko ? '첨부 제거' : 'Remove attachment'}
+                    disabled={busy}
+                    onRemove={(path) =>
+                      setAttachments((prev) => prev.filter((x) => x.path !== path))
+                    }
+                    onFailure={setModelNotice}
+                  />
                 ))}
               </div>
             ) : undefined

@@ -14,6 +14,7 @@ vi.mock('@genoffice/ui', () => ({
   AiPanelSideButton: () =>
     React.createElement('button', { className: 'ai-header-btn ai-panel-side-button' }),
   aiPanelWidthAtPointer: (x: number) => x,
+  AttachmentWikiButton: () => null,
 }))
 
 import { HwpAiPanel } from '../src/renderer/ai/AiPanel'

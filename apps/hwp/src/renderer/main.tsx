@@ -1,10 +1,15 @@
 import { createRoot } from 'react-dom/client'
 import '@genoffice/ui/tokens.css'
+import '@genoffice/ui/screentip.css'
 import '@genoffice/ui/ai-panel-prefs.css'
-import { applyAiPanelPrefs } from '@genoffice/ui'
+import '@genoffice/ui/attachment-wiki.css'
+import { applyAiPanelPrefs, installScreenTips } from '@genoffice/ui'
 import { App } from './App'
 import './styles.css'
 import type { UiTheme } from '../shared/ipc'
+
+// hover tips for the panel's icon buttons (data-tip), like the other editors
+installScreenTips()
 
 /** follow the suite's light / dark / system theme (the shell broadcasts changes to every tab) */
 function applyTheme(theme: UiTheme): void {

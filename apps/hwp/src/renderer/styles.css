@@ -4,6 +4,9 @@
   --hwp-shadow-soft: rgb(0 0 0 / 9%);
   --hwp-shimmer-base: #666666;
   --hwp-shimmer-hi: #d9d9d9;
+  --hwp-chip-remove-bg: #000;
+  --hwp-chip-remove-hover: #4b4e51;
+  --hwp-chip-remove-ink: #fff;
 }
 
 [data-theme='dark'] {
@@ -11,6 +14,9 @@
   --hwp-shadow-soft: rgb(0 0 0 / 45%);
   --hwp-shimmer-base: #8a8a8a;
   --hwp-shimmer-hi: #d0d0d0;
+  --hwp-chip-remove-bg: #000;
+  --hwp-chip-remove-hover: #4b4e51;
+  --hwp-chip-remove-ink: #fff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -19,6 +25,9 @@
     --hwp-shadow-soft: rgb(0 0 0 / 45%);
     --hwp-shimmer-base: #8a8a8a;
     --hwp-shimmer-hi: #d0d0d0;
+    --hwp-chip-remove-bg: #000;
+    --hwp-chip-remove-hover: #4b4e51;
+    --hwp-chip-remove-ink: #fff;
   }
 }
 
@@ -1048,40 +1057,96 @@ body {
   cursor: default;
 }
 
-/* ---- AI attachments (RFP, reference documents) ---- */
-.hwp-ai__attachments {
+/* ---- AI attachments (RFP, reference documents): the other editors' card ---- */
+.ai-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 10px 0;
+  gap: 8px;
+  /* room above for the remove badge that sits on each card's corner */
+  padding: 13px 14px 0;
 }
 
-.hwp-ai__attachment {
-  display: inline-flex;
+/* fixed-width bordered card: type icon tile, name and size, remove badge on the corner */
+.ai-attachment-card {
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 2px 4px 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-subtle);
-  color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
+  gap: 10px;
+  width: 190px;
+  height: 56px;
+  padding: 0 14px 0 8px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 12px;
+  background: var(--bg-content);
+}
+
+.ai-attachment-card-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ai-attachment-card-icon img {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+.ai-attachment-card-meta {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ai-attachment-card-name {
   overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.hwp-ai__attachment button {
+.ai-attachment-card-size {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ai-attachment-thumb-remove {
+  position: absolute;
+  top: -10px;
+  right: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
   border: none;
-  background: transparent;
-  color: var(--text-secondary);
+  border-radius: 50%;
+  background: var(--hwp-chip-remove-bg);
+  color: var(--hwp-chip-remove-ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
-  border-radius: 6px;
 }
 
-.hwp-ai__attachment button:hover:not(:disabled) {
-  background: var(--hover);
+.ai-attachment-thumb-remove:hover:not(:disabled) {
+  background: var(--hwp-chip-remove-hover);
+}
+
+.ai-attachment-thumb-remove:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 /* attach button: the other editors' paperclip art */
