@@ -1,3 +1,5 @@
+import { annotPanelStrings } from './strings-annot-panel'
+
 const fillFormStrings = {
   ribbonTabFillForm: 'Fill Form',
   formPreviousField: 'Previous field',
@@ -199,6 +201,7 @@ const fillFormStringsFor = (lang: string) => ({
 export const strings = {
   zh: {
     ...fillFormStringsFor('zh'),
+    ...annotPanelStrings.zh,
     ribbonTabHome: '开始',
     ribbonTabAnnotate: '注释',
     ribbonTabEdit: '编辑',
@@ -532,6 +535,7 @@ export const strings = {
   },
   en: {
     ...fillFormStringsFor('en'),
+    ...annotPanelStrings.en,
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annotate',
     ribbonTabEdit: 'Edit',
@@ -874,6 +878,7 @@ export const strings = {
   },
   vi: {
     ...fillFormStringsFor('vi'),
+    ...annotPanelStrings.vi,
     ribbonTabHome: 'Trang chủ',
     ribbonTabAnnotate: 'Chú thích',
     ribbonTabEdit: 'Chỉnh sửa',
@@ -1219,6 +1224,7 @@ export const strings = {
   },
   ja: {
     ...fillFormStringsFor('ja'),
+    ...annotPanelStrings.ja,
     ribbonTabHome: 'ホーム',
     ribbonTabAnnotate: '注釈',
     ribbonTabEdit: '編集',
@@ -1560,6 +1566,7 @@ export const strings = {
   },
   ko: {
     ...fillFormStringsFor('ko'),
+    ...annotPanelStrings.ko,
     ribbonTabHome: '홈',
     ribbonTabAnnotate: '주석',
     ribbonTabEdit: '편집',
@@ -1900,6 +1907,7 @@ export const strings = {
   },
   fr: {
     ...fillFormStringsFor('fr'),
+    ...annotPanelStrings.fr,
     ribbonTabHome: 'Accueil',
     ribbonTabAnnotate: 'Annoter',
     ribbonTabEdit: 'Édition',
@@ -2250,6 +2258,7 @@ export const strings = {
   },
   de: {
     ...fillFormStringsFor('de'),
+    ...annotPanelStrings.de,
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Anmerken',
     ribbonTabEdit: 'Bearbeiten',
@@ -2598,6 +2607,7 @@ export const strings = {
   },
   es: {
     ...fillFormStringsFor('es'),
+    ...annotPanelStrings.es,
     ribbonTabHome: 'Inicio',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -2946,6 +2956,7 @@ export const strings = {
   },
   th: {
     ...fillFormStringsFor('th'),
+    ...annotPanelStrings.th,
     ribbonTabHome: 'หน้าแรก',
     ribbonTabAnnotate: 'คำอธิบายประกอบ',
     ribbonTabEdit: 'แก้ไข',
@@ -3286,6 +3297,7 @@ export const strings = {
   },
   id: {
     ...fillFormStringsFor('id'),
+    ...annotPanelStrings.id,
     ribbonTabHome: 'Beranda',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -3631,6 +3643,7 @@ export const strings = {
   },
   ru: {
     ...fillFormStringsFor('ru'),
+    ...annotPanelStrings.ru,
     ribbonTabHome: 'Главная',
     ribbonTabAnnotate: 'Аннотирование',
     ribbonTabEdit: 'Правка',
@@ -3977,6 +3990,7 @@ export const strings = {
   },
   ar: {
     ...fillFormStringsFor('ar'),
+    ...annotPanelStrings.ar,
     ribbonTabHome: 'الشريط الرئيسي',
     ribbonTabAnnotate: 'تعليق توضيحي',
     ribbonTabEdit: 'تحرير',
@@ -4316,6 +4330,7 @@ export const strings = {
   },
   pt: {
     ...fillFormStringsFor('pt'),
+    ...annotPanelStrings.pt,
     ribbonTabHome: 'Página Inicial',
     ribbonTabAnnotate: 'Anotar',
     ribbonTabEdit: 'Editar',
@@ -4663,6 +4678,7 @@ export const strings = {
   },
   it: {
     ...fillFormStringsFor('it'),
+    ...annotPanelStrings.it,
     ribbonTabHome: 'Home',
     ribbonTabAnnotate: 'Annota',
     ribbonTabEdit: 'Modifica',
@@ -5013,6 +5029,7 @@ export const strings = {
   },
   pl: {
     ...fillFormStringsFor('pl'),
+    ...annotPanelStrings.pl,
     ribbonTabHome: 'Narzędzia główne',
     ribbonTabAnnotate: 'Adnotacje',
     ribbonTabEdit: 'Edycja',
@@ -5358,6 +5375,7 @@ export const strings = {
   },
   cs: {
     ...fillFormStringsFor('cs'),
+    ...annotPanelStrings.cs,
     ribbonTabHome: 'Domů',
     ribbonTabAnnotate: 'Anotace',
     ribbonTabEdit: 'Úpravy',
@@ -5701,6 +5719,7 @@ export const strings = {
   },
   nl: {
     ...fillFormStringsFor('nl'),
+    ...annotPanelStrings.nl,
     ribbonTabHome: 'Start',
     ribbonTabAnnotate: 'Annoteren',
     ribbonTabEdit: 'Bewerken',
@@ -6046,6 +6065,7 @@ export const strings = {
   },
   ms: {
     ...fillFormStringsFor('ms'),
+    ...annotPanelStrings.ms,
     ribbonTabHome: 'Laman Utama',
     ribbonTabAnnotate: 'Anotasi',
     ribbonTabEdit: 'Edit',
@@ -6390,6 +6410,7 @@ export const strings = {
   },
   he: {
     ...fillFormStringsFor('he'),
+    ...annotPanelStrings.he,
     ribbonTabHome: 'בית',
     ribbonTabAnnotate: 'הערות',
     ribbonTabEdit: 'עריכה',
@@ -6725,6 +6746,7 @@ export const strings = {
   },
   hi: {
     ...fillFormStringsFor('hi'),
+    ...annotPanelStrings.hi,
     ribbonTabHome: 'होम',
     ribbonTabAnnotate: 'एनोटेट',
     ribbonTabEdit: 'संपादन',
@@ -7066,6 +7088,7 @@ export const strings = {
   },
   'zh-TW': {
     ...fillFormStringsFor('zh-TW'),
+    ...annotPanelStrings['zh-TW'],
     ribbonTabHome: '常用',
     ribbonTabAnnotate: '註解',
     ribbonTabEdit: '編輯',
