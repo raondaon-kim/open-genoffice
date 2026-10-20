@@ -31,6 +31,8 @@ interface LaunchOptions {
   videoDir: string
   /** absolute document path passed as argv, opened in an editor tab on launch */
   openFile?: string
+  /** more absolute document paths passed as argv after `openFile`, each opened in a tab */
+  openFiles?: string[]
   /** extra environment variables for the launched app */
   env?: Record<string, string>
 }
@@ -69,6 +71,7 @@ export async function launchShell(options: LaunchOptions): Promise<LaunchedApp> 
   if (process.platform === 'linux') args.push('--no-sandbox', '--disable-gpu')
   args.push(SHELL_DIR)
   if (options.openFile) args.push(options.openFile)
+  if (options.openFiles) args.push(...options.openFiles)
   const app = await electron.launch({
     executablePath,
     args,
