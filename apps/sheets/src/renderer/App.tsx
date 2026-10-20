@@ -4702,6 +4702,10 @@ export function App({
         onAddAttachmentPaths={(paths) => void handleAddAttachmentPaths(paths)}
         onAddPastedImage={(data, ext) => void handleAddPastedImage(data, ext)}
         onRemoveAttachment={handleRemoveAttachment}
+        onAttachmentNotice={(message) => {
+          setAttachNotice(message)
+          window.setTimeout(() => setAttachNotice(null), 5000)
+        }}
         onPromptChange={setPrompt}
         onSend={handleSend}
         onStop={handleStopAgent}

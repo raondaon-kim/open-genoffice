@@ -1,4 +1,4 @@
-import { aiPanelWidthAtPointer, AiPanelSideButton } from '@genoffice/ui'
+import { aiPanelWidthAtPointer, AiPanelSideButton, AttachmentWikiButton } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills } from '@genoffice/agent-core'
@@ -108,11 +108,14 @@ function AttachmentList({
   previews,
   onRemove,
   removeLabel,
+  wikiButton,
 }: {
   atts: AttachmentMeta[]
   previews: Record<string, string>
   onRemove?: (path: string) => void
   removeLabel?: string
+  /** composer chips only: the "add to work material" button */
+  wikiButton?: (a: AttachmentMeta) => ReactNode
 }) {
   const remove = (path: string) =>
     onRemove && (
@@ -158,6 +161,7 @@ function AttachmentList({
               <span className="ai-attachment-card-name">{a.name}</span>
               <span className="ai-attachment-card-size">{formatAttachmentSize(a.sizeBytes)}</span>
             </span>
+            {wikiButton?.(a)}
             {remove(a.path)}
           </span>
         ),
@@ -1491,6 +1495,17 @@ export function AiPanel({
               previews={attachmentPreviews}
               onRemove={removeAttachment}
               removeLabel={t('aiRemoveAttachmentTitle')}
+              wikiButton={(a) => (
+                <AttachmentWikiButton
+                  path={a.path}
+                  name={a.name}
+                  lang={lang}
+                  api={window.workWiki}
+                  onResult={(_r, failure) => {
+                    if (failure) showAttachNotice([failure])
+                  }}
+                />
+              )}
             />
           </div>
         )}

@@ -1,4 +1,4 @@
-import { aiPanelWidthAtPointer, AiPanelSideButton } from '@genoffice/ui'
+import { aiPanelWidthAtPointer, AiPanelSideButton, AttachmentWikiButton } from '@genoffice/ui'
 import React, { useEffect, useRef, useState } from 'react'
 import { AiComposer, AiScopeQuote, AiTypingIndicator, type AiScopeQuoteData } from '@genoffice/ui'
 import { GensparkMark } from '../ribbon-icons'
@@ -220,6 +220,7 @@ export function AiChatPanel({
   onAddAttachmentPaths,
   onAddPastedImage,
   onRemoveAttachment,
+  onAttachmentNotice,
   prompt,
   preview,
   aiBusy,
@@ -251,6 +252,8 @@ export function AiChatPanel({
   /// extension
   readonly onAddPastedImage: (data: ArrayBuffer, ext: string) => void
   readonly onRemoveAttachment: (path: string) => void
+  /** a failure line for the attachment notice (e.g. the work wiki button) */
+  readonly onAttachmentNotice?: ((message: string) => void) | undefined
   readonly prompt: string
   readonly preview: ChangePlan | null
   readonly aiBusy: boolean
@@ -781,6 +784,15 @@ export function AiChatPanel({
                             {formatAttachmentSize(attachment.sizeBytes)}
                           </span>
                         </span>
+                        <AttachmentWikiButton
+                          path={attachment.path}
+                          name={attachment.name}
+                          lang={lang}
+                          api={window.workWiki}
+                          onResult={(_r, failure) => {
+                            if (failure) onAttachmentNotice?.(failure)
+                          }}
+                        />
                         <button
                           className="ai-attachment-thumb-remove"
                           onClick={() => onRemoveAttachment(attachment.path)}

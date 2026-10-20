@@ -1,5 +1,6 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 
 import type {
   AiChatResponse,
@@ -701,6 +702,12 @@ const projectApi: ProjectApi = {
   rebindChat: (args) => ipcRenderer.invoke('project:rebindChat', args),
 }
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// the work wiki: the attachment card's "add to work material" button (wiki:status / wiki:add-material)
+contextBridge.exposeInMainWorld(
+  'workWiki',
+  createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
+)
 
 // Off by default. e2e drivers launch the BUILT app with GENOFFICE_DEBUG_HOOKS=1
 // so the renderer exposes window.__genofficeDebug (see App.tsx) — the dev-only

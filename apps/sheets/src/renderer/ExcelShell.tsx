@@ -195,6 +195,7 @@ interface ExcelShellProps {
   readonly onAddAttachmentPaths: (paths: readonly string[]) => void
   readonly onAddPastedImage: (data: ArrayBuffer, ext: string) => void
   readonly onRemoveAttachment: (path: string) => void
+  readonly onAttachmentNotice?: (message: string) => void
   readonly onPromptChange: (prompt: string) => void
   /** Send the composer text, or the given instruction when provided (Retry also
    *  resends that message's original attachments and passes the failed bubble's
@@ -348,6 +349,7 @@ export function ExcelShell({
   onAddAttachmentPaths,
   onAddPastedImage,
   onRemoveAttachment,
+  onAttachmentNotice,
   onGetSortColumns,
   onGetSheetProtection,
   onGetWorkbookProtection,
@@ -721,6 +723,7 @@ export function ExcelShell({
           onAddAttachmentPaths={onAddAttachmentPaths}
           onAddPastedImage={onAddPastedImage}
           onRemoveAttachment={onRemoveAttachment}
+          onAttachmentNotice={onAttachmentNotice}
           prompt={prompt}
           preview={preview}
           aiBusy={aiBusy}

@@ -1,5 +1,6 @@
 import type { AiPanelPrefs } from '@genoffice/ui'
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import { createWorkWikiPreloadApi } from '@genoffice/work-wiki'
 import type { Lang } from '@genoffice/i18n'
 import type { AiStreamChunk } from '@genoffice/ai-provider'
 import type { ProjectApi } from '@genoffice/project-store'
@@ -123,6 +124,12 @@ const projectApi: Pick<ProjectApi, 'resolveChat' | 'appendChat' | 'loadChat' | '
 
 contextBridge.exposeInMainWorld('htmlApi', api)
 contextBridge.exposeInMainWorld('projectApi', projectApi)
+
+// the work wiki: the attachment card's "add to work material" button (wiki:status / wiki:add-material)
+contextBridge.exposeInMainWorld(
+  'workWiki',
+  createWorkWikiPreloadApi((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
+)
 
 // open documents dragged from the OS onto this tab as a new shell tab
 installDropOpenBridge()
