@@ -1,4 +1,5 @@
 export * from './types'
+export * from './material'
 export { parsePage, sections, serializePage, slugify, todayIso } from './page'
 export type { Section } from './page'
 export { fenceWikiText, WIKI_FENCE_RULE } from './fence'

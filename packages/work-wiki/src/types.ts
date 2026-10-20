@@ -1,3 +1,5 @@
+import type { WikiMaterialApi } from './material'
+
 export type WikiPageType = 'work' | 'method' | 'client'
 
 /** folder under wiki/ for each page type */
@@ -40,7 +42,7 @@ export interface WikiHit {
 }
 
 /** what an assistant can do with the work wiki (window.workWiki) */
-export interface WorkWikiApi {
+export interface WorkWikiApi extends WikiMaterialApi {
   catalog(): Promise<string>
   search(query: string): Promise<WikiHit[]>
   read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
@@ -52,6 +54,8 @@ export const WIKI_CHANNELS = {
   search: 'wiki:search',
   read: 'wiki:read',
   remember: 'wiki:remember',
+  status: 'wiki:status',
+  addMaterial: 'wiki:add-material',
 } as const
 
 export const WIKI_UNAVAILABLE = '업무 위키를 사용할 수 없습니다'

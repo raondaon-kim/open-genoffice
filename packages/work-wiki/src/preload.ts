@@ -11,5 +11,8 @@ export function createWorkWikiPreloadApi(
     read: (slug) => invoke(WIKI_CHANNELS.read, slug) as ReturnType<WorkWikiApi['read']>,
     remember: (points, work) =>
       invoke(WIKI_CHANNELS.remember, points, work) as ReturnType<WorkWikiApi['remember']>,
+    status: () => invoke(WIKI_CHANNELS.status) as ReturnType<WorkWikiApi['status']>,
+    addMaterial: (paths) =>
+      invoke(WIKI_CHANNELS.addMaterial, paths) as ReturnType<WorkWikiApi['addMaterial']>,
   }
 }

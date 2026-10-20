@@ -15,6 +15,8 @@ const api = (): WorkWikiApi => ({
   ]),
   read: vi.fn(async () => ({ ok: true as const, page: '⟦업무 위키:1⟧\n...\n⟦/업무 위키:1⟧' })),
   remember: vi.fn(async () => ({ ok: true })),
+  status: vi.fn(async () => ({ enabled: true })),
+  addMaterial: vi.fn(async () => []),
 })
 
 describe('work wiki skill', () => {

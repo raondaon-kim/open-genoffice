@@ -76,6 +76,8 @@ describe('review fixes', () => {
       ],
       read: async () => ({ ok: true, page: '' }),
       remember: async () => ({ ok: true }),
+      status: async () => ({ enabled: true }),
+      addMaterial: async () => [],
     }
     const skill = createWorkWikiSkill(() => api)
     await skill.refresh()
