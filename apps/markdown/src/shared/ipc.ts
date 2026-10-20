@@ -11,6 +11,10 @@ import type { ExportImageMime } from './export-image-mime'
 export const MAX_PASTED_IMAGE_BYTES = 50 * 1024 * 1024
 
 export const MARKDOWN_CHANNELS = {
+  /** invoke → the texts the PDF editor's "Add to note" queued for this note tab, once */
+  noteAppendTake: 'markdown:note-append-take',
+  /** main → renderer: texts are waiting for this note tab */
+  noteAppendReady: 'markdown:note-append-ready',
   consumePending: 'markdown:consume-pending',
   readFile: 'markdown:read-file',
   save: 'markdown:save',
@@ -158,6 +162,10 @@ export interface ImageData {
 
 /** API exposed by preload to the renderer (window.markdownApi) */
 export interface MarkdownApi {
+  /** Texts the PDF editor's "Add to note" queued for this note tab, taken once; [] otherwise */
+  takeNoteAppend?(): Promise<string[]>
+  /** The shell queued texts for this note tab; take them with takeNoteAppend */
+  onNoteAppendReady?(handler: () => void): () => void
   /** Take the md path pending for this view (queued at tab creation); null = new untitled document */
   consumePending(): Promise<string | null>
   /** Headless export mode: the PDF path this hidden renderer must export to, null in normal use */

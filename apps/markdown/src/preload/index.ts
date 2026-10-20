@@ -23,6 +23,13 @@ const api: MarkdownApi = {
   readFile: (path) => ipcRenderer.invoke(MARKDOWN_CHANNELS.readFile, path),
   save: (request) => ipcRenderer.invoke(MARKDOWN_CHANNELS.save, request),
   setDirty: (dirty) => ipcRenderer.send(MARKDOWN_CHANNELS.dirtyChanged, dirty),
+  takeNoteAppend: () =>
+    (ipcRenderer.invoke(MARKDOWN_CHANNELS.noteAppendTake) as Promise<string[]>).catch(() => []),
+  onNoteAppendReady: (handler) => {
+    const listener = () => handler()
+    ipcRenderer.on(MARKDOWN_CHANNELS.noteAppendReady, listener)
+    return () => ipcRenderer.removeListener(MARKDOWN_CHANNELS.noteAppendReady, listener)
+  },
   onSaveRequest: (handler) => {
     const listener = (_e: Electron.IpcRendererEvent, mode: SaveMode) => handler(mode)
     ipcRenderer.on(MARKDOWN_CHANNELS.saveRequest, listener)

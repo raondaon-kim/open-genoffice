@@ -56,6 +56,7 @@ import {
 } from './asset-lifecycle'
 import { createMarkdownConversionSession, writeMarkdownConversion } from './conversion-lifecycle'
 import { MARKDOWN_CHANNELS, MAX_PASTED_IMAGE_BYTES } from '../shared/ipc'
+import { registerMarkdownNoteAppendIpc } from './note-append'
 import {
   EXPORT_IMAGE_EXTS,
   EXPORT_IMAGE_MIME_BY_EXT,
@@ -784,6 +785,7 @@ function registerMarkdownIpc(): void {
   ipcRegistered = true
 
   registerImageProtocol()
+  registerMarkdownNoteAppendIpc({ documentPath: (wcId) => savePathByWc.get(wcId) ?? null })
 
   ipcMain.handle(MARKDOWN_CHANNELS.consumePending, (e) => openPathByWc.get(e.sender.id) ?? null)
 
