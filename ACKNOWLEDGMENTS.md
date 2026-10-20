@@ -40,3 +40,7 @@ Home's Quick Look (Space on a file row previews it) comes from
 [IeumOffice](https://github.com/pblsketch/openoffice) by pblsketch (Apache-2.0), another fork of
 GenOffice. Its commits were cherry-picked with their authorship kept; this build leaves out its
 Windows Explorer / desktop keyboard hook and the tray mode that serves it.
+
+The split view (two documents side by side, with the same-document save guard) also comes from
+IeumOffice, cherry-picked the same way. Its Hangul editor part was re-implemented here after
+IeumOffice's design, because this app's Hangul editor is different code.

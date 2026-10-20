@@ -100,6 +100,11 @@ The fork's material changes on top of upstream:
 - **Home Quick Look** (ported from IeumOffice, Apache-2.0): Space on a Home file row shows a
   preview (thumbnail, structured text, tables, slides, images); ↑/↓ step, Enter opens. Its
   Explorer/desktop keyboard hook, the C# helper and the tray mode are not included.
+- **Split view** (ported from IeumOffice, Apache-2.0): two documents side by side in one window
+  (drag a tab to the right or bottom edge, or the tab menu), a draggable divider, one AI panel
+  for the focused pane, a prompt before a save overwrites what the other copy of the same file
+  saved, and the arrangement restored on the next launch. The Hangul editor's part is
+  re-implemented for this app's editor; IeumOffice's mind map and help-tab parts are not included.
 
 Features of the August fork that upstream now provides itself (bring-your-own-
 key providers including DeepSeek, GLM, Kimi, MiniMax, OpenRouter and a custom
