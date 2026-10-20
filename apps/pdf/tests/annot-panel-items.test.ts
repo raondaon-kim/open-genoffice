@@ -210,6 +210,65 @@ describe('buildAnnotItems', () => {
     expect(byKey(items, 'O32').kindLabel).toContain('Sparkle')
   })
 
+  it('lists the drawings of this session, not saved yet, by kind with their bounds', () => {
+    const items = buildAnnotItems(
+      input({
+        unsavedDrawings: [
+          {
+            id: 'd1',
+            input: {
+              kind: 'ink',
+              pageIndex: 0,
+              color: [0, 0, 1],
+              width: 2,
+              paths: [
+                [10, 20, 30, 40],
+                [5, 50, 25, 15],
+              ],
+            },
+          },
+          {
+            id: 'd2',
+            input: {
+              kind: 'rect',
+              pageIndex: 1,
+              color: [1, 0, 0],
+              width: 1,
+              rect: [100, 100, 200, 150],
+            },
+          },
+          {
+            id: 'd3',
+            input: {
+              kind: 'arrow',
+              pageIndex: 1,
+              color: [0, 0, 0],
+              width: 1,
+              from: [300, 10],
+              to: [200, 60],
+            },
+          },
+          {
+            id: 'd4',
+            input: { kind: 'image', pageIndex: 2, image: 'AAAA', rect: [50, 60, 150, 110] },
+          },
+        ],
+      }),
+    )
+    expect(byKey(items, 'Dd1')).toMatchObject({
+      kind: 'other',
+      kindLabel: '손그림',
+      origin: 'unsaved',
+      page: 0,
+      rect: [5, 15, 30, 50],
+      text: '',
+      target: { type: 'location' },
+    })
+    expect(byKey(items, 'Dd2')).toMatchObject({ kindLabel: '사각형', rect: [100, 100, 200, 150] })
+    expect(byKey(items, 'Dd3')).toMatchObject({ kindLabel: '선', rect: [200, 10, 300, 60] })
+    expect(byKey(items, 'Dd4')).toMatchObject({ kindLabel: '도장', color: null })
+  })
+
   it('drops items on pages deleted in this session', () => {
     const items = buildAnnotItems(input({ displayPage: (i) => (i === 1 ? null : i + 1) }))
     expect(items.some((i) => i.key === 'Lm1' || i.key === 'O31' || i.key === 'Pn1')).toBe(false)

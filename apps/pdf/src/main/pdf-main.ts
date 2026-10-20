@@ -710,9 +710,12 @@ let noteStore: NoteLinkStore | null = null
 const noteLinkStore = (): NoteLinkStore =>
   (noteStore ??= createNoteLinkStore(join(app.getPath('userData'), 'pdf-note-links.json')))
 
+/** "New PDF" blanks the person saved themselves: no longer "save first" for their note */
+const notesSavedUntitled = new Set<string>()
+
 const noteLinks = createNoteLinkService({
   store: noteLinkStore,
-  isUntitled: (path) => untitledPdfPaths.has(path),
+  isUntitled: (path) => untitledPdfPaths.has(path) && !notesSavedUntitled.has(path),
   pickNotePath: async (owner, defaultPath) => {
     const sender = webContents.fromId(owner)
     const parent =
@@ -740,6 +743,15 @@ export async function copyPdfNoteLink(from: string, to: string): Promise<void> {
     await noteLinkStore().copy(from, to)
   } catch (err) {
     console.warn('[pdf] note link copy failed:', err)
+  }
+}
+
+/** shell: a folder moved or renamed in the app; every PDF and note under it follows */
+export async function rebasePdfNoteLinks(oldDir: string, newDir: string): Promise<void> {
+  try {
+    await noteLinkStore().rebaseDir(oldDir, newDir)
+  } catch (err) {
+    console.warn('[pdf] note link folder move failed:', err)
   }
 }
 
@@ -1187,6 +1199,10 @@ function registerPdfIpc(): void {
       )
       // Refresh the record for the written bytes
       await rememberDiskState(e.sender.id, target)
+      // the person saved a "New PDF" blank in place: its note no longer waits for a save
+      if (target === path && (request as { auto?: unknown }).auto !== true) {
+        if (untitledPdfPaths.has(path)) notesSavedUntitled.add(path)
+      }
       if (request.redactions !== undefined) {
         // Commit document identity only after the atomic write succeeds. Revoke the
         // source grant so stale renderer requests cannot write back to the original.

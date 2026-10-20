@@ -62,6 +62,7 @@ import {
   createPdfView,
   markPdfUntitledPath,
   movePdfNoteLink,
+  rebasePdfNoteLinks,
 } from '../src/main/pdf-main'
 import { createNoteLinkStore } from '../src/main/note-links'
 
@@ -120,6 +121,39 @@ describe('pdf:note-open', () => {
     createPdfView(blank)
     expect(await call(PDF_CHANNELS.noteOpen, {})).toEqual({ ok: false, reason: 'unsaved' })
     expect(showSaveDialog).not.toHaveBeenCalled()
+  })
+
+  it('treats a "New PDF" blank as saved for notes once the person saved it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'note-handler-'))
+    const blank = await writePdf(dir, 'Untitled 2.pdf')
+    markPdfUntitledPath(blank)
+    createPdfView(blank)
+    const save = (auto: boolean) =>
+      handlers.get(PDF_CHANNELS.save)!(
+        { sender: lastContents },
+        {
+          path: blank,
+          markups: [
+            {
+              pageIndex: 0,
+              type: 'highlight',
+              color: [1, 1, 0],
+              quads: [[10, 40, 90, 40, 10, 20, 90, 20]],
+            },
+          ],
+          drawings: [],
+          formValues: [],
+          stamps: [],
+          auto,
+        },
+      ) as Promise<{ ok: boolean }>
+    // an automatic save is not the person saving
+    expect((await save(true)).ok).toBe(true)
+    expect(await call(PDF_CHANNELS.noteOpen, {})).toEqual({ ok: false, reason: 'unsaved' })
+    expect((await save(false)).ok).toBe(true)
+    showSaveDialog.mockResolvedValue({ canceled: true })
+    expect(await call(PDF_CHANNELS.noteOpen, {})).toEqual({ ok: false, reason: 'cancelled' })
+    expect(showSaveDialog).toHaveBeenCalledTimes(1)
   })
 
   it('answers with a reason and asks nothing when the shell did not inject the note calls', async () => {
@@ -206,6 +240,21 @@ describe('the note link follows copies and in-app moves', () => {
     writeFileSync(moved, '# n\n')
     await movePdfNoteLink(notePath, moved)
     expect(await links().get(pdf)).toBe(moved)
+  })
+
+  it('follows a folder moved or renamed in the app, whether or not the shell tracks its files', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'note-handler-'))
+    mkdirSync(join(dir, 'Course'))
+    const pdf = await writePdf(join(dir, 'Course'))
+    const notePath = join(dir, 'Course', 'n.md')
+    writeFileSync(notePath, '# n\n')
+    await links().set(pdf, notePath)
+    const { renameSync } = await import('node:fs')
+    renameSync(join(dir, 'Course'), join(dir, 'Course 2'))
+    await rebasePdfNoteLinks(join(dir, 'Course'), join(dir, 'Course 2'))
+    expect(await links().get(join(dir, 'Course 2', 'Paper.pdf'))).toBe(
+      join(dir, 'Course 2', 'n.md'),
+    )
   })
 
   it('ignores moves of other files', async () => {

@@ -156,6 +156,13 @@ describe('shell wiring', () => {
     expect(index).toMatch(/openMarkdownTab\(path, \{ activate \}\)/)
   })
 
+  it('carries every note link under a folder moved or renamed in the app', () => {
+    const block = index.slice(index.indexOf('function afterFolderMoved('))
+    expect(block.slice(0, block.indexOf('\n}\n'))).toMatch(
+      /void rebasePdfNoteLinks\(oldDir, newDir\)/,
+    )
+  })
+
   it('carries the note link across Save As, derived copies and in-app moves', () => {
     expect(index).toMatch(/void copyPdfNoteLink\(tab\.filePath, target\)/)
     expect(index).toMatch(/void movePdfNoteLink\(oldPath, newPath\)/)

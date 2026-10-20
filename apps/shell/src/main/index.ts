@@ -214,6 +214,7 @@ import {
   markPdfUntitledPath,
   movePdfNoteLink,
   pdfFileRenamed,
+  rebasePdfNoteLinks,
   pdfIsDirty,
   requestPdfSaveAs,
   sendPdfPrintRequest,
@@ -3311,6 +3312,8 @@ function fileTargetSources(): FileTargetSources {
 
 /** a folder moved/renamed: re-key every tracked file that lived under it */
 function afterFolderMoved(oldDir: string, newDir: string, filesBefore: readonly string[]): void {
+  // every PDF note link under the folder, not only the files the shell tracks
+  void rebasePdfNoteLinks(oldDir, newDir)
   for (const file of filesBefore) afterFileMoved(file, rebasePath(file, oldDir, newDir))
 }
 

@@ -105,6 +105,7 @@ export function AnnotPanelHost(props: AnnotPanelHostProps) {
     pendingNotes: props.drawings.flatMap((d) =>
       d.input.kind === 'note' ? [{ id: d.id, input: d.input }] : [],
     ),
+    unsavedDrawings: props.drawings.filter((d) => d.input.kind !== 'note'),
     deletedObjNums: new Set(props.annotDeletes.map((d) => d.annot.objNum)),
     editedNotes: new Map(props.noteEdits.map((e) => [e.annot.objNum, e.contents])),
     pageTexts: texts && texts.doc === doc ? texts.map : new Map(),

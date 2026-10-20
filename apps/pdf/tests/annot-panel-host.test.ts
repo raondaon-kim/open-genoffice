@@ -106,6 +106,39 @@ describe('AnnotPanelHost', () => {
     expect(keys()).toEqual(['S22'])
   })
 
+  it('lists the drawings of this session before they are saved', async () => {
+    act(() =>
+      root.render(
+        createElement(AnnotPanelHost, {
+          doc: fakeDoc([[]]),
+          unsavedMarkups: [],
+          drawings: [
+            {
+              id: 'k1',
+              input: {
+                kind: 'ink',
+                pageIndex: 0,
+                color: [0, 0, 1],
+                width: 2,
+                paths: [[1, 2, 3, 4]],
+              },
+            },
+          ],
+          annotDeletes: [],
+          noteEdits: [],
+          displayPage: (i: number) => i + 1,
+          title: 'Doc',
+          t,
+          onActivate: vi.fn(),
+          onClose: vi.fn(),
+          onNotice: vi.fn(),
+        } as never),
+      ),
+    )
+    await settle()
+    expect(keys()).toEqual(['Dk1'])
+  })
+
   it('lists a markup on a page without a text layer with the no-text label', async () => {
     render(fakeDoc([[highlight(5)]]))
     await settle()

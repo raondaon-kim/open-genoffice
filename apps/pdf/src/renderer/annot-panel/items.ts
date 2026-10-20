@@ -15,7 +15,7 @@
  * - `AnnotTarget` `custom`: an item's own click action.
  * - Per-item actions are rendered by the panel's `renderItemActions` prop.
  */
-import type { MarkupType } from '../../shared/ipc'
+import type { DrawingInput, MarkupType } from '../../shared/ipc'
 import type { TFunc } from '../i18n/locale'
 import { pdfToView, quadToRect, type LocalMarkup, type PageGeom } from '../annotations'
 import {
@@ -140,6 +140,8 @@ export interface AnnotBuildInput {
   /** page geometry, for top-to-bottom order on rotated pages */
   geomOf?: (origIdx: number) => PageGeom
   t: TFunc
+  /** drawings made in this session, not saved yet (notes go in pendingNotes) */
+  unsavedDrawings?: readonly { id: string; input: DrawingInput }[]
   /** items from other features */
   extra?: readonly AnnotItemDraft[]
 }
@@ -179,6 +181,40 @@ export function kindFilterLabel(kind: string, t: TFunc, fallback: string): strin
       return t('apKindOther')
     default:
       return fallback
+  }
+}
+
+/** the PDF /Subtype each kind of drawing is saved as (an arrow is a /Line with an end style) */
+const DRAWING_SUBTYPES: Partial<Record<DrawingInput['kind'], string>> = {
+  ink: 'Ink',
+  rect: 'Square',
+  ellipse: 'Circle',
+  line: 'Line',
+  arrow: 'Line',
+  image: 'Stamp',
+}
+
+/** a drawing's bounds in PDF user space */
+function drawingRect(d: DrawingInput): Rect | null {
+  const box = (xs: number[], ys: number[]): Rect | null =>
+    xs.length === 0 ? null : [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+  switch (d.kind) {
+    case 'ink': {
+      const pts = d.paths.flat()
+      return box(
+        pts.filter((_, i) => i % 2 === 0),
+        pts.filter((_, i) => i % 2 === 1),
+      )
+    }
+    case 'rect':
+    case 'ellipse':
+    case 'image':
+      return box([d.rect[0], d.rect[2]], [d.rect[1], d.rect[3]])
+    case 'line':
+    case 'arrow':
+      return box([d.from[0], d.to[0]], [d.from[1], d.to[1]])
+    default:
+      return null
   }
 }
 
@@ -301,6 +337,24 @@ export function buildAnnotItems(o: AnnotBuildInput): AnnotItem[] {
       color: a.color,
       text: '',
       createdMs: a.createdMs,
+      target: { type: 'location' },
+    })
+  }
+
+  // this session's drawings, named like the saved annotations they become
+  for (const d of o.unsavedDrawings ?? []) {
+    const subtype = DRAWING_SUBTYPES[d.input.kind]
+    if (!subtype) continue
+    drafts.push({
+      key: `D${d.id}`,
+      kind: 'other',
+      kindLabel: subtypeLabel(subtype, t),
+      origin: 'unsaved',
+      page: d.input.pageIndex,
+      rect: drawingRect(d.input),
+      color: 'color' in d.input && d.input.kind !== 'note' ? d.input.color : null,
+      text: '',
+      createdMs: null,
       target: { type: 'location' },
     })
   }

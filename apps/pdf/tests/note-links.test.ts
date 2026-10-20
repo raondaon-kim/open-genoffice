@@ -4,7 +4,7 @@
  * Save As and derived copies share the note; in-app moves of the PDF or the note follow.
  */
 // @vitest-environment node
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -113,7 +113,7 @@ describe('note link store', () => {
     for (let i = 0; i < 12; i++) expect(await fresh.get(join(dir, `p${i}.pdf`))).toBe(n)
   })
 
-  it('starts empty from an unreadable file instead of failing', async () => {
+  it('keeps a copy of a damaged file before starting it over', async () => {
     const n = note()
     const store = createNoteLinkStore(file)
     await store.set(join(dir, 'a.pdf'), n)
@@ -122,5 +122,36 @@ describe('note link store', () => {
     expect(await fresh.get(join(dir, 'a.pdf'))).toBeNull()
     await fresh.set(join(dir, 'b.pdf'), n)
     expect(await createNoteLinkStore(file).get(join(dir, 'b.pdf'))).toBe(n)
+    expect(readFileSync(`${file}.bad`, 'utf8')).toBe('{ not json')
+  })
+
+  it('changes nothing when the file cannot be read for another reason (it is not lost)', async () => {
+    // a directory where the file should be: reading fails with something other than "missing",
+    // like a file held by another program
+    mkdirSync(file, { recursive: true })
+    const store = createNoteLinkStore(file)
+    await expect(store.set(join(dir, 'a.pdf'), note())).rejects.toThrow()
+    expect(statSync(file).isDirectory()).toBe(true)
+  })
+
+  it('moves every link under a moved or renamed folder, PDFs and notes alike', async () => {
+    const course = join(dir, 'Course')
+    mkdirSync(join(course, 'notes'), { recursive: true })
+    const n1 = join(course, 'notes', 'a.md')
+    writeFileSync(n1, '# a\n')
+    const outside = note('outside.md')
+    const store = createNoteLinkStore(file)
+    await store.set(join(course, 'a.pdf'), n1)
+    await store.set(join(course, 'b.pdf'), outside)
+    await store.set(join(dir, 'Coursework.pdf'), n1) // same prefix, not inside the folder
+    const moved = join(dir, 'Course 2026')
+    // a trailing separator on the old folder is the same folder
+    await store.rebaseDir(`${course}${process.platform === 'win32' ? '\\' : '/'}`, moved)
+    mkdirSync(join(moved, 'notes'), { recursive: true })
+    writeFileSync(join(moved, 'notes', 'a.md'), '# a\n')
+    expect(await store.get(join(moved, 'a.pdf'))).toBe(join(moved, 'notes', 'a.md'))
+    expect(await store.get(join(moved, 'b.pdf'))).toBe(outside)
+    expect(await store.get(join(dir, 'Coursework.pdf'))).toBe(join(moved, 'notes', 'a.md'))
+    expect(await store.get(join(course, 'a.pdf'))).toBeNull()
   })
 })

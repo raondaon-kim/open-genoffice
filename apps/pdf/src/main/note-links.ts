@@ -1,12 +1,12 @@
-import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { access, copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { dirname, resolve, sep } from 'node:path'
 
 /**
  * Which Markdown note belongs to which PDF: one JSON file in userData,
  * `{ version: 1, links: { <canonical PDF path>: <note path> } }`.
  *
  * - A link whose note file no longer exists is no link (the next Open note asks again).
- * - Save As and derived copies (redaction, certificate signing) share the note: `copy`.
+ * - Save As and the redacted copy share the note: `copy`.
  * - In-app moves and renames follow: `movePdf` for the PDF, `moveNote` for the note.
  * - Moves outside the app are not tracked.
  */
@@ -19,6 +19,8 @@ export interface NoteLinkStore {
   movePdf(oldPath: string, newPath: string): Promise<void>
   /** every PDF whose note was `oldPath` now points at `newPath` */
   moveNote(oldPath: string, newPath: string): Promise<void>
+  /** a folder moved or renamed in the app: every PDF and note path under it follows */
+  rebaseDir(oldDir: string, newDir: string): Promise<void>
 }
 
 interface LinkFile {
@@ -48,15 +50,28 @@ export function createNoteLinkStore(
   /** changes run one after another so concurrent writes never drop a link */
   let queue: Promise<unknown> = Promise.resolve()
 
+  /**
+   * The links on disk. Missing: none yet. Damaged JSON: a copy is kept as `.bad` and the
+   * file starts over. Any other read error (a file held by another program) rejects, so
+   * a change never writes over links it could not read.
+   */
   async function read(): Promise<LinkFile> {
+    let text: string
     try {
-      const parsed = JSON.parse(await readFile(file, 'utf8')) as Partial<LinkFile>
+      text = await readFile(file, 'utf8')
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { version: 1, links: {} }
+      throw err
+    }
+    try {
+      const parsed = JSON.parse(text) as Partial<LinkFile>
       if (parsed && parsed.version === 1 && parsed.links && typeof parsed.links === 'object') {
         return { version: 1, links: { ...parsed.links } }
       }
     } catch {
-      // missing or unreadable: start empty
+      // damaged: fall through to the backup below
     }
+    await copyFile(file, `${file}.bad`).catch(() => undefined)
     return { version: 1, links: {} }
   }
 
@@ -102,6 +117,25 @@ export function createNoteLinkStore(
         delete links[key(oldPath)]
         links[key(newPath)] = notePath
         return true
+      }),
+    rebaseDir: (oldDir, newDir) =>
+      change((links) => {
+        const prefix = key(oldDir).replace(/[\\/]+$/, '') + sep
+        const under = (path: string) => key(path).startsWith(prefix)
+        const rebased = (path: string) => resolve(newDir, resolve(path).slice(prefix.length))
+        let moved = false
+        for (const [pdf, notePath] of Object.entries(links)) {
+          const pdfUnder = under(pdf)
+          const noteUnder = under(notePath)
+          if (!pdfUnder && !noteUnder) continue
+          const nextNote = noteUnder ? rebased(notePath) : notePath
+          if (pdfUnder) {
+            delete links[pdf]
+            links[key(rebased(pdf))] = nextNote
+          } else links[pdf] = nextNote
+          moved = true
+        }
+        return moved
       }),
     moveNote: (oldPath, newPath) =>
       change((links) => {
