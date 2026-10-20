@@ -4236,3 +4236,274 @@ button {
   flex: 1;
   min-width: 0;
 }
+
+/* Annotation list (from IeumOffice pblsketch/openoffice, 3c002a56) */
+
+/* annotation panel */
+
+.pdf-annot-pane {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 8px 4px;
+  user-select: text;
+}
+
+.pdf-annot-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pdf-annot-count {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.pdf-annot-menu-wrap {
+  position: relative;
+}
+
+.pdf-annot-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.pdf-annot-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 400;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pdf-annot-menu button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.pdf-annot-menu button:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.pdf-annot-menu-reason {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: normal;
+}
+
+.pdf-annot-filters {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 0 6px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pdf-annot-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+}
+
+.pdf-annot-filters input,
+.pdf-annot-filters select {
+  min-width: 0;
+  flex: 1;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.pdf-annot-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdf-annot-color-all,
+.pdf-annot-clear {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.pdf-annot-clear {
+  align-self: flex-start;
+}
+
+.pdf-annot-color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pdf-annot-color[aria-pressed='true'],
+.pdf-annot-color-all[aria-pressed='true'] {
+  border-color: var(--accent);
+}
+
+.pdf-annot-swatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+}
+
+.pdf-annot-swatch-none {
+  border-style: dashed;
+}
+
+.pdf-annot-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 2px;
+}
+
+.pdf-annot-empty {
+  padding: 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pdf-annot-item {
+  margin-bottom: 4px;
+  border-radius: 8px;
+}
+
+.pdf-annot-item:hover {
+  background: var(--hover);
+}
+
+.pdf-annot-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.pdf-annot-item-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 11.5px;
+}
+
+.pdf-annot-kind {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-annot-page {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.pdf-annot-lost .pdf-annot-page {
+  color: var(--danger);
+}
+
+.pdf-annot-text {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.pdf-annot-muted,
+.pdf-annot-detail {
+  color: var(--text-muted);
+}
+
+.pdf-annot-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-annot-meta {
+  display: flex;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.pdf-annot-unsaved {
+  color: var(--accent);
+}
+
+.pdf-annot-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 8px 6px;
+}
+
+/* the brief flash on the place a panel item points at: screen-only, never saved or printed */
+.pdf-annot-flash {
+  position: absolute;
+  z-index: 4;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  pointer-events: none;
+  animation: pdf-annot-flash 1.2s ease-out forwards;
+}
+
+@keyframes pdf-annot-flash {
+  0%,
+  40% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}

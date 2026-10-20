@@ -202,6 +202,9 @@ import { planEditOps, reduceBucket } from './edit-ops'
 import type { Bucket, Op, OpContext, PlanResult } from './edit-ops'
 import { rectsNear } from './edit-state'
 import { labelWithKey, selectionBarKey, selectionEnd } from './selection-shortcuts'
+import { AnnotPanelHost } from './annot-panel/AnnotPanelHost'
+import { AnnotFlash, useAnnotFlash } from './annot-panel/AnnotFlash'
+import { activateAnnotItem, type AnnotItem } from './annot-panel/items'
 import type {
   StampConfig,
   SavedMarkupAnnot,
@@ -318,7 +321,7 @@ export default function App() {
   const [scale, setScale] = useState(1)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageInput, setPageInput] = useState('1')
-  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | null>('thumbs')
+  const [sidebar, setSidebar] = useState<'thumbs' | 'outline' | 'annots' | null>('thumbs')
   const [sidebarW, setSidebarW] = useState(loadSidebarW)
   /** raster width for thumbnails — only updated when a drag ends (re-rastering every frame would jank) */
   const [thumbRasterW, setThumbRasterW] = useState(() => loadSidebarW() - SIDEBAR_CHROME)
@@ -2330,6 +2333,24 @@ export default function App() {
     setSelPopup(null)
     setAskPop({ rect, excerpt: aiSelection?.text ?? sel?.toString() ?? '' })
   }
+
+  // ── Annotation list: a click goes to the place and flashes it, or opens a note's thread ──
+  const [annotFlash, flashAnnot] = useAnnotFlash()
+  const activateAnnot = (item: AnnotItem) =>
+    activateAnnotItem(item, {
+      reveal: (origIdx, rect) => {
+        const el = scrollRef.current
+        const visIdx = visList.indexOf(origIdx)
+        if (!el || visIdx < 0) return
+        const box = pdfRectToCss(pageGeom(origIdx), rect, scale)
+        el.scrollTop = Math.max(0, pageTop(visIdx) + box.top - el.clientHeight * 0.35)
+        flashAnnot(origIdx, rect)
+      },
+      openNote: (origIdx, rootKey) => {
+        setNoteDraft(null)
+        setActiveNote({ origIdx, rootKey })
+      },
+    })
 
   /** The bar's memo: an empty note at the end of the selection, its card open (the note tool's draft) */
   const openSelectionNote = () => {
@@ -6268,6 +6289,17 @@ export default function App() {
           </span>
           {t('outline')}
         </button>
+        <button
+          className={`rb-big${sidebar === 'annots' ? ' active' : ''}`}
+          data-tip={t('apPanelTip')}
+          aria-pressed={sidebar === 'annots'}
+          onClick={() => setSidebar((v) => (v === 'annots' ? null : 'annots'))}
+        >
+          <span className="rb-big-icon">
+            <IconNote />
+          </span>
+          {t('apPanel')}
+        </button>
         {searchBtn}
         <button
           className={`rb-big${spread === 2 ? ' active' : ''}`}
@@ -7049,6 +7081,31 @@ export default function App() {
         </div>
         <div className="app-content">
           <div className="pdf-body">
+            {sidebar === 'annots' && (
+              <AnnotPanelHost
+                doc={doc}
+                width={sidebarW}
+                title={(metadata ?? docInfo).title?.trim() || fileName}
+                t={t}
+                unsavedMarkups={markups}
+                drawings={drawings}
+                annotDeletes={annotDeletes}
+                noteEdits={noteEdits}
+                displayPage={(origIdx) => {
+                  const v = visList.indexOf(origIdx)
+                  return v < 0 ? null : v + 1
+                }}
+                geomOf={pageGeom}
+                createDocument={
+                  window.pdfApi?.createDocument
+                    ? (request) => window.pdfApi.createDocument(request)
+                    : undefined
+                }
+                onActivate={activateAnnot}
+                onClose={() => setSidebar(null)}
+                onNotice={showNotice}
+              />
+            )}
             {sidebar === 'outline' && outline && (
               <div className="pdf-thumbs pdf-outline-pane" style={{ width: sidebarW }}>
                 <div className="pdf-outline-header">
@@ -7201,7 +7258,9 @@ export default function App() {
                 })}
               </div>
             )}
-            {(sidebar === 'thumbs' || (sidebar === 'outline' && !!outline)) && (
+            {(sidebar === 'thumbs' ||
+              sidebar === 'annots' ||
+              (sidebar === 'outline' && !!outline)) && (
               <div className="pdf-side-resizer" onPointerDown={startSidebarResize} />
             )}
             <div
@@ -8207,6 +8266,9 @@ export default function App() {
                                   }
                                 />
                               ))}
+                              {annotFlash?.origIdx === origIdx && (
+                                <AnnotFlash target={annotFlash} geom={geom} scale={scale} />
+                              )}
                               {searchOpen && (
                                 <div className="pdf-search-layer">
                                   {activeMatches.flatMap((m, mi) =>
