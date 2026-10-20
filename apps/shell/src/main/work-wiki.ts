@@ -257,17 +257,41 @@ const MATERIAL_TEXT = {
     materialFilter: '文档',
     materialAdded: '已向工作维基添加 {n} 份资料。整理完成后 AI 会参考。',
     materialOff: '工作维基已关闭或无法使用。',
+    materialDuplicate: '已在工作维基中',
+    reason_unsupported: '无法添加此格式',
+    'reason_too-large': '文件大于 100 MB',
+    'reason_no-text': '文件中没有可读取的文字',
+    reason_unreadable: '无法读取文件',
+    'reason_too-many': '一次添加的文件过多',
+    'reason_wiki-off': '工作维基已关闭',
+    'reason_not-attached': '此文件不是在这里附加的',
   },
   en: {
     materialFilter: 'Documents',
     materialAdded:
       'Added {n} file(s) to the work wiki. The AI will use them once they are organized.',
     materialOff: 'The work wiki is off or unavailable.',
+    materialDuplicate: 'already in the work wiki',
+    reason_unsupported: 'this format cannot be added',
+    'reason_too-large': 'the file is larger than 100 MB',
+    'reason_no-text': 'no readable text in the file',
+    reason_unreadable: 'the file could not be read',
+    'reason_too-many': 'too many files at once',
+    'reason_wiki-off': 'the work wiki is off',
+    'reason_not-attached': 'this file was not attached here',
   },
   ko: {
     materialFilter: '문서',
     materialAdded: '업무 위키에 자료 {n}개를 넣었습니다. 정리가 끝나면 AI가 참고합니다.',
     materialOff: '업무 위키가 꺼져 있거나 사용할 수 없습니다.',
+    materialDuplicate: '이미 업무 위키에 있습니다',
+    reason_unsupported: '추가할 수 없는 형식입니다',
+    'reason_too-large': '파일이 100MB보다 큽니다',
+    'reason_no-text': '파일에서 읽을 수 있는 글자가 없습니다',
+    reason_unreadable: '파일을 읽지 못했습니다',
+    'reason_too-many': '한 번에 너무 많은 파일입니다',
+    'reason_wiki-off': '업무 위키가 꺼져 있습니다',
+    'reason_not-attached': '이 문서에 첨부한 파일이 아닙니다',
   },
 } as const
 
@@ -314,16 +338,22 @@ export async function addWikiMaterialFromDialog(
     files: picked.filePaths,
     rawSources: join(s.folder, 'raw', 'sources'),
     extractText,
+    indexPath: join(stateDirFor(s.folder), 'material-index.json'),
   })
+  const added = r.filter((x) => x.status === 'added').length
+  const rest = r.filter((x) => x.status !== 'added')
   const lines = [
-    tmw(lang, 'materialAdded', { n: r.added.length }),
-    ...r.skipped.map((k) => `· ${basename(k.file)}: ${k.reason}`),
+    tmw(lang, 'materialAdded', { n: added }),
+    ...rest.map(
+      (x) =>
+        `· ${basename(x.path)}: ${tmw(lang, x.status === 'duplicate' ? 'materialDuplicate' : `reason_${x.reason ?? 'unreadable'}`)}`,
+    ),
   ]
   await dialog.showMessageBox({
-    type: r.skipped.length ? 'warning' : 'info',
+    type: rest.some((x) => x.status === 'skipped') ? 'warning' : 'info',
     message: lines.join(String.fromCharCode(10)),
   })
-  return { added: r.added.length, skipped: r.skipped.length, canceled: false }
+  return { added, skipped: rest.length, canceled: false }
 }
 
 /** settings changed: the old engine finishes its running job before the next one starts */
