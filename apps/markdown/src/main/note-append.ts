@@ -1,6 +1,6 @@
 // From IeumOffice (pblsketch/openoffice) apps/markdown/src/main/note-append.ts, 6c33de7a.
 /**
- * "Add to note" from the PDF editor (reading-assist spec 4.9): the shell
+ * "Add to note" from the PDF editor: the shell
  * opens or brings forward the Markdown tab of a PDF's note and queues text
  * for that tab's webContents, then nudges it. The renderer takes the queue
  * once it is ready and puts the text at the END of its editor document,

@@ -1,9 +1,8 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/notes/NoteActions.tsx, 6c33de7a;
 // the "Added to the note" notice also offers Open note here.
 /**
- * The note of each PDF (reading-assist spec 4.9), the editor's buttons:
- * "Open note" in the ribbon and the annotation panel, "Add to note" on
- * passage cards, panel items and overview sections.
+ * The note of each PDF, the editor's buttons: "Open note" in the ribbon and the
+ * annotation panel, "Add to note" on the annotation panel's items.
  *
  * A PDF without a saved path (a new, untitled blank) disables them with
  * "Save the PDF first"; the main process refuses it as well. The calls carry

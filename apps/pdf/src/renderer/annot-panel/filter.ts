@@ -1,15 +1,15 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/annot-panel/filter.ts, 3c002a56.
 /**
- * Filtering and sorting the annotation panel's items (reading-assist spec
- * 4.3): kind, color, page range, text search, and any extra dimension a later
- * feature adds as an `AnnotFacet`; page order (default) or creation order.
+ * Filtering and sorting the annotation panel's items: kind, color, page range,
+ * text search, and any extra dimension a later feature adds as an `AnnotFacet`;
+ * page order (default) or creation order.
  * Pure.
  */
 import type { TFunc } from '../i18n/locale'
 import { KIND_ORDER, kindFilterLabel, type AnnotItem, type Rgb } from './items'
 
 /**
- * An extra filter dimension (e.g. the category of accepted AI highlights):
+ * An extra filter dimension (an extension point; none is used in this app yet):
  * the panel shows a choice of the values its items have.
  */
 export interface AnnotFacet {

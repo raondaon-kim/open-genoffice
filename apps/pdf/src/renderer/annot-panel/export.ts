@@ -1,6 +1,6 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/annot-panel/export.ts, 3c002a56.
 /**
- * The annotation panel's export (reading-assist spec 4.3): the filtered list
+ * The annotation panel's export: the filtered list
  * as Markdown in the spec's exact shape, the same as simple HTML for a Word
  * document, and opening either through the existing `createDocument` channel.
  * No AI is involved. Pure apart from `openAnnotDocument`'s one call.

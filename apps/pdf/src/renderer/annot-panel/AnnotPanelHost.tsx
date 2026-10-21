@@ -51,7 +51,7 @@ export interface AnnotPanelHostProps extends Omit<AnnotPanelProps, 'items' | 'lo
   /** 1-based shown page of an original page; null when deleted */
   displayPage: (origIdx: number) => number | null
   geomOf?: (origIdx: number) => PageGeom
-  /** items from other features (e.g. AI highlight suggestions while previewed) */
+  /** items from other features (an extension point; none is used in this app yet) */
   extraItems?: readonly AnnotItemDraft[]
 }
 

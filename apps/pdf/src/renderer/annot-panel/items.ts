@@ -5,9 +5,8 @@
  * markups and notes, and whatever later features add. Pure.
  *
  * Extension points for later features:
- * - `AnnotBuildInput.extra`: more items (`AnnotItemDraft`), e.g. pending AI
- *   highlight suggestions while their preview is on. The builder fills in the
- *   page number and position like any other item.
+ * - `AnnotBuildInput.extra`: more items (`AnnotItemDraft`) from a later
+ *   feature. The builder fills in the page number and position like any other item.
  * - `AnnotKind` is open: a new kind is any string; give its items a
  *   `kindLabel`, and `KIND_ORDER` decides where it sits in the kind filter.
  * - `AnnotItem.category`: a label shown with the kind (an accepted AI
@@ -30,7 +29,7 @@ export type Rgb = [number, number, number]
 type Rect = [number, number, number, number]
 
 export type CoreAnnotKind = 'highlight' | 'underline' | 'strikeout' | 'note' | 'other'
-/** a core kind, or one a later feature adds (e.g. 'suggestion') */
+/** a core kind, or one a later feature adds */
 export type AnnotKind = CoreAnnotKind | (string & {})
 
 /** the kind filter's order; kinds not listed follow in the order they appear */
@@ -78,7 +77,7 @@ export interface AnnotItem {
   /** an extension item's paragraphs after its quote (export) */
   body?: string
   replies?: number
-  /** an accepted AI highlight's category (/Subj) */
+  /** a label shown with the kind, for a later feature's items (none in this app yet) */
   category?: string
   /** creation time (epoch ms); null when unknown */
   createdMs: number | null

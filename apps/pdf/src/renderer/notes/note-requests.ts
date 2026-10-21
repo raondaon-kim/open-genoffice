@@ -1,10 +1,10 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/notes/note-requests.ts, 6c33de7a,
 // without the passage-card and overview requests this app does not have.
 /**
- * What "Add to note" sends for each kind of item (reading-assist spec 4.9):
- * text parts only. The main process knows the view's PDF and its note and
- * builds the inserted Markdown (quote with the page link, body, or the
- * overview heading). Pages are the PDF file's own: an original page index + 1,
+ * What "Add to note" sends for each kind of item: text parts only. The main
+ * process knows the view's PDF and its note and builds the inserted Markdown
+ * (quote with the page link, then the body). Pages are the PDF file's own: an
+ * original page index + 1,
  * which is where `#page=N` lands in any viewer.
  */
 import type { PdfNoteInsertRequest, PdfNoteResult } from '../../shared/ipc'
@@ -15,7 +15,7 @@ const withTitle = (title: string | undefined) => (title?.trim() ? { title: title
 
 const MARKUPS = new Set(['highlight', 'underline', 'strikeout'])
 
-/** an annotation panel item; null for items that cannot go to the note (no page, drawings, suggestions) */
+/** an annotation panel item; null for items that cannot go to the note (no page, drawings, stamps) */
 export function annotNoteRequest(item: AnnotItem, title?: string): PdfNoteInsertRequest | null {
   if (item.page === null || item.notFound) return null
   const page = item.page + 1

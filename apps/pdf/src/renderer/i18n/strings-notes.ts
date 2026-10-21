@@ -22,7 +22,7 @@ import { hi } from './notes/hi'
 import { zhTW } from './notes/zh-TW'
 import { vi } from './notes/vi'
 
-/** Copy for the note of each PDF (reading assistant) */
+/** Copy for the note of each PDF */
 export const notesStrings = defineStrings({
   zh,
   en,

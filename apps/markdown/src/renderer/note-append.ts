@@ -1,6 +1,6 @@
 // From IeumOffice (pblsketch/openoffice) apps/markdown/src/renderer/note-append.ts, 6c33de7a.
 /**
- * "Add to note" from the PDF editor (reading-assist spec 4.9), the editor
+ * "Add to note" from the PDF editor, the editor
  * side: the text goes at the end of the document as new blocks (a blank line
  * apart from what was there when saved) through an ordinary, undoable edit, so
  * the tab shows it as changed. The file is not written; the person saves.

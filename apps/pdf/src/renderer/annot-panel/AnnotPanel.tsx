@@ -43,7 +43,7 @@ export interface AnnotPanelProps {
   createDocument?: CreateDocument
   /** defaults to the clipboard */
   copyText?: (text: string) => Promise<void>
-  /** extra filter dimensions (e.g. the category of accepted AI highlights) */
+  /** extra filter dimensions (an extension point; none is used in this app yet) */
   facets?: readonly AnnotFacet[]
   /** extra buttons under an item (e.g. "Add to note") */
   renderItemActions?: (item: AnnotItem) => ReactNode

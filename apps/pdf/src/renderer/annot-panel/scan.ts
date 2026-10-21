@@ -1,7 +1,7 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/annot-panel/scan.ts, 3c002a56.
 /**
- * Reading the saved annotations of a whole document for the annotation panel
- * (reading-assist spec 4.3): markups with the text under them, /Text notes,
+ * Reading the saved annotations of a whole document for the annotation panel:
+ * markups with the text under them, /Text notes,
  * and every other user-visible annotation by its kind. Straight from PDF.js;
  * the page's text content is read only when the page has markups.
  */

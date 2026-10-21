@@ -1,6 +1,6 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/annot-panel/text-under.ts, 3c002a56.
 /**
- * The text under a markup annotation (reading-assist spec 4.3): the
+ * The text under a markup annotation: the
  * characters of a page's PDF.js text content whose boxes overlap the
  * annotation's QuadPoints. Everything is in PDF user space, so the page's
  * /Rotate plays no part, and quads written in any corner order (other

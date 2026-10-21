@@ -1,7 +1,7 @@
 // From IeumOffice (pblsketch/openoffice) apps/pdf/src/renderer/annot-panel/AnnotFlash.tsx, 3c002a56.
 /**
  * The brief flash on the place an annotation panel item points at
- * (reading-assist spec 4.3). Screen-only DOM over the page: never part of a
+ *. Screen-only DOM over the page: never part of a
  * save, the print raster or an export. Colors come from theme tokens.
  */
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'

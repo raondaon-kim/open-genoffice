@@ -22,7 +22,7 @@ import { hi } from './annot-panel/hi'
 import { zhTW } from './annot-panel/zh-TW'
 import { vi } from './annot-panel/vi'
 
-/** Copy for the annotation overview panel (reading assistant) */
+/** Copy for the annotation list panel */
 export const annotPanelStrings = defineStrings({
   zh,
   en,
