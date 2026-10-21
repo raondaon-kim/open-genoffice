@@ -77,7 +77,8 @@ export function readForeignDocs(wikiDir: string): { docs: SearchDoc[] } {
         continue
       }
       if (isDir) {
-        if (!rel && (OWN.has(name) || name === 'media')) continue
+        // our folders, media, and the index LLM Wiki builds from the pages (not pages)
+        if (!rel && (OWN.has(name) || name === 'media' || name === 'index')) continue
         walk(path, relPath, depth + 1)
       } else if (name.endsWith('.md')) {
         if (!rel && CATALOG_FILES.has(name)) continue

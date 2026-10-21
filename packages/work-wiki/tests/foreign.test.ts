@@ -70,3 +70,14 @@ describe('resolveWikiFile', () => {
     expect(resolveWikiFile(wiki, 'entities/missing')).toBeNull()
   })
 })
+
+describe('readForeignDocs and the index files', () => {
+  it('skips wiki/index/** (index files are not pages)', () => {
+    const wiki = wikiWith({
+      'concepts/pdm.md': '# PDM\n\n사업 논리 모형.\n',
+      'index/concepts.md': '# 개념 (1)\n\n- [[pdm]] — PDM\n',
+      'index/work/2026.md': '# 작업물 › 2026\n',
+    })
+    expect(readForeignDocs(wiki).docs.map((d) => d.id)).toEqual(['concepts/pdm'])
+  })
+})

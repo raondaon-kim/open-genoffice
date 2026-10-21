@@ -439,7 +439,17 @@ export function workWikiDocumentSaved(path: string): void {
 }
 
 export function registerWorkWikiIpc(): void {
-  ipcMain.handle(WIKI_CHANNELS.catalog, () => engine?.catalog() ?? '')
+  ipcMain.handle(WIKI_CHANNELS.catalog, (_e, query: unknown) =>
+    engine ? engine.catalogFor(typeof query === 'string' ? query : '') : '',
+  )
+  ipcMain.handle(WIKI_CHANNELS.index, (_e, category: unknown, group: unknown) =>
+    engine
+      ? engine.indexFile(
+          typeof category === 'string' ? category : undefined,
+          typeof group === 'string' ? group : undefined,
+        )
+      : WIKI_UNAVAILABLE,
+  )
   ipcMain.handle(WIKI_CHANNELS.search, (_e, q: unknown) => engine?.search(String(q ?? '')) ?? [])
   ipcMain.handle(
     WIKI_CHANNELS.read,

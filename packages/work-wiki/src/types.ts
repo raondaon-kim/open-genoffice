@@ -43,7 +43,10 @@ export interface WikiHit {
 
 /** what an assistant can do with the work wiki (window.workWiki) */
 export interface WorkWikiApi extends WikiMaterialApi {
-  catalog(): Promise<string>
+  /** the catalog for a question (pages it matches first); the plain catalog without one */
+  catalog(query?: string): Promise<string>
+  /** LLM Wiki's index: the top index, a category's list, or one group of it */
+  index(category?: string, group?: string): Promise<string>
   search(query: string): Promise<WikiHit[]>
   read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
   remember(points: string[], work?: string): Promise<{ ok: boolean; error?: string }>
@@ -51,6 +54,7 @@ export interface WorkWikiApi extends WikiMaterialApi {
 
 export const WIKI_CHANNELS = {
   catalog: 'wiki:catalog',
+  index: 'wiki:index',
   search: 'wiki:search',
   read: 'wiki:read',
   remember: 'wiki:remember',

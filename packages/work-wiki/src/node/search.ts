@@ -107,26 +107,65 @@ export class WikiSearch {
 
 const LABEL = { work: '업무', method: '작업 방식', client: '기관' } as const
 
+const typeOrder = (t: WikiPage['type']) => (t === 'work' ? 0 : t === 'method' ? 1 : 2)
+
+/** work first (newest first), then methods, then clients */
+export function byCatalogOrder(a: WikiPage, b: WikiPage): number {
+  return typeOrder(a.type) !== typeOrder(b.type)
+    ? typeOrder(a.type) - typeOrder(b.type)
+    : b.updated.localeCompare(a.updated)
+}
+
+export function catalogLine(p: WikiPage, aliases = false): string {
+  const alias = aliases && p.aliases.length ? ` (aliases: ${p.aliases.join(', ')})` : ''
+  return `- [${LABEL[p.type]}] ${p.title}${alias} — ${p.summary} (${PAGE_FOLDERS[p.type]}/${p.slug})`
+}
+
+/** as many lines as fit in capChars, in order */
+export function fitLines(lines: string[], capChars: number): string {
+  let out = ''
+  for (const line of lines) {
+    if (out.length + line.length + 1 > capChars) break
+    out += `${line}\n`
+  }
+  return out.trimEnd()
+}
+
 /** one line per page — work first (newest first), then methods, then clients — within capChars */
 export function buildCatalog(
   pages: WikiPage[],
   capChars = 3000,
   opts: { aliases?: boolean } = {},
 ): string {
-  const order = (t: WikiPage['type']) => (t === 'work' ? 0 : t === 'method' ? 1 : 2)
-  const sorted = [...pages].sort((a, b) =>
-    order(a.type) !== order(b.type)
-      ? order(a.type) - order(b.type)
-      : b.updated.localeCompare(a.updated),
+  return fitLines(
+    [...pages].sort(byCatalogOrder).map((p) => catalogLine(p, opts.aliases)),
+    capChars,
   )
-  let out = ''
-  for (const p of sorted) {
-    const alias = opts.aliases && p.aliases.length ? ` (aliases: ${p.aliases.join(', ')})` : ''
-    const line = `- [${LABEL[p.type]}] ${p.title}${alias} — ${p.summary} (${PAGE_FOLDERS[p.type]}/${p.slug})\n`
-    if (out.length + line.length > capChars) break
-    out += line
-  }
-  return out.trimEnd()
+}
+
+/**
+ * The catalog for one question or document: the pages that match `query`
+ * first (best match first), then the rest in catalog order, within capChars.
+ * A large wiki no longer pushes the relevant page out of a fixed-size list.
+ */
+export function relevantCatalog(
+  pages: WikiPage[],
+  query: string,
+  capChars: number,
+  opts: { aliases?: boolean } = { aliases: true },
+): string {
+  const idOf = (p: WikiPage) => `${PAGE_FOLDERS[p.type]}/${p.slug}`
+  const byId = new Map(pages.map((p) => [idOf(p), p]))
+  const first = new WikiSearch(pages.map(docOfPage))
+    .search(query, pages.length)
+    .map((h) => byId.get(h.id))
+    .filter((p): p is WikiPage => p !== undefined)
+  const seen = new Set(first.map(idOf))
+  const rest = pages.filter((p) => !seen.has(idOf(p))).sort(byCatalogOrder)
+  return fitLines(
+    [...first, ...rest].map((p) => catalogLine(p, opts.aliases)),
+    capChars,
+  )
 }
 
 /** local hits first, then the other source's, alternating, without duplicate ids */

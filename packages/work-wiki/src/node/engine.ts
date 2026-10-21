@@ -2,7 +2,7 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { basename, extname, join, resolve } from 'node:path'
 import { fenceWikiText } from '../fence'
 import { serializePage, todayIso } from '../page'
-import { WIKI_UNAVAILABLE } from '../types'
+import { PAGE_FOLDERS, WIKI_UNAVAILABLE } from '../types'
 import type { WikiHit } from '../types'
 import { readForeignDocs, resolveWikiFile } from './foreign'
 import { learn } from './learn'
@@ -10,7 +10,15 @@ import type { WikiComplete } from './learn'
 import { maskSensitive } from './mask'
 import type { MirrorOutcome } from './mirror'
 import { buildFirstDigest, buildRevisionDigest, DocumentRegistry } from './registry'
-import { buildCatalog, docOfPage, mergeHits, WikiSearch } from './search'
+import {
+  buildCatalog,
+  byCatalogOrder,
+  catalogLine,
+  docOfPage,
+  fitLines,
+  mergeHits,
+  WikiSearch,
+} from './search'
 import { WikiStore } from './store'
 
 export interface EngineOptions {
@@ -59,6 +67,47 @@ const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase()
 const DEFAULT_DEBOUNCE_MS = 120_000
 const INDEX_TTL_MS = 30_000
 const READ_CAP = 12_000
+const CATALOG_CAP = 3000
+const INDEX_TEXT_CAP = 5800 // the fence adds about 60 chars; the tool result stays under 6,000
+const INDEX_SEGMENT = /^[^\\/:*?"<>|.][^\\/:*?"<>|]*$/
+export const INDEX_MISSING = '색인이 아직 없습니다. wiki_search로 찾으세요.'
+const INDEX_CUT_HINT =
+  '… (목록이 깁니다. 이 분류의 묶음(group)이나 "다음:" 파일을 지정해 다시 여세요.)'
+const HIT_LABEL: Record<WikiHit['kind'], string> = {
+  work: '업무',
+  method: '작업 방식',
+  client: '기관',
+  entity: '인물·기관',
+  concept: '개념',
+  source: '자료',
+  other: '위키',
+}
+
+const foreignHint = (n: number) =>
+  `- LLM Wiki 자료 페이지 ${n}개 (인물·기관·개념·자료 요약): wiki_search로 찾으세요`
+
+/**
+ * One line per category of LLM Wiki's top index (`## 개념 (40)` followed by
+ * `… · 목록: index/concepts.md`), pointing at wiki_index. Empty when the
+ * index does not exist yet.
+ */
+function indexCategoryLines(wikiDir: string): string[] {
+  let text: string
+  try {
+    text = readFileSync(join(wikiDir, 'index.md'), 'utf8').slice(0, 8000)
+  } catch {
+    return []
+  }
+  const out: string[] = []
+  const lines = text.split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const head = /^## (.+)$/.exec(lines[i]!)
+    if (!head) continue
+    const key = /index\/([^\s/]+)\.md/.exec(lines[i + 1] ?? '')?.[1]
+    if (key) out.push(`- [목차] ${head[1]} — wiki_index("${key}")로 목록을 엽니다`)
+  }
+  return out
+}
 const OWN_FOLDERS = new Set(['work', 'methods', 'clients'])
 
 export class WorkWikiEngine {
@@ -301,13 +350,83 @@ export class WorkWikiEngine {
     try {
       if (Date.now() - this.indexBuiltAt > INDEX_TTL_MS) this.refreshSearch()
       const own = buildCatalog(this.store.listPages())
-      return this.foreignCount > 0
-        ? `${own}\n- LLM Wiki 자료 페이지 ${this.foreignCount}개 (인물·기관·개념·자료 요약): wiki_search로 찾으세요`.trimStart()
-        : own
+      return this.foreignCount > 0 ? `${own}\n${foreignHint(this.foreignCount)}`.trimStart() : own
     } catch (err) {
       this.disable(err)
       return ''
     }
+  }
+
+  /**
+   * The catalog for one question, within `cap`: pages either engine finds for
+   * it first, then the categories of LLM Wiki's top index (opened with
+   * wiki_index), then recent GenOffice pages. Without a question it is the
+   * plain catalog.
+   */
+  async catalogFor(query: string, cap = CATALOG_CAP): Promise<string> {
+    if (!query.trim()) return this.catalog()
+    if (!this.isEnabled || !this.store) return ''
+    const hits = await this.search(query)
+    if (!this.store) return ''
+    const lines: string[] = []
+    const seen = new Set<string>()
+    for (const h of hits) {
+      seen.add(h.id)
+      lines.push(`- [${HIT_LABEL[h.kind]}] ${h.title} — ${h.summary.slice(0, 160)} (${h.id})`)
+    }
+    let categories: string[] = []
+    let pages: ReturnType<WikiStore['listPages']> = []
+    try {
+      categories = indexCategoryLines(this.store.wikiDir)
+      pages = this.store.listPages()
+    } catch (err) {
+      this.disable(err)
+      return ''
+    }
+    lines.push(...categories)
+    for (const p of pages.sort(byCatalogOrder)) {
+      if (!seen.has(`${PAGE_FOLDERS[p.type]}/${p.slug}`)) lines.push(catalogLine(p))
+    }
+    if (categories.length === 0 && this.foreignCount > 0) lines.push(foreignHint(this.foreignCount))
+    return fitLines(lines, cap)
+  }
+
+  /**
+   * An index file of LLM Wiki's two-level index: the top index, a category's
+   * list, or one group of a category, fenced and capped at 6,000 chars.
+   * Accepts the pointers the files print (`index/concepts.md`,
+   * `concepts/교육`). Missing (LLM Wiki has not built it yet): a hint to use
+   * wiki_search.
+   */
+  indexFile(category?: string, group?: string): string {
+    if (!this.isEnabled || !this.store) return WIKI_UNAVAILABLE
+    const clean = (s: string) =>
+      s
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^wiki\//, '')
+        .replace(/^index(\/|\.md$)/, '')
+        .replace(/\.md$/i, '')
+    const parts = [category, group]
+      .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
+      .flatMap((s) => clean(s).split('/'))
+      .filter(Boolean)
+    if (parts.length > 2 || !parts.every((p) => INDEX_SEGMENT.test(p))) return INDEX_MISSING
+    const file =
+      parts.length === 0
+        ? join(this.store.wikiDir, 'index.md')
+        : join(this.store.wikiDir, 'index', ...parts.slice(0, -1), `${parts.at(-1)}.md`)
+    let text: string
+    try {
+      text = readFileSync(file, 'utf8')
+    } catch {
+      return INDEX_MISSING
+    }
+    if (text.length > INDEX_TEXT_CAP) {
+      const cut = text.slice(0, INDEX_TEXT_CAP)
+      text = `${cut.slice(0, Math.max(cut.lastIndexOf('\n'), 0))}\n${INDEX_CUT_HINT}`
+    }
+    return fenceWikiText(text)
   }
 
   async search(query: string): Promise<WikiHit[]> {

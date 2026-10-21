@@ -6,7 +6,8 @@ export function createWorkWikiPreloadApi(
   invoke: (channel: string, ...args: unknown[]) => Promise<unknown>,
 ): WorkWikiApi {
   return {
-    catalog: () => invoke(WIKI_CHANNELS.catalog) as Promise<string>,
+    catalog: (query) => invoke(WIKI_CHANNELS.catalog, query) as Promise<string>,
+    index: (category, group) => invoke(WIKI_CHANNELS.index, category, group) as Promise<string>,
     search: (query) => invoke(WIKI_CHANNELS.search, query) as ReturnType<WorkWikiApi['search']>,
     read: (slug) => invoke(WIKI_CHANNELS.read, slug) as ReturnType<WorkWikiApi['read']>,
     remember: (points, work) =>

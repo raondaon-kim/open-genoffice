@@ -2,7 +2,7 @@ import { fenceWikiText, WIKI_FENCE_RULE } from '../fence'
 import { sections } from '../page'
 import { PAGE_CAPS } from '../types'
 import type { WikiPage, WikiPageType } from '../types'
-import { buildCatalog } from './search'
+import { relevantCatalog } from './search'
 import type { WikiStore } from './store'
 
 export type WikiComplete = (system: string, user: string) => Promise<string>
@@ -223,7 +223,8 @@ export async function learn(
   complete: WikiComplete,
   input: LearnInput,
 ): Promise<LearnResult> {
-  const catalog = buildCatalog(store.listPages(), 6000, { aliases: true })
+  // the pages most related to this document first, so a large wiki keeps them in view
+  const catalog = relevantCatalog(store.listPages(), `${input.title}\n${input.digest}`, 6000)
   const kindNote =
     input.kind === 'revision'
       ? 'This is a REVISION of a document already learned: focus on what changed and the direction of the change.'

@@ -71,6 +71,7 @@ describe('review fixes', () => {
   it('the catalog context and search results are fenced too', async () => {
     const api: WorkWikiApi = {
       catalog: async () => '- [업무] KOICA — 요약 (koica)',
+      index: async () => '',
       search: async () => [
         { id: 'work/koica', kind: 'work', title: 'KOICA', summary: '요약', score: 1 },
       ],

@@ -4,6 +4,7 @@ import type { WorkWikiApi } from '../src/types'
 
 const api = (): WorkWikiApi => ({
   catalog: vi.fn(async () => '- [업무] KOICA 보건 — 제안 (koica-health)'),
+  index: vi.fn(async () => '# 위키 목차'),
   search: vi.fn(async () => [
     {
       id: 'work/koica-health',
