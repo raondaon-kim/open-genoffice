@@ -29,6 +29,7 @@
     "@genoffice/i18n": "*",
     "@genoffice/project-store": "*",
     "@genoffice/ui": "*",
+    "@genoffice/work-wiki": "*",
     "@lezer/highlight": "^1.2.5",
     "@tiptap/core": "3.31.0",
     "@tiptap/extension-bold": "3.31.0",

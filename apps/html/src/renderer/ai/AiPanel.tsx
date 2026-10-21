@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills } from '@genoffice/agent-core'
 import type { AgentImage } from '@genoffice/agent-core'
+import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import type { AiSettings } from '@genoffice/ai-provider'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
@@ -680,6 +681,7 @@ export function AiPanel({
           () => intentRef.current,
           () => isDocEmpty(depsRef.current.access.getText()),
         ),
+        createWorkWikiSkill(() => window.workWiki),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),

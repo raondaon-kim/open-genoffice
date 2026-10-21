@@ -125,6 +125,7 @@ import {
   composeSkills,
   type AgentImage,
 } from '@genoffice/agent-core'
+import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import { type WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
@@ -1294,6 +1295,7 @@ export function App({
         createImageSkill(() =>
           imageGenerationAvailable(aiSettingsRef.current, gskLoggedInRef.current),
         ),
+        createWorkWikiSkill(() => window.workWiki),
       ]),
       events: {
         onText: (text) => {

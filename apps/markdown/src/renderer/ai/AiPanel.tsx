@@ -2,6 +2,7 @@ import { aiPanelWidthAtPointer, AiPanelSideButton } from '@genoffice/ui'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { AgentLoop, composeSkills, streamText } from '@genoffice/agent-core'
+import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
 import {
   AiComposer,
@@ -372,6 +373,7 @@ export function AiPanel({
           }),
         ),
         createSearchSkill(),
+        createWorkWikiSkill(() => window.workWiki),
       ]),
       captureSnapshot: () => depsRef.current.getSnapshot(),
       systemSuffix: () => aiLangDirective(langRef.current),
