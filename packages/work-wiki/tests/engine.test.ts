@@ -204,3 +204,105 @@ describe('WorkWikiEngine', () => {
     expect(engine.read('x')).toEqual({ ok: false, error: '업무 위키를 사용할 수 없습니다' })
   })
 })
+
+describe('WorkWikiEngine and the saved-document mirror', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] }))
+  afterEach(() => vi.useRealTimers())
+
+  const make = (over: Partial<EngineOptions> = {}) => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-m-'))
+    const order: string[] = []
+    const complete = vi.fn(async (system: string) => {
+      order.push('learn')
+      return system.includes('PLAN') ? planJson : '## 개요\n요약\n\n## 이력\n'
+    })
+    const mirror = {
+      mirror: vi.fn(async (_path: string) => {
+        order.push('mirror')
+        return { status: 'written' as const, mirror: 'genoffice-saved/a.hwp' }
+      }),
+      moved: vi.fn(async () => {}),
+    }
+    const engine = new WorkWikiEngine({
+      root,
+      complete,
+      extractText: async () => 'Ⅰ. 개요\n내용',
+      debounceMs: 1000,
+      mirror,
+      ...over,
+    })
+    return { engine, complete, mirror, order }
+  }
+
+  it('a document job mirrors before learning; a deferred mirror schedules a mirror job at retryAt', async () => {
+    const { engine, mirror, order } = make()
+    engine.start()
+    const retryAt = Date.now() + 50_000
+    mirror.mirror.mockImplementationOnce(async () => {
+      order.push('mirror')
+      return { status: 'deferred', retryAt } as never
+    })
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    expect(order[0]).toBe('mirror')
+    expect(order).toContain('learn')
+    expect(mirror.mirror).toHaveBeenCalledTimes(1)
+    // the held change is written when the hour (here retryAt) is up, without learning again
+    const learned = order.filter((o) => o === 'learn').length
+    await vi.advanceTimersByTimeAsync(50_000)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(2)
+    expect(order.filter((o) => o === 'learn').length).toBe(learned)
+  })
+
+  it('a deferred mirror never replaces a newer pending save of the same document', async () => {
+    const { engine, mirror } = make()
+    engine.start()
+    mirror.mirror.mockImplementationOnce(async () => {
+      // the person saves again while the job runs
+      engine.onDocumentSaved('D:/docs/a.hwp')
+      return { status: 'deferred', retryAt: Date.now() + 999_999 } as never
+    })
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    // the newer save runs as a full document job after its own debounce
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(2)
+  })
+
+  it('a mirror error never stops learning', async () => {
+    const { engine, mirror, complete } = make()
+    engine.start()
+    mirror.mirror.mockRejectedValueOnce(new Error('share offline'))
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    expect(complete).toHaveBeenCalled()
+    expect(engine.enabled).toBe(true)
+  })
+
+  it('onPagesWritten fires after learn writes pages', async () => {
+    const onPagesWritten = vi.fn()
+    const { engine } = make({ onPagesWritten })
+    engine.start()
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    expect(onPagesWritten).toHaveBeenCalledTimes(1)
+    // an unchanged save writes no pages
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(1100)
+    await engine.runDue()
+    expect(onPagesWritten).toHaveBeenCalledTimes(1)
+  })
+
+  it('documentMoved passes the move to the mirror', async () => {
+    const { engine, mirror } = make()
+    engine.start()
+    await engine.documentMoved('D:/docs/a.hwp', 'D:/docs/b.hwp')
+    expect(mirror.moved).toHaveBeenCalledWith('D:/docs/a.hwp', 'D:/docs/b.hwp')
+  })
+})

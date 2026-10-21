@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { basename, dirname, extname, join } from 'node:path'
 import { WIKI_MATERIAL_EXTS } from '@genoffice/work-wiki/material'
 import type { WikiMaterialResult } from '@genoffice/work-wiki/material'
+import { hwpTextAsMarkdown } from '@genoffice/work-wiki/node'
 
 const HANGUL = new Set(['.hwp', '.hwpx'])
 const ACCEPTED = new Set<string>(WIKI_MATERIAL_EXTS.map((e) => `.${e}`))
@@ -79,14 +80,14 @@ async function addMaterialNow(opts: {
     try {
       let target: string
       if (HANGUL.has(ext)) {
-        const text = (await opts.extractText(file))?.replace(/^\[page \d+\]\r?\n/gm, '').trim()
-        if (!text) {
+        const stem = basename(file, extname(file))
+        const markdown = hwpTextAsMarkdown(stem, (await opts.extractText(file)) ?? '')
+        if (!markdown) {
           results.push({ path: file, status: 'skipped', reason: 'no-text' })
           continue
         }
-        const stem = basename(file, extname(file))
         target = freeName(opts.rawSources, `${stem}.md`)
-        writeFileSync(target, `# ${stem}\n\n${text}\n`, 'utf8')
+        writeFileSync(target, markdown, 'utf8')
       } else {
         target = freeName(opts.rawSources, basename(file))
         writeFileSync(target, bytes)

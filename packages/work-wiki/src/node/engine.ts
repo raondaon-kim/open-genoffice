@@ -8,6 +8,7 @@ import { readForeignDocs, resolveWikiFile } from './foreign'
 import { learn } from './learn'
 import type { WikiComplete } from './learn'
 import { maskSensitive } from './mask'
+import type { MirrorOutcome } from './mirror'
 import { buildFirstDigest, buildRevisionDigest, DocumentRegistry } from './registry'
 import { buildCatalog, docOfPage, mergeHits, WikiSearch } from './search'
 import { WikiStore } from './store'
@@ -26,12 +27,20 @@ export interface EngineOptions {
   /** the other wiki's search (LLM Wiki); its failure only narrows the results */
   extraSearch?: (query: string) => Promise<WikiHit[]>
   log?: (msg: string) => void
+  /** copies saved documents into raw/sources for LLM Wiki (see mirror.ts) */
+  mirror?: {
+    mirror(path: string): Promise<MirrorOutcome>
+    moved(oldPath: string, newPath: string): Promise<void>
+  }
+  /** learning wrote wiki pages (the shell asks LLM Wiki to rebuild its index) */
+  onPagesWritten?: () => void
 }
 
 interface Job {
   path: string
   dueAt: number
-  kind: 'document' | 'note'
+  /** mirror: only copy the document (a change held back by the copy's hourly limit) */
+  kind: 'document' | 'note' | 'mirror'
 }
 
 const LEARNED = new Set(['.hwp', '.hwpx', '.docx', '.pptx'])
@@ -200,6 +209,8 @@ export class WorkWikiEngine {
     if (!this.accepts(job.path, job.kind)) return
     if (!existsSync(this.opts.root))
       throw new Error(`wiki folder is not available: ${this.opts.root}`)
+    if (job.kind === 'mirror') return this.runMirror(job.path)
+    if (job.kind === 'document' && attempt === 1) await this.runMirror(job.path)
     try {
       const text =
         job.kind === 'note' ? readFileSync(job.path, 'utf8') : await this.opts.extractText(job.path)
@@ -224,11 +235,42 @@ export class WorkWikiEngine {
       })
       registry.commit(job.path, text, result.work)
       this.refreshSearch()
+      try {
+        this.opts.onPagesWritten?.()
+      } catch {
+        // the index rebuild is a courtesy; learning already succeeded
+      }
     } catch (err) {
       if (attempt < 2 && this.isEnabled) return this.runJob(job, attempt + 1)
       const msg = err instanceof Error ? err.message : String(err)
       // throws when the folder is gone: runDue turns that into disable()
       store.appendLog(`실패: ${title} — ${msg}`.slice(0, 300))
+    }
+  }
+
+  /** copy the saved document into the wiki's sources; never throws, never stops learning */
+  private async runMirror(path: string): Promise<void> {
+    if (!this.opts.mirror) return
+    try {
+      const out = await this.opts.mirror.mirror(path)
+      // a change held back by the hourly limit is written when the hour is up, unless a newer
+      // save of the document is already queued (its document job mirrors too)
+      if (out.status === 'deferred' && !this.jobs.has(norm(path))) {
+        this.schedule({ path, dueAt: out.retryAt, kind: 'mirror' })
+      }
+    } catch (err) {
+      this.opts.log?.(
+        `mirror failed: ${basename(path)} — ${err instanceof Error ? err.message : String(err)}`,
+      )
+    }
+  }
+
+  /** a document was moved or renamed in the app: its wiki copy follows; never throws */
+  async documentMoved(oldPath: string, newPath: string): Promise<void> {
+    try {
+      await this.opts.mirror?.moved(oldPath, newPath)
+    } catch (err) {
+      this.opts.log?.(`mirror move failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
