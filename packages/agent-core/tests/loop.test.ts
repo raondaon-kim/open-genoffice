@@ -2132,7 +2132,7 @@ describe('composeSkills', () => {
     const merged = composeSkills('ab', 'INTRO', [a, b])
     expect(merged.systemPrompt).toBe('INTRO\n\nPA\n\nPB')
     expect(merged.tools.map((t) => t.name)).toEqual(['tool_a', 'tool_b'])
-    expect(merged.buildContext?.()).toBe('CA')
+    expect(merged.buildContext?.('q')).toBe('CA')
     expect((await merged.executeTool({ id: '1', name: 'tool_b', input: {} })).output).toBe('from-b')
     const unknown = await merged.executeTool({ id: '2', name: 'nope', input: {} })
     expect(unknown.isError).toBe(true)

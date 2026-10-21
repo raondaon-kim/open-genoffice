@@ -81,8 +81,7 @@ describe('review fixes', () => {
       addMaterial: async () => [],
     }
     const skill = createWorkWikiSkill(() => api)
-    await skill.refresh()
-    expect(skill.buildContext?.()).toContain('⟦업무 위키:')
+    expect(await skill.buildContext?.('KOICA')).toContain('⟦업무 위키:')
     const r = await skill.executeTool({ id: '1', name: 'wiki_search', input: { query: 'KOICA' } })
     expect(r.output).toContain('⟦업무 위키:')
   })

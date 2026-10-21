@@ -532,17 +532,39 @@ export class AgentLoop<TSnapshot = unknown> {
     // to every sub-skill, each of which reads the live document, so a document
     // mid-transition is enough to wedge the panel. The user message was never
     // pushed, so the rollback in failRun() is a no-op and only the report matters.
-    try {
-      const context = this.options.skill.buildContext?.() ?? ''
+    // A context that is a Promise (chosen per question, e.g. the work wiki's
+    // catalog) is awaited first; a reset meanwhile drops this run.
+    const toUserMsg = (context: string): AgentMessage => {
       const format =
         this.options.formatUserMessage ??
         ((instr: string, ctx: string) => (ctx ? `${instr}\n\n${ctx}` : instr))
-      const userMsg: AgentMessage = {
+      return {
         role: 'user',
         text: format(instruction, context),
         ...(images?.length ? { images } : {}),
       }
-      void this.beginRun(userMsg)
+    }
+    const generation = this.generation
+    try {
+      const context = this.options.skill.buildContext?.(instruction) ?? ''
+      if (typeof context === 'string') {
+        void this.beginRun(toUserMsg(context))
+        return
+      }
+      void context.then(
+        (ctx) => {
+          if (generation !== this.generation) return
+          try {
+            void this.beginRun(toUserMsg(ctx))
+          } catch (err) {
+            this.failRun(err instanceof Error ? err.message : String(err))
+          }
+        },
+        (err: unknown) => {
+          if (generation === this.generation)
+            this.failRun(err instanceof Error ? err.message : String(err))
+        },
+      )
     } catch (err) {
       this.failRun(err instanceof Error ? err.message : String(err))
     }
@@ -571,6 +593,16 @@ export class AgentLoop<TSnapshot = unknown> {
     this.history = this.history.map((m) =>
       m.role === 'assistant' && m.reasoning ? { ...m, reasoning: undefined } : m,
     )
+    // Per-question context (e.g. the work wiki catalog) rides on the newest
+    // message only; earlier copies would cost tokens on every request.
+    const strip = this.options.skill.stripContext
+    if (strip) {
+      this.history = this.history.map((m) => {
+        if (m.role !== 'user') return m
+        const text = strip(m.text)
+        return text === m.text ? m : { ...m, text }
+      })
+    }
     if (userMsg.role === 'user') {
       userMsg = { ...userMsg, text: sanitizeAgentPayload(userMsg.text) }
     }

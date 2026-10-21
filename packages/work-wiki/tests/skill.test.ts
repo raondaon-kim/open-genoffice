@@ -21,12 +21,56 @@ const api = (): WorkWikiApi => ({
 })
 
 describe('work wiki skill', () => {
-  it('puts the rules in the prompt and the cached catalog in the turn context', async () => {
-    const skill = createWorkWikiSkill(() => api())
-    await skill.refresh()
+  it('puts the rules in the prompt and the catalog for the question in the turn context', async () => {
+    const a = api()
+    const skill = createWorkWikiSkill(() => a)
     expect(skill.systemPrompt).toContain('wiki_search')
-    expect(skill.buildContext?.()).toContain('KOICA 보건')
-    expect(skill.tools.map((t) => t.name)).toEqual(['wiki_search', 'wiki_read', 'wiki_remember'])
+    expect(skill.systemPrompt).toContain('wiki_index')
+    expect(await skill.buildContext?.('KOICA 보건 제안서')).toContain('KOICA 보건')
+    expect(a.catalog).toHaveBeenCalledWith('KOICA 보건 제안서')
+    expect(skill.tools.map((t) => t.name)).toEqual([
+      'wiki_search',
+      'wiki_read',
+      'wiki_index',
+      'wiki_remember',
+    ])
+  })
+
+  it('stripContext removes the catalog from an earlier message and keeps the rest', async () => {
+    const skill = createWorkWikiSkill(() => api())
+    const ctx = (await skill.buildContext?.('q')) as string
+    const message = `내 질문\n\n${ctx}`
+    expect(skill.stripContext?.(message)).toBe('내 질문')
+    expect(skill.stripContext?.('### 업무 위키 목차 없이 쓴 글')).toBe(
+      '### 업무 위키 목차 없이 쓴 글',
+    )
+  })
+
+  it('a catalog that does not answer in time is left out of the turn', async () => {
+    vi.useFakeTimers()
+    try {
+      const a = api()
+      a.catalog = vi.fn(() => new Promise<string>(() => {}))
+      const skill = createWorkWikiSkill(() => a)
+      const pending = skill.buildContext?.('q') as Promise<string>
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(await pending).toBe('')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('wiki_index returns the index text from the api', async () => {
+    const a = api()
+    const skill = createWorkWikiSkill(() => a)
+    const top = await skill.executeTool({ id: '1', name: 'wiki_index', input: {} })
+    expect(top.output).toBe('# 위키 목차')
+    await skill.executeTool({
+      id: '2',
+      name: 'wiki_index',
+      input: { category: 'concepts', group: '교육' },
+    })
+    expect(a.index).toHaveBeenLastCalledWith('concepts', '교육')
   })
 
   it('remembers only what the user said, never its own drafts', () => {
@@ -56,8 +100,7 @@ describe('work wiki skill', () => {
 
   it('degrades softly when the wiki is not available', async () => {
     const skill = createWorkWikiSkill(() => undefined)
-    await skill.refresh()
-    expect(skill.buildContext?.()).toBe('')
+    expect(await skill.buildContext?.('q')).toBe('')
     const r = await skill.executeTool({ id: '1', name: 'wiki_search', input: { query: 'x' } })
     expect(r.isError).toBe(true)
     expect(r.output).toContain('업무 위키를 사용할 수 없습니다')
@@ -68,7 +111,11 @@ describe('work wiki skill', () => {
     const p = createWorkWikiPreloadApi(invoke)
     await p.search('q')
     await p.remember(['a'], 'w')
+    await p.catalog('question')
+    await p.index('concepts', '교육')
     expect(invoke).toHaveBeenNthCalledWith(1, 'wiki:search', 'q')
     expect(invoke).toHaveBeenNthCalledWith(2, 'wiki:remember', ['a'], 'w')
+    expect(invoke).toHaveBeenNthCalledWith(3, 'wiki:catalog', 'question')
+    expect(invoke).toHaveBeenNthCalledWith(4, 'wiki:index', 'concepts', '교육')
   })
 })

@@ -10,15 +10,20 @@ declare global {
 }
 
 const PROMPT = `## Work wiki (업무 위키)
-The user's work memory, kept automatically from saved documents and chat: past works (업무), how they do work (작업 방식) and client preferences (기관). The catalog of pages comes with each turn.
+The user's work memory, kept automatically from saved documents and chat: past works (업무), how they do work (작업 방식) and client preferences (기관). The newest message carries a catalog for it: the pages that match it first, then the wiki's categories ([목차]).
 - Before writing or restructuring a document, call wiki_search for the work or the kind of work, then wiki_read the matching work and method pages (2-3 pages at most).
+- To browse beyond the catalog, call wiki_index: no argument for the table of contents, a category for its full list, and a group when a category is split.
 - For company facts, people, track record and past material, search the wiki first: LLM Wiki's pages (sources, entities, concepts) hold what the user added.
 - Follow the method page's structure, emphasis and wording unless the user asks otherwise.
 - Use facts from work pages (track record, staff, client) instead of placeholders, and name the pages used (e.g. "업무 위키: koica-health").
 - When the user states something durable about the work or how they want work done, call wiki_remember with short points — without being asked. Remember only what the user said (facts about the work, standing preferences), never your own drafts, plans or suggestions, one-off instructions or document text.
 - ${WIKI_FENCE_RULE}`
 
-const CATALOG_TTL_MS = 60_000
+/** a catalog that does not arrive in time is left out of that turn (the tools still work) */
+const CATALOG_TIMEOUT_MS = 5_000
+const CATALOG_HEADING = '### 업무 위키 목차'
+/** the catalog block buildContext attaches; stripContext removes it from earlier messages */
+const CATALOG_BLOCK = /\n*### 업무 위키 목차\n⟦업무 위키:[0-9a-f]+⟧[\s\S]*?⟦\/업무 위키:[0-9a-f]+⟧/g
 
 const fail = (summary: string, output: string): ToolExecution => ({
   output,
@@ -29,18 +34,27 @@ const fail = (summary: string, output: string): ToolExecution => ({
 export function createWorkWikiSkill(
   getApi: () => WorkWikiApi | undefined,
 ): AgentSkill & { refresh(): Promise<void> } {
-  let catalog = ''
-  let lastRefresh = 0
-  const refresh = async () => {
-    lastRefresh = Date.now()
+  /** the catalog for one question; '' when the wiki is off, slow or failing */
+  const catalogFor = async (question: string): Promise<string> => {
     const api = getApi()
+    if (!api) return ''
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
-      catalog = api ? await api.catalog() : ''
+      const catalog = await Promise.race([
+        api.catalog(question),
+        new Promise<string>((resolve) => {
+          timer = setTimeout(() => resolve(''), CATALOG_TIMEOUT_MS)
+        }),
+      ])
+      return catalog ? `${CATALOG_HEADING}\n${fenceWikiText(catalog)}` : ''
     } catch {
-      catalog = ''
+      return ''
+    } finally {
+      clearTimeout(timer)
     }
   }
-  void refresh()
+  // kept for callers that warmed the old cached catalog; the catalog is now built per question
+  const refresh = async () => {}
 
   return {
     id: 'work-wiki',
@@ -67,6 +81,15 @@ export function createWorkWikiSkill(
         },
       },
       {
+        name: 'wiki_index',
+        description:
+          "Open the work wiki's table of contents. No argument: the top index (categories with counts and recent pages). category (e.g. concepts, sources, work): that category's full page list. group: one group of a split category. Pages listed as [[slug]] can be opened with wiki_read.",
+        inputSchema: {
+          type: 'object',
+          properties: { category: { type: 'string' }, group: { type: 'string' } },
+        },
+      },
+      {
         name: 'wiki_remember',
         description:
           'Remember durable points about the work or how the user wants work done. Short Korean points.',
@@ -81,11 +104,9 @@ export function createWorkWikiSkill(
       },
     ],
     refresh,
-    // buildContext is synchronous: it serves the cached catalog and refreshes it in the background
-    buildContext: () => {
-      if (Date.now() - lastRefresh > CATALOG_TTL_MS) void refresh()
-      return catalog ? `### 업무 위키 목차\n${fenceWikiText(catalog)}` : ''
-    },
+    // the catalog for this question rides on the newest message only
+    buildContext: (instruction?: string) => catalogFor(instruction ?? ''),
+    stripContext: (text: string) => text.replace(CATALOG_BLOCK, ''),
     executeTool: async (call: AgentToolCall): Promise<ToolExecution> => {
       const api = getApi()
       if (!api) return fail(call.name, WIKI_UNAVAILABLE)
@@ -110,11 +131,18 @@ export function createWorkWikiSkill(
             ? { output: r.page, summary: `업무 위키 읽기: ${id}` }
             : fail('wiki_read', r.error)
         }
+        if (call.name === 'wiki_index') {
+          const category = typeof input.category === 'string' ? input.category : undefined
+          const group = typeof input.group === 'string' ? input.group : undefined
+          return {
+            output: await api.index(category, group),
+            summary: `업무 위키 목차: ${[category, group].filter(Boolean).join(' › ') || '전체'}`,
+          }
+        }
         if (call.name === 'wiki_remember') {
           const points = Array.isArray(input.points) ? input.points.map(String) : []
           const work = typeof input.work === 'string' ? input.work : undefined
           const r = await api.remember(points, work)
-          void refresh()
           return r.ok
             ? {
                 output: 'remembered',

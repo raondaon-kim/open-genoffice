@@ -20,8 +20,16 @@ export interface AgentSkill {
   /**
    * Fresh context sections attached to every user turn (e.g. document
    * skeleton + selection). Return '' when there is nothing to attach.
+   * `instruction` is the user's message, for context chosen per question;
+   * a Promise is awaited before the run starts.
    */
-  buildContext?(): string
+  buildContext?(instruction?: string): string | Promise<string>
+  /**
+   * Remove this skill's per-question context from an earlier user message.
+   * The loop applies it to every earlier user message before each run, so
+   * only the newest message carries that context.
+   */
+  stripContext?(text: string): string
   /**
    * signal: aborted when the user hits stop. Long-running tools (e.g.
    * generate_deck with internal LLM calls) should check signal.aborted in
@@ -64,11 +72,15 @@ export function composeSkills(id: string, intro: string, skills: AgentSkill[]): 
       }
       return all
     },
-    buildContext: () =>
-      skills
-        .map((s) => s.buildContext?.() ?? '')
-        .filter(Boolean)
-        .join('\n\n'),
+    // stays synchronous unless a sub-skill's context is async
+    buildContext: (instruction) => {
+      const parts = skills.map((s) => s.buildContext?.(instruction) ?? '')
+      const join = (texts: string[]) => texts.filter(Boolean).join('\n\n')
+      return parts.every((p): p is string => typeof p === 'string')
+        ? join(parts)
+        : Promise.all(parts).then(join)
+    },
+    stripContext: (text) => skills.reduce((t, s) => (s.stripContext ? s.stripContext(t) : t), text),
     executeTool: (call, signal) => {
       const skill = ownerOf(call.name)
       if (!skill) {
