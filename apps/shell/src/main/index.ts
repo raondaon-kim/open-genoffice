@@ -5996,6 +5996,8 @@ async function savePdfAs(): Promise<void> {
     } else {
       // No pending edits → a byte-identical copy
       await atomicCopyFile(tab.filePath, target)
+      // the PDF save handler reports its own writes; this copy bypasses it
+      workWikiDocumentSaved(target)
     }
     // the Save As copy shares the original's note
     void copyPdfNoteLink(tab.filePath, target)

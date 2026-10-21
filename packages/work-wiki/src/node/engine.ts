@@ -374,15 +374,18 @@ export class WorkWikiEngine {
       seen.add(h.id)
       lines.push(`- [${HIT_LABEL[h.kind]}] ${h.title} — ${h.summary.slice(0, 160)} (${h.id})`)
     }
-    let categories: string[] = []
-    let pages: ReturnType<WikiStore['listPages']> = []
-    try {
-      categories = indexCategoryLines(this.store.wikiDir)
-      pages = this.store.listPages()
-    } catch (err) {
-      this.disable(err)
-      return ''
+    const store = this.store
+    const read = (): { categories: string[]; pages: ReturnType<WikiStore['listPages']> } | null => {
+      try {
+        return { categories: indexCategoryLines(store.wikiDir), pages: store.listPages() }
+      } catch (err) {
+        this.disable(err)
+        return null
+      }
     }
+    const found = read()
+    if (!found) return ''
+    const { categories, pages } = found
     lines.push(...categories)
     for (const p of pages.sort(byCatalogOrder)) {
       if (!seen.has(`${PAGE_FOLDERS[p.type]}/${p.slug}`)) lines.push(catalogLine(p))

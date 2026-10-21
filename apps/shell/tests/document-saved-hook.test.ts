@@ -30,3 +30,13 @@ describe('moving a document in the app', () => {
     expect(fn).toMatch(/workWikiDocumentMoved\(oldPath, newPath\)/)
   })
 })
+
+describe('a clean PDF Save As', () => {
+  it('reports the byte-identical copy to the work wiki (it bypasses the PDF save handler)', () => {
+    const body = index.slice(index.indexOf('async function savePdfAs('))
+    const fn = body.slice(0, body.indexOf('\n}\n'))
+    expect(fn).toMatch(
+      /await atomicCopyFile\(tab\.filePath, target\)\r?\n(\s*\/\/[^\n]*\n)?\s*workWikiDocumentSaved\(target\)/,
+    )
+  })
+})

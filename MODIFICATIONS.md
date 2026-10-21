@@ -44,9 +44,15 @@ The fork's material changes on top of upstream:
     upstream deck pipeline composes the deck in the organization's colors,
     fonts, sizes and title positions.
 - **Work wiki** (`packages/work-wiki`):
-  - **What is kept:** every saved Hangul, Word and PowerPoint document, files dropped into
-    `raw/sources/`, and durable points from chat are learned into a small wiki of works (업무),
-    working methods (작업 방식) and clients (기관).
+  - **What is kept:** every document saved in the seven editors (Hangul, Word, PowerPoint,
+    Excel, PDF, Markdown, HTML), files dropped into `raw/sources/`, and durable points from chat
+    are learned into a small wiki of works (업무), working methods (작업 방식) and clients (기관).
+  - **Saved documents for LLM Wiki:** a saved document is also copied as it is into
+    `raw/sources/genoffice-saved/` (Hangul as Markdown text) under a name no other source uses,
+    replaced only when its content changed and at most once an hour, so LLM Wiki learns it too.
+    A changed source is rewritten: LLM Wiki drops the pages only it produced and ingests it
+    again. On by default; Settings › Work wiki can switch it off, and the first copy shows a
+    one-time notice.
   - **Folder:** the LLM Wiki folder format, `Documents\GenOffice 업무위키` by default. Our pages
     live in `wiki/work`, `wiki/methods` and `wiki/clients`; LLM Wiki owns the rest.
   - **Bundled LLM Wiki:** the Windows installer carries a modified [LLM Wiki](https://github.com/nashsu/llm_wiki)
@@ -59,8 +65,14 @@ The fork's material changes on top of upstream:
     - The first save sends an outline digest; later saves send only the changed paragraphs.
     - A plan call and 1–3 merge calls (thinking off) keep the pages under their caps.
     - Code maintains the work page's related-documents list.
-  - **How the assistants use it:** they get the catalog each turn, plus `wiki_search`, `wiki_read`
-    and `wiki_remember`. Wiki text is fenced as data.
+  - **How the assistants use it:** every AI panel (all seven editors) gets a catalog built for
+    the newest message (matching pages first, then the wiki's categories, within 3,000 chars;
+    earlier catalogs are removed from the history), plus `wiki_search`, `wiki_read`,
+    `wiki_index` and `wiki_remember`. Wiki text is fenced as data.
+  - **Index:** the bundled LLM Wiki builds its index from the pages on disk instead of having the
+    model rewrite it: a top `wiki/index.md` (at most 4,000 chars) and one list per category in
+    `wiki/index/`, split into groups and parts when large. Prompts get the part of the index
+    that matches what they read.
   - **Settings:** on/off and the folder, in Settings → AI media.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
