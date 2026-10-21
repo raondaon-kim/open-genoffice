@@ -39,7 +39,7 @@ vi.mock('electron', () => ({
     removeHandler: vi.fn(),
   },
 }))
-import { createPdfView } from '../src/main/pdf-main'
+import { createPdfView, setPdfDocumentSavedHook } from '../src/main/pdf-main'
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -145,5 +145,20 @@ describe('redaction working document', () => {
     pick.mockResolvedValue({ canceled: false, filePath: s.source })
     expect(await s.call(PDF_CHANNELS.requestRedactionCopy, s.source)).toBe(false)
     expect(new Uint8Array(await readFile(s.source))).toEqual(s.original)
+  })
+})
+
+describe('redacted copies reach the work wiki', () => {
+  it('reports the redacted copy, not the original', async () => {
+    const saved = vi.fn()
+    setPdfDocumentSavedHook(saved)
+    try {
+      const s = await setup()
+      expect(await s.call(PDF_CHANNELS.requestRedactionCopy, s.source)).toBe(true)
+      expect(saved).toHaveBeenCalledWith(s.copy)
+      expect(saved).not.toHaveBeenCalledWith(s.source)
+    } finally {
+      setPdfDocumentSavedHook(null)
+    }
   })
 })

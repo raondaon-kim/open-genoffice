@@ -81,7 +81,7 @@ vi.mock('electron', () => ({
 }))
 
 import { setOpenPathProbe } from '@genoffice/electron-utils'
-import { createHtmlView } from '../src/main/html-main'
+import { createHtmlView, setHtmlDocumentSavedHook } from '../src/main/html-main'
 import { HTML_CHANNELS } from '../src/shared/ipc'
 import type { SaveHtmlResult } from '../src/shared/ipc'
 
@@ -192,5 +192,46 @@ describe('a copy pair holds this document (the path is open in another pane)', (
       await save(contents, { text: '<p>Mine</p>', imageSources: [], mode: 'save' }),
     ).toMatchObject({ ok: true, path })
     expect(showMessageBox).not.toHaveBeenCalled()
+  })
+})
+
+describe('saves reach the work wiki (html)', () => {
+  const saved = vi.fn()
+  afterEach(() => {
+    saved.mockReset()
+    setHtmlDocumentSavedHook(null)
+    setOpenPathProbe(null)
+  })
+
+  it('reports a successful manual and automatic save once each, with the path', async () => {
+    setHtmlDocumentSavedHook(saved)
+    const path = await createDocument()
+    const contents = await openedView(path)
+    await save(contents, { text: '<p>Mine</p>', imageSources: [], mode: 'save' })
+    expect(saved).toHaveBeenCalledTimes(1)
+    expect(saved).toHaveBeenLastCalledWith(path)
+    await save(contents, { text: '<p>Mine 2</p>', imageSources: [], mode: 'save', auto: true })
+    expect(saved).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not report a save that did not write', async () => {
+    setHtmlDocumentSavedHook(saved)
+    const path = await createDocument()
+    const contents = await openedView(path)
+    writeFileSync(path, '<p>Changed elsewhere</p>')
+    setOpenPathProbe((each) => each === path)
+    await save(contents, { text: '<p>Mine</p>', imageSources: [], mode: 'save', auto: true })
+    expect(saved).not.toHaveBeenCalled()
+  })
+
+  it('a hook that throws never fails the save', async () => {
+    setHtmlDocumentSavedHook(() => {
+      throw new Error('wiki down')
+    })
+    const path = await createDocument()
+    const contents = await openedView(path)
+    expect(
+      await save(contents, { text: '<p>Mine</p>', imageSources: [], mode: 'save' }),
+    ).toMatchObject({ ok: true })
   })
 })

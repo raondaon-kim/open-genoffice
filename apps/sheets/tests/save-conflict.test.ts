@@ -129,7 +129,11 @@ vi.mock('@genoffice/xlsx-gateway/gateway/xlsx-package-io', async (importOriginal
 }))
 
 import { setOpenPathProbe } from '@genoffice/electron-utils'
-import { createSheetsView } from '../src/main/sheets-main'
+import {
+  createSheetsView,
+  markSheetsUnsavedNew,
+  setSheetsDocumentSavedHook,
+} from '../src/main/sheets-main'
 
 let dir: string
 
@@ -313,5 +317,56 @@ describe('split-view save guard (sheets)', () => {
     })
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(readFileSync(path)).toEqual(externalBytes)
+  })
+})
+
+describe('saves reach the work wiki (sheets)', () => {
+  const saved = vi.fn()
+  beforeEach(() => {
+    saved.mockReset()
+    setSheetsDocumentSavedHook(saved)
+  })
+  afterEach(() => setSheetsDocumentSavedHook(null))
+
+  it('reports a successful manual save once, with the saved path', async () => {
+    const path = writeWorkbook()
+    const opened = await openWorkbook(path)
+    await saveWorkbook(opened.sessionId)
+    expect(saved).toHaveBeenCalledTimes(1)
+    expect(saved).toHaveBeenCalledWith(path)
+  })
+
+  it('reports an automatic (quiet) save too', async () => {
+    const path = writeWorkbook()
+    const opened = await openWorkbook(path)
+    await saveWorkbook(opened.sessionId, { quiet: true })
+    expect(saved).toHaveBeenCalledWith(path)
+  })
+
+  it('does not report a save that was refused', async () => {
+    const path = writeWorkbook()
+    const opened = await openWorkbook(path)
+    writeFileSync(path, externalBytes)
+    await expect(saveWorkbook(opened.sessionId)).rejects.toThrow()
+    expect(saved).not.toHaveBeenCalled()
+  })
+
+  it('does not report the quiet save of an unsaved new workbook (a temp file)', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'genoffice-sheets-new-'))
+    const path = join(tempDir, 'Book1.xlsx')
+    writeFileSync(path, Buffer.from('original-bytes'))
+    markSheetsUnsavedNew(path, join(dir, 'Book1.xlsx'), tempDir)
+    const opened = await openWorkbook(path)
+    await saveWorkbook(opened.sessionId, { quiet: true })
+    expect(saved).not.toHaveBeenCalled()
+  })
+
+  it('a hook that throws never fails the save', async () => {
+    setSheetsDocumentSavedHook(() => {
+      throw new Error('wiki down')
+    })
+    const path = writeWorkbook()
+    const opened = await openWorkbook(path)
+    expect((await saveWorkbook(opened.sessionId)).canceled).toBe(false)
   })
 })

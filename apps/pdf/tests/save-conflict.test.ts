@@ -68,7 +68,7 @@ vi.mock('electron', () => ({
 }))
 
 import { setOpenPathProbe } from '@genoffice/electron-utils'
-import { createPdfView } from '../src/main/pdf-main'
+import { createPdfView, setPdfDocumentSavedHook } from '../src/main/pdf-main'
 import { PDF_CHANNELS } from '../src/shared/ipc'
 import type { SavePdfResult } from '../src/shared/ipc'
 
@@ -196,5 +196,44 @@ describe('a copy pair holds this PDF (the path is open in another pane)', () => 
 
     expect(await save(wcId, savedRequest(path))).toMatchObject({ ok: true })
     expect(showMessageBox).not.toHaveBeenCalled()
+  })
+})
+
+describe('saves reach the work wiki (pdf)', () => {
+  const saved = vi.fn()
+  afterEach(() => {
+    saved.mockReset()
+    setPdfDocumentSavedHook(null)
+    setOpenPathProbe(null)
+  })
+
+  it('reports a successful manual and automatic save once each, with the path', async () => {
+    setPdfDocumentSavedHook(saved)
+    const path = await makePdfFile()
+    const wcId = await openedView(path)
+    expect(await save(wcId, savedRequest(path))).toMatchObject({ ok: true })
+    expect(saved).toHaveBeenCalledTimes(1)
+    expect(saved).toHaveBeenLastCalledWith(path)
+    expect(await save(wcId, savedRequest(path, { auto: true }))).toMatchObject({ ok: true })
+    expect(saved).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not report a save that did not write', async () => {
+    setPdfDocumentSavedHook(saved)
+    const path = await makePdfFile()
+    const wcId = await openedView(path)
+    writeFileSync(path, await pdfBytes('changed elsewhere'))
+    setOpenPathProbe((each) => each === path)
+    expect(await save(wcId, savedRequest(path, { auto: true }))).toMatchObject({ ok: false })
+    expect(saved).not.toHaveBeenCalled()
+  })
+
+  it('a hook that throws never fails the save', async () => {
+    setPdfDocumentSavedHook(() => {
+      throw new Error('wiki down')
+    })
+    const path = await makePdfFile()
+    const wcId = await openedView(path)
+    expect(await save(wcId, savedRequest(path))).toMatchObject({ ok: true })
   })
 })

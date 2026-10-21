@@ -188,6 +188,7 @@ import {
   setSheetsHostWindowHook,
   setSheetsShellWindow,
   setSheetsWorkbookOpenedHook,
+  setSheetsDocumentSavedHook,
   startSheetsCaptureServer,
   stopSheetsSidecar,
 } from '../../../sheets/src/main/sheets-main'
@@ -220,6 +221,7 @@ import {
   sendPdfPrintRequest,
   setPdfRenamedHook,
   setPdfRedactionSavedHook,
+  setPdfDocumentSavedHook,
   setPdfSaveAsInFlight,
 } from '../../../pdf/src/main/pdf-main'
 import { PDF_CHANNELS } from '../../../pdf/src/shared/ipc'
@@ -240,6 +242,7 @@ import {
   sendMarkdownPrintRequest,
   setMarkdownDocxExportedHook,
   setMarkdownFileSavedHook,
+  setMarkdownDocumentSavedHook,
 } from '../../../markdown/src/main/markdown-main'
 import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hwp/src/main/hwp-main'
 import { loadFormFile } from './hwp-form-open'
@@ -274,6 +277,7 @@ import {
   setHtmlDocxExportPrepareHook,
   setHtmlDocxExportedHook,
   setHtmlFileSavedHook,
+  setHtmlDocumentSavedHook,
   setHtmlPresentHooks,
   setHtmlProvisionalTitleHook,
 } from '../../../html/src/main/html-main'
@@ -3577,9 +3581,13 @@ function createShellWindow(): void {
     applyPendingDir(wc.id, path)
   })
   // docs' save-as / silent first save lands on a new path → sync the tab title too
-  // every docx / pptx save feeds the work wiki
+  // every saved document (docx, pptx, xlsx, pdf, md, html) feeds the work wiki
   setDocsDocumentSavedHook((path) => workWikiDocumentSaved(path))
   setSlidesDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setSheetsDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setPdfDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setMarkdownDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setHtmlDocumentSavedHook((path) => workWikiDocumentSaved(path))
   setDocsFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)

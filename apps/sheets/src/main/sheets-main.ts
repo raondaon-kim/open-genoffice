@@ -1974,6 +1974,19 @@ export function setSheetsWorkbookOpenedHook(
   workbookOpenedHook = fn
 }
 
+/** Fired after every successful save to a user file (not the temp file of an unsaved new workbook); the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setSheetsDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
+}
+
 /** forward an application-menu File command into the sheets renderer */
 export function sendSheetsMenuAction(
   action: 'open' | 'save' | 'save-as' | 'print' | 'export-pdf' | 'export-csv' | 'undo' | 'redo',
@@ -3460,6 +3473,7 @@ export function registerSheetsIpc(): void {
     // Restored session saved (possibly Save As elsewhere): the unsaved work is
     // persisted, so the original's recovery copy must not re-offer it.
     if (session.restoreTarget !== undefined) clearWorkbookRecovery(session.restoreTarget)
+    notifyDocumentSaved((csvInPlace ? session.csvSourcePath : undefined) ?? targetPath)
     return { canceled: false, file, touchedEntries: mutation.touchedEntries }
   })
 

@@ -78,7 +78,7 @@ vi.mock('electron', () => ({
 }))
 
 import { setOpenPathProbe } from '@genoffice/electron-utils'
-import { createMarkdownView } from '../src/main/markdown-main'
+import { createMarkdownView, setMarkdownDocumentSavedHook } from '../src/main/markdown-main'
 import { MARKDOWN_CHANNELS } from '../src/shared/ipc'
 import type { SaveMarkdownResult } from '../src/shared/ipc'
 
@@ -195,5 +195,46 @@ describe('a copy pair holds this document (the path is open in another pane)', (
       path,
     })
     expect(showMessageBox).not.toHaveBeenCalled()
+  })
+})
+
+describe('saves reach the work wiki (markdown)', () => {
+  const saved = vi.fn()
+  afterEach(() => {
+    saved.mockReset()
+    setMarkdownDocumentSavedHook(null)
+    setOpenPathProbe(null)
+  })
+
+  it('reports a successful manual and automatic save once each, with the path', async () => {
+    setMarkdownDocumentSavedHook(saved)
+    const path = await createDocument()
+    const contents = await openedView(path)
+    await save(contents, { text: '# Mine', imageSources: [], mode: 'save' })
+    expect(saved).toHaveBeenCalledTimes(1)
+    expect(saved).toHaveBeenLastCalledWith(path)
+    await save(contents, { text: '# Mine 2', imageSources: [], mode: 'save', auto: true })
+    expect(saved).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not report a save that did not write', async () => {
+    setMarkdownDocumentSavedHook(saved)
+    const path = await createDocument()
+    const contents = await openedView(path)
+    writeFileSync(path, '# Changed elsewhere')
+    setOpenPathProbe((each) => each === path)
+    await save(contents, { text: '# Mine', imageSources: [], mode: 'save', auto: true })
+    expect(saved).not.toHaveBeenCalled()
+  })
+
+  it('a hook that throws never fails the save', async () => {
+    setMarkdownDocumentSavedHook(() => {
+      throw new Error('wiki down')
+    })
+    const path = await createDocument()
+    const contents = await openedView(path)
+    expect(await save(contents, { text: '# Mine', imageSources: [], mode: 'save' })).toMatchObject({
+      ok: true,
+    })
   })
 })

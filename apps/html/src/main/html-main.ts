@@ -898,6 +898,19 @@ export function setHtmlFileSavedHook(hook: (wc: WebContents, path: string) => vo
   fileSavedHook = hook
 }
 
+/** Fired after every successful write (manual or automatic) with the written path; the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setHtmlDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
+}
+
 /** An untitled document got a provisional name from the user's first AI request — the shell titles its tab */
 let provisionalTitleHook: ((wc: WebContents, title: string) => void) | null = null
 
@@ -1538,6 +1551,7 @@ function registerHtmlIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
+        notifyDocumentSaved(target)
         return done({
           ok: true,
           path: target,

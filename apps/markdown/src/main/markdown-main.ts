@@ -457,6 +457,19 @@ export function setMarkdownFileSavedHook(hook: (wc: WebContents, path: string) =
   fileSavedHook = hook
 }
 
+/** Fired after every successful write (manual or automatic) with the written path; the shell feeds the work wiki. */
+let documentSavedHook: ((filePath: string) => void) | null = null
+export function setMarkdownDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+  documentSavedHook = fn
+}
+function notifyDocumentSaved(filePath: string): void {
+  try {
+    documentSavedHook?.(filePath)
+  } catch {
+    // the wiki never blocks a save
+  }
+}
+
 /** Fired after a "convert & open in Docs" export — the shell routes the new .docx to a docs tab */
 let docxExportedHook: ((path: string) => void) | null = null
 /** One marked cache session per app process. Old crash leftovers are removed after seven days. */
@@ -913,6 +926,7 @@ function registerMarkdownIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
+        notifyDocumentSaved(target)
         return done({
           ok: true,
           path: target,
