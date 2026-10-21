@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { streamForProvider } from '@genoffice/ai-provider'
 import { format, getUiLang } from '@genoffice/i18n'
 import type { Lang } from '@genoffice/i18n'
@@ -410,16 +410,17 @@ export function startWorkWiki(opts: {
 
 /** the first saved copy ever: tell the person once, as an OS notification */
 function showMirrorNotice(): void {
-  showMirrorNoticeOnce({
+  // a message box, not an OS toast: Windows drops toasts from an app without a
+  // registered app user model id, and this notice must be seen
+  void showMirrorNoticeOnce({
     shown: () => readWorkWikiSettings().mirrorNoticeShown,
     markShown: () =>
       writeAppSetting(paths!.appSettingsPath, 'workWiki', {
         ...readWorkWikiSettings(),
         mirrorNoticeShown: true,
       }),
-    notify: (title, body) => {
-      if (Notification.isSupported()) new Notification({ title, body }).show()
-    },
+    notify: (title, body) =>
+      dialog.showMessageBox({ type: 'info', title, message: title, detail: body }),
     lang: getUiLang(),
   })
 }

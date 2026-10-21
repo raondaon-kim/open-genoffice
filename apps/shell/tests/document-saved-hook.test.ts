@@ -40,3 +40,13 @@ describe('a clean PDF Save As', () => {
     )
   })
 })
+
+describe('the saved-copies notice', () => {
+  it('is an in-app message box (a Windows toast needs an app user model id the shell does not set)', () => {
+    const wiki = readFileSync(join(__dirname, '../src/main/work-wiki.ts'), 'utf8')
+    const body = wiki.slice(wiki.indexOf('function showMirrorNotice('))
+    const fn = body.slice(0, body.indexOf('\n}\n'))
+    expect(fn).toMatch(/dialog\.showMessageBox\(/)
+    expect(fn).not.toMatch(/new Notification\(/)
+  })
+})
