@@ -22,3 +22,17 @@ export function normalizeWorkWikiSettings(raw: unknown, defaultFolder: string): 
     mirrorNoticeShown: o.mirrorNoticeShown === true,
   }
 }
+
+/**
+ * Whether a settings change needs the engine restarted. The saved-copies
+ * switch and the notice flag are read live, so they do not; a restart waits
+ * for a running learn job.
+ */
+export function workWikiNeedsRestart(prev: WorkWikiSettings, next: WorkWikiSettings): boolean {
+  return (
+    prev.enabled !== next.enabled ||
+    prev.folder !== next.folder ||
+    prev.exclude.length !== next.exclude.length ||
+    prev.exclude.some((e, i) => e !== next.exclude[i])
+  )
+}

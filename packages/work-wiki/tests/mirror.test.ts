@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -78,6 +79,8 @@ describe('saved-document mirror', () => {
       mirror: 'genoffice-saved/보고서.docx',
       hash: createHash('sha256').update('v1').digest('hex'),
       writtenAt: s.now(),
+      // what the copy holds: the same bytes for a non-Hangul file
+      copyHash: createHash('sha256').update('v1').digest('hex'),
     })
     // no temp file is left next to the copy
     expect(readdirSync(s.saved)).toEqual(['보고서.docx'])
@@ -219,5 +222,45 @@ describe('saved-document mirror', () => {
     mkdirSync(s.stateDir, { recursive: true })
     writeFileSync(join(s.stateDir, 'saved-index.json'), '{ broken')
     expect((await s.mirror.mirror(s.doc('a.docx', 'x'))).status).toBe('written')
+  })
+})
+
+describe('saved-document mirror: shared folders and shared text', () => {
+  it("never overwrites a coworker's file that took the name after our copy was deleted", async () => {
+    const s = setup()
+    const path = s.doc('보고서.docx', 'mine v1')
+    await s.mirror.mirror(path)
+    // our copy is deleted; a coworker's different file now has the name
+    writeFileSync(join(s.saved, '보고서.docx'), 'coworker')
+    s.tick(2 * HOUR)
+    writeFileSync(path, 'mine v2')
+    expect(await s.mirror.mirror(path)).toEqual({
+      status: 'written',
+      mirror: 'genoffice-saved/보고서 (2).docx',
+    })
+    expect(readFileSync(join(s.saved, '보고서.docx'), 'utf8')).toBe('coworker')
+    expect(readFileSync(join(s.saved, '보고서 (2).docx'), 'utf8')).toBe('mine v2')
+  })
+
+  it('rewrites its own copy in place, and re-creates it when it was deleted', async () => {
+    const s = setup()
+    const path = s.doc('a.docx', 'v1')
+    await s.mirror.mirror(path)
+    s.tick(2 * HOUR)
+    writeFileSync(path, 'v2')
+    expect(await s.mirror.mirror(path)).toMatchObject({ mirror: 'genoffice-saved/a.docx' })
+    rmSync(join(s.saved, 'a.docx'))
+    s.tick(2 * HOUR)
+    writeFileSync(path, 'v3')
+    expect(await s.mirror.mirror(path)).toMatchObject({ mirror: 'genoffice-saved/a.docx' })
+    expect(readFileSync(join(s.saved, 'a.docx'), 'utf8')).toBe('v3')
+  })
+
+  it('uses the text the caller already extracted for a Hangul file', async () => {
+    const extractText = vi.fn(async () => 'should not be read')
+    const s = setup({ extractText })
+    await s.mirror.mirror(s.doc('기안.hwp', 'bin'), { text: async () => '공유된 본문' })
+    expect(extractText).not.toHaveBeenCalled()
+    expect(readFileSync(join(s.saved, '기안.md'), 'utf8')).toBe('# 기안\n\n공유된 본문\n')
   })
 })

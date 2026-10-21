@@ -34,7 +34,7 @@ import {
   writeAppState,
 } from './llm-wiki-seed'
 import type { CodexBridgeEndpoint } from './llm-wiki-seed'
-import { normalizeWorkWikiSettings } from './work-wiki-settings'
+import { normalizeWorkWikiSettings, workWikiNeedsRestart } from './work-wiki-settings'
 import { showMirrorNoticeOnce } from './work-wiki-notice'
 import type { WorkWikiSettings } from './work-wiki-settings'
 
@@ -485,12 +485,13 @@ export function registerWorkWikiIpc(): void {
   ipcMain.handle(HOME_CHANNELS.openLlmWiki, () => openLlmWiki())
   ipcMain.handle(HOME_CHANNELS.getWorkWikiSettings, () => readWorkWikiSettings())
   ipcMain.handle(HOME_CHANNELS.setWorkWikiSettings, async (_e, patch: unknown) => {
+    const prev = readWorkWikiSettings()
     const next = normalizeWorkWikiSettings(
-      { ...readWorkWikiSettings(), ...(patch && typeof patch === 'object' ? patch : {}) },
+      { ...prev, ...(patch && typeof patch === 'object' ? patch : {}) },
       defaultFolder(),
     )
     writeAppSetting(paths!.appSettingsPath, 'workWiki', next)
-    await restart()
+    if (workWikiNeedsRestart(prev, next)) await restart()
     return next
   })
   ipcMain.handle(HOME_CHANNELS.pickWorkWikiFolder, async (e) => {

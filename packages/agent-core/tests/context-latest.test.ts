@@ -120,3 +120,49 @@ describe('context on the latest message only', () => {
     expect(composeSkills('s', '', [sync]).stripContext?.('keep')).toBe('keep')
   })
 })
+
+describe('stop and reset while the context is still being built', () => {
+  function pendingSkill() {
+    let resolve!: (ctx: string) => void
+    const skill = catalogSkill({
+      buildContext: () =>
+        new Promise<string>((r) => {
+          resolve = r
+        }),
+    })
+    return { skill, finish: (ctx: string) => resolve(ctx) }
+  }
+
+  it('reset drops the run: nothing is sent and the next message runs', async () => {
+    const { skill, finish } = pendingSkill()
+    const transport = answeringTransport()
+    const loop = new AgentLoop({ transport, skill })
+    loop.run('first')
+    loop.reset()
+    finish('### 목차\n<<late>>')
+    await flush()
+    expect(transport.requests).toBe(0)
+    expect(loop.messages).toHaveLength(0)
+    loop.run('second')
+    finish('')
+    await flush()
+    expect(transport.requests).toBe(1)
+  })
+
+  it('stop ends the run as cancelled once the context arrives, without a request', async () => {
+    const { skill, finish } = pendingSkill()
+    const transport = answeringTransport()
+    const onDone = vi.fn()
+    const loop = new AgentLoop({ transport, skill, events: { onDone } })
+    loop.run('first')
+    loop.cancel()
+    finish('')
+    await flush()
+    expect(transport.requests).toBe(0)
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ cancelled: true }))
+    loop.run('second')
+    finish('')
+    await flush()
+    expect(transport.requests).toBe(1)
+  })
+})

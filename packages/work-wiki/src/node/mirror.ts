@@ -50,6 +50,11 @@ export interface SavedMirrorOptions {
   onFirstMirror?: () => void
 }
 
+/** per call: the document's text when the caller has read it already (Hangul files) */
+export interface MirrorCallOptions {
+  text?: () => Promise<string | null>
+}
+
 export type MirrorOutcome =
   | { status: 'written' | 'unchanged' | 'skipped'; mirror?: string }
   | { status: 'deferred'; retryAt: number }
@@ -60,6 +65,8 @@ interface MirrorRecord {
   /** sha256 of the original's bytes */
   hash: string
   writtenAt: number
+  /** sha256 of what was written into the copy (absent in records from before it was kept) */
+  copyHash?: string
 }
 
 interface SavedIndex {
@@ -73,6 +80,14 @@ const DEFAULT_INTERVAL_MS = 3_600_000
 const DEFAULT_MAX_BYTES = 100 * 1024 * 1024
 const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase()
 const sha256 = (data: Buffer) => createHash('sha256').update(data).digest('hex')
+/** sha256 of a file, or null when it cannot be read (absent) */
+const fileHash = (path: string): string | null => {
+  try {
+    return sha256(readFileSync(path))
+  } catch {
+    return null
+  }
+}
 
 function isRecord(v: unknown): v is MirrorRecord {
   const r = v as MirrorRecord
@@ -110,7 +125,7 @@ function writeAtomic(dest: string, data: Buffer | string): void {
 }
 
 export function createSavedMirror(o: SavedMirrorOptions): {
-  mirror(path: string): Promise<MirrorOutcome>
+  mirror(path: string, opts?: MirrorCallOptions): Promise<MirrorOutcome>
   moved(oldPath: string, newPath: string): Promise<void>
 } {
   const indexPath = join(o.stateDir, 'saved-index.json')
@@ -179,7 +194,7 @@ export function createSavedMirror(o: SavedMirrorOptions): {
     return rel.replace(/\\/g, '/')
   }
 
-  const mirrorNow = async (path: string): Promise<MirrorOutcome> => {
+  const mirrorNow = async (path: string, opts?: MirrorCallOptions): Promise<MirrorOutcome> => {
     if (!o.enabled()) return { status: 'skipped' }
     const key = norm(path)
     if (key.startsWith(`${norm(o.root)}/`)) return { status: 'skipped' }
@@ -203,24 +218,41 @@ export function createSavedMirror(o: SavedMirrorOptions): {
     const stem = basename(path, extname(path))
     let data: Buffer | string = bytes
     if (HANGUL.has(ext)) {
-      data = hwpTextAsMarkdown(stem, (await o.extractText(path)) ?? '')
+      // the caller may have read the text already (the engine learns from the same text)
+      const text = await (opts?.text ? opts.text() : o.extractText(path))
+      data = hwpTextAsMarkdown(stem, text ?? '')
       if (!data) return { status: 'skipped' }
     }
 
-    let rel = rec?.mirror
+    let rel: string | undefined = rec?.mirror
     if (!rel) {
       const adopted = materialCopy(hash)
       if (adopted) {
         // already in the wiki as material: that copy is this document's from now on.
         // Nothing was written now, so its next change may be written at once.
-        idx.docs[key] = { mirror: adopted, hash, writtenAt: now() - interval }
+        idx.docs[key] = {
+          mirror: adopted,
+          hash,
+          writtenAt: now() - interval,
+          copyHash: fileHash(join(sourcesDir, adopted)) ?? undefined,
+        }
         save(idx)
         return { status: 'unchanged', mirror: adopted }
       }
-      rel = `${SAVED_DIR}/${freeName(HANGUL.has(ext) ? `${stem}.md` : basename(path))}`
+    } else if (rec?.copyHash) {
+      // In a shared folder our deleted copy's name can since have gone to someone
+      // else's file: only a file that still holds what we wrote is ours to replace
+      const current = fileHash(join(sourcesDir, rel))
+      if (current !== null && current !== rec.copyHash) rel = undefined
     }
+    if (!rel) rel = `${SAVED_DIR}/${freeName(HANGUL.has(ext) ? `${stem}.md` : basename(path))}`
     writeAtomic(join(sourcesDir, rel), data)
-    idx.docs[key] = { mirror: rel, hash, writtenAt: now() }
+    idx.docs[key] = {
+      mirror: rel,
+      hash,
+      writtenAt: now(),
+      copyHash: sha256(typeof data === 'string' ? Buffer.from(data, 'utf8') : data),
+    }
     save(idx)
     if (!noticed) {
       noticed = true
@@ -251,7 +283,7 @@ export function createSavedMirror(o: SavedMirrorOptions): {
   }
 
   return {
-    mirror: (path) => serial(() => mirrorNow(path)),
+    mirror: (path, opts) => serial(() => mirrorNow(path, opts)),
     moved: (oldPath, newPath) => serial(() => movedNow(oldPath, newPath)),
   }
 }

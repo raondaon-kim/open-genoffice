@@ -342,3 +342,63 @@ describe('WorkWikiEngine formats', () => {
     ])
   })
 })
+
+describe('WorkWikiEngine: copy retries and shared text', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] }))
+  afterEach(() => vi.useRealTimers())
+
+  it('a copy that could not be written is tried again ten minutes later', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-retry-'))
+    const mirror = {
+      mirror: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('share locked'))
+        .mockResolvedValue({ status: 'written', mirror: 'genoffice-saved/a.docx' }),
+      moved: vi.fn(async () => {}),
+    }
+    const engine = new WorkWikiEngine({
+      root,
+      complete: model(),
+      extractText: async () => '내용',
+      debounceMs: 10,
+      mirror,
+    })
+    engine.start()
+    engine.onDocumentSaved('D:/docs/a.docx')
+    await vi.advanceTimersByTimeAsync(50)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(9 * 60_000)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(60_000 + 100)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(2)
+  })
+
+  it('a Hangul document is read once per save, for the copy and the learning', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-once-'))
+    const extractText = vi.fn(async () => 'Ⅰ. 개요\n내용')
+    const mirror = {
+      mirror: vi.fn(async (_p: string, o?: { text?: () => Promise<string | null> }) => {
+        await o?.text?.()
+        return { status: 'written' as const, mirror: 'genoffice-saved/a.md' }
+      }),
+      moved: vi.fn(async () => {}),
+    }
+    const engine = new WorkWikiEngine({
+      root,
+      complete: model(),
+      extractText,
+      debounceMs: 10,
+      mirror,
+    })
+    engine.start()
+    engine.onDocumentSaved('D:/docs/a.hwp')
+    await vi.advanceTimersByTimeAsync(50)
+    await engine.runDue()
+    expect(mirror.mirror).toHaveBeenCalledTimes(1)
+    expect(mirror.mirror.mock.calls[0]![1]?.text).toBeTypeOf('function')
+    expect(extractText).toHaveBeenCalledTimes(1)
+  })
+})

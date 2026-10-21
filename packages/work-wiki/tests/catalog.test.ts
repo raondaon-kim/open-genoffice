@@ -150,3 +150,48 @@ describe('WorkWikiEngine.indexFile', () => {
     expect(engine.indexFile('../../secret')).toBe('색인이 아직 없습니다. wiki_search로 찾으세요.')
   })
 })
+
+describe('index names with spaces', () => {
+  function engineWithIndex(files: Record<string, string>) {
+    const root = mkdtempSync(join(tmpdir(), 'ww-sp-'))
+    for (const [rel, text] of Object.entries(files)) {
+      const parts = rel.split('/')
+      mkdirSync(join(root, 'wiki', ...parts.slice(0, -1)), { recursive: true })
+      writeFileSync(join(root, 'wiki', ...parts), text)
+    }
+    const engine = new WorkWikiEngine({
+      root,
+      complete: vi.fn(async () => ''),
+      extractText: async () => null,
+    })
+    engine.start()
+    return engine
+  }
+
+  it('wiki_index finds a group by its label with spaces (the file key has dashes)', () => {
+    const engine = engineWithIndex({
+      'index.md': '#\n',
+      'index/concepts/AI-윤리.md': '- [[x]] — X\n',
+    })
+    expect(engine.indexFile('concepts', 'AI 윤리')).toContain('[[x]]')
+  })
+
+  it('a category folder with a space is read as it is', () => {
+    const engine = engineWithIndex({ 'index.md': '#\n', 'index/내 메모.md': '- [[m]] — M\n' })
+    expect(engine.indexFile('내 메모')).toContain('[[m]]')
+  })
+
+  it('says "not found" when the index exists but has no such list', () => {
+    const engine = engineWithIndex({ 'index.md': '#\n' })
+    const text = engine.indexFile('nothing')
+    expect(text).not.toBe('색인이 아직 없습니다. wiki_search로 찾으세요.')
+    expect(text).toContain('wiki_index()')
+  })
+
+  it('the catalog lists a category whose folder name has a space', async () => {
+    const engine = engineWithIndex({
+      'index.md': '# 위키 목차\n\n## 내 메모 (3)\n메모 · 목록: index/내 메모.md\n',
+    })
+    expect(await engine.catalogFor('메모')).toContain('[목차] 내 메모 (3)')
+  })
+})

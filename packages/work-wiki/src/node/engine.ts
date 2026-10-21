@@ -8,7 +8,7 @@ import { readForeignDocs, resolveWikiFile } from './foreign'
 import { learn } from './learn'
 import type { WikiComplete } from './learn'
 import { maskSensitive } from './mask'
-import type { MirrorOutcome } from './mirror'
+import type { MirrorCallOptions, MirrorOutcome } from './mirror'
 import { buildFirstDigest, buildRevisionDigest, DocumentRegistry } from './registry'
 import {
   buildCatalog,
@@ -37,7 +37,7 @@ export interface EngineOptions {
   log?: (msg: string) => void
   /** copies saved documents into raw/sources for LLM Wiki (see mirror.ts) */
   mirror?: {
-    mirror(path: string): Promise<MirrorOutcome>
+    mirror(path: string, opts?: MirrorCallOptions): Promise<MirrorOutcome>
     moved(oldPath: string, newPath: string): Promise<void>
   }
   /** learning wrote wiki pages (the shell asks LLM Wiki to rebuild its index) */
@@ -68,9 +68,27 @@ const DEFAULT_DEBOUNCE_MS = 120_000
 const INDEX_TTL_MS = 30_000
 const READ_CAP = 12_000
 const CATALOG_CAP = 3000
+/** wait before trying a copy that could not be written again */
+const MIRROR_RETRY_MS = 10 * 60_000
 const INDEX_TEXT_CAP = 5800 // the fence adds about 60 chars; the tool result stays under 6,000
 const INDEX_SEGMENT = /^[^\\/:*?"<>|.][^\\/:*?"<>|]*$/
 export const INDEX_MISSING = '색인이 아직 없습니다. wiki_search로 찾으세요.'
+const INDEX_NOT_FOUND =
+  '목차에 그런 분류나 묶음이 없습니다. wiki_index()로 목차를 열어 분류 이름을 확인하세요.'
+
+/**
+ * The file name LLM Wiki's index builder gives a group label: path characters
+ * and spaces become "-", and a name ending in "-<digits>" gets "_" so it never
+ * looks like a numbered part (see the fork's wiki-index.ts fileKey).
+ */
+function indexFileKey(label: string): string {
+  const key = label
+    .replace(/[\\/:*?"<>|#[\]]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+    .slice(0, 60)
+  return /-\d+$/.test(key) ? `${key}_` : key
+}
 const INDEX_CUT_HINT =
   '… (목록이 깁니다. 이 분류의 묶음(group)이나 "다음:" 파일을 지정해 다시 여세요.)'
 const HIT_LABEL: Record<WikiHit['kind'], string> = {
@@ -103,7 +121,8 @@ function indexCategoryLines(wikiDir: string): string[] {
   for (let i = 0; i < lines.length; i++) {
     const head = /^## (.+)$/.exec(lines[i]!)
     if (!head) continue
-    const key = /index\/([^\s/]+)\.md/.exec(lines[i + 1] ?? '')?.[1]
+    // a category folder may contain spaces ("목록: index/내 메모.md")
+    const key = /index\/([^/\n]+?)\.md/.exec(lines[i + 1] ?? '')?.[1]
     if (key) out.push(`- [목차] ${head[1]} — wiki_index("${key}")로 목록을 엽니다`)
   }
   return out
@@ -270,10 +289,12 @@ export class WorkWikiEngine {
     if (!existsSync(this.opts.root))
       throw new Error(`wiki folder is not available: ${this.opts.root}`)
     if (job.kind === 'mirror') return this.runMirror(job.path)
-    if (job.kind === 'document' && attempt === 1) await this.runMirror(job.path)
+    // one read of the document per save, shared by the copy (Hangul) and the learning
+    let read: Promise<string | null> | undefined
+    const documentText = () => (read ??= this.opts.extractText(job.path))
+    if (job.kind === 'document' && attempt === 1) await this.runMirror(job.path, documentText)
     try {
-      const text =
-        job.kind === 'note' ? readFileSync(job.path, 'utf8') : await this.opts.extractText(job.path)
+      const text = job.kind === 'note' ? readFileSync(job.path, 'utf8') : await documentText()
       if (!text || !text.trim()) {
         store.appendLog(`건너뜀(본문 없음): ${title}`)
         return
@@ -309,10 +330,10 @@ export class WorkWikiEngine {
   }
 
   /** copy the saved document into the wiki's sources; never throws, never stops learning */
-  private async runMirror(path: string): Promise<void> {
+  private async runMirror(path: string, text?: () => Promise<string | null>): Promise<void> {
     if (!this.opts.mirror) return
     try {
-      const out = await this.opts.mirror.mirror(path)
+      const out = await this.opts.mirror.mirror(path, text ? { text } : undefined)
       // a change held back by the hourly limit is written when the hour is up, unless a newer
       // save of the document is already queued (its document job mirrors too)
       if (out.status === 'deferred' && !this.jobs.has(norm(path))) {
@@ -322,6 +343,15 @@ export class WorkWikiEngine {
       this.opts.log?.(
         `mirror failed: ${basename(path)} — ${err instanceof Error ? err.message : String(err)}`,
       )
+      // a locked or briefly unreachable share: try the copy again later, unless a newer
+      // save of the document is already queued (its document job copies too)
+      if (this.isEnabled && !this.jobs.has(norm(path))) {
+        try {
+          this.schedule({ path, dueAt: Date.now() + MIRROR_RETRY_MS, kind: 'mirror' })
+        } catch {
+          // the queue file is unwritable: the next save copies it
+        }
+      }
     }
   }
 
@@ -414,17 +444,25 @@ export class WorkWikiEngine {
       .filter((s): s is string => typeof s === 'string' && s.trim() !== '')
       .flatMap((s) => clean(s).split('/'))
       .filter(Boolean)
-    if (parts.length > 2 || !parts.every((p) => INDEX_SEGMENT.test(p))) return INDEX_MISSING
-    const file =
-      parts.length === 0
-        ? join(this.store.wikiDir, 'index.md')
-        : join(this.store.wikiDir, 'index', ...parts.slice(0, -1), `${parts.at(-1)}.md`)
-    let text: string
-    try {
-      text = readFileSync(file, 'utf8')
-    } catch {
-      return INDEX_MISSING
+    const wikiDir = this.store.wikiDir
+    // the index exists but has no such list: say so, rather than "not built yet"
+    const missing = () => (existsSync(join(wikiDir, 'index.md')) ? INDEX_NOT_FOUND : INDEX_MISSING)
+    if (parts.length > 2 || !parts.every((p) => INDEX_SEGMENT.test(p))) return missing()
+    const fileOf = (segments: string[]) =>
+      segments.length === 0
+        ? join(wikiDir, 'index.md')
+        : join(wikiDir, 'index', ...segments.slice(0, -1), `${segments.at(-1)}.md`)
+    // as given (a pointer printed in a file), else as the index names files (a group's label)
+    let text: string | null = null
+    for (const segments of [parts, parts.map(indexFileKey)]) {
+      try {
+        text = readFileSync(fileOf(segments), 'utf8')
+        break
+      } catch {
+        // try the next spelling
+      }
     }
+    if (text === null) return missing()
     if (text.length > INDEX_TEXT_CAP) {
       const cut = text.slice(0, INDEX_TEXT_CAP)
       text = `${cut.slice(0, Math.max(cut.lastIndexOf('\n'), 0))}\n${INDEX_CUT_HINT}`
