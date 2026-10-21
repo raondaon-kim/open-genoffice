@@ -77,7 +77,9 @@ The fork's material changes on top of upstream:
   proxy's `/models`). A company build sets `OPEN_GENOFFICE_LITELLM_URL` and
   `OPEN_GENOFFICE_LITELLM_MODEL` at packaging time; the values ship as
   `org-defaults.json` and seed the AI settings on a first run only. No internal
-  address is stored in the repository.
+  address is stored in the repository. In such a build the LiteLLM model is fixed to the
+  build's model: Settings shows it read-only without the proxy's list, and a different stored
+  LiteLLM model is rewritten at startup.
   Settings › AI model offers LiteLLM, Codex and own API keys as three connection modes;
   the LiteLLM card prefills the build's address (also on an existing install) and defaults to
   `deepseek-flash`.

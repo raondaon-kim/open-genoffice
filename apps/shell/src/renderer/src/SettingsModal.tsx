@@ -357,6 +357,17 @@ function AiModelPane({ t }: { t: TFunc }) {
   const endpointApiKey = endpointConfig?.apiKey ?? ''
   // The stored model decides where the pin goes below, but changing it must not
   // send another request, so it is read when the reply lands rather than keyed on.
+  // the address and model the company build carries (empty for an open build); a company
+  // build's LiteLLM model is the only one offered or saved
+  const [orgBaseUrl, setOrgBaseUrl] = useState('')
+  const [orgModel, setOrgModel] = useState('')
+  useEffect(() => {
+    void window.aiOffice.getOrgAiDefaults?.().then((o) => {
+      setOrgBaseUrl(o?.baseUrl ?? '')
+      setOrgModel(o?.model ?? '')
+    })
+  }, [])
+
   const selectedModelRef = useRef('')
   useEffect(() => {
     selectedModelRef.current = endpointConfig?.model ?? ''
@@ -366,6 +377,8 @@ function AiModelPane({ t }: { t: TFunc }) {
 
   useEffect(() => {
     if (!endpointProvider) return
+    // a company build's LiteLLM model is fixed: the proxy's other models are never listed
+    if (endpointProvider === 'litellm' && orgModel) return
     // A list belonging to a different server — or to no server, once the address
     // is cleared — is misinformation, so it goes the moment the address changes:
     // the free-text box is the honest thing to show while the answer is unknown.
@@ -400,13 +413,7 @@ function AiModelPane({ t }: { t: TFunc }) {
       cancelled = true
       clearTimeout(timer)
     }
-  }, [endpointProvider, endpointBaseUrl, endpointApiKey])
-
-  // the address the company build carries (empty for an open build)
-  const [orgBaseUrl, setOrgBaseUrl] = useState('')
-  useEffect(() => {
-    void window.aiOffice.getOrgAiDefaults?.().then((o) => setOrgBaseUrl(o?.baseUrl ?? ''))
-  }, [])
+  }, [endpointProvider, endpointBaseUrl, endpointApiKey, orgModel])
 
   // LiteLLM calls DeepSeek unless the user picked something else: once the proxy's list is known
   // (or while it is not), a missing or unlisted model becomes the default. Only a new list or a
@@ -415,7 +422,8 @@ function AiModelPane({ t }: { t: TFunc }) {
   useEffect(() => {
     if (!settings || settings.provider !== 'litellm') return
     const own = settings.providers.litellm ?? { apiKey: '', model: '' }
-    const next = chooseLitellmModel(litellmListed, own.model)
+    // a company build's model wins over anything stored or listed
+    const next = orgModel || chooseLitellmModel(litellmListed, own.model)
     if (next === own.model) return
     setSettings({
       ...settings,
@@ -424,7 +432,7 @@ function AiModelPane({ t }: { t: TFunc }) {
     setDirty(true)
     setSaved(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings?.provider, litellmListed])
+  }, [settings?.provider, litellmListed, orgModel])
 
   if (!settings) return null
   const provider = settings.provider
@@ -583,8 +591,20 @@ function AiModelPane({ t }: { t: TFunc }) {
       <div className="set-field">
         <div className="set-field-text">
           <label className="set-field-label">{t('setAiModelId')}</label>
+          {isLitellm && orgModel && (
+            <div className="set-field-desc">{t('setAiLitellmManaged')}</div>
+          )}
         </div>
-        {meta && meta.models.length > 0 ? (
+        {isLitellm && orgModel ? (
+          <input
+            id="set-ai-model"
+            className="set-input"
+            type="text"
+            value={orgModel}
+            readOnly
+            spellCheck={false}
+          />
+        ) : meta && meta.models.length > 0 ? (
           <Dropdown
             className="set-dd"
             value={config.model || meta.defaultModel}

@@ -155,6 +155,33 @@ describe('AI connection modes', () => {
     expect(saved?.byokProvider).toBe('anthropic')
   })
 
+  it('a company build locks the LiteLLM model to its own: no proxy list, read-only, saved as that model', async () => {
+    const s = defaultAiSettings()
+    s.provider = 'litellm'
+    s.providers.litellm = { apiKey: 'k', model: 'gpt-5', baseUrl: 'http://proxy.test:4000/v1' }
+    install(s, {
+      org: { baseUrl: 'http://proxy.test:4000/v1', model: 'deepseek-flash' },
+      models: ['gpt-5', 'deepseek-flash', 'claude-opus'],
+    })
+    await openAiPane()
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 700))
+    })
+    await flush()
+    const model = host.querySelector<HTMLInputElement>('#set-ai-model')
+    expect(model?.value).toBe('deepseek-flash')
+    expect(model?.readOnly).toBe(true)
+    // the proxy's other models are never offered
+    expect(host.textContent).not.toContain('gpt-5')
+    expect(host.textContent).not.toContain('claude-opus')
+    expect(host.textContent).toContain('Set by the company build')
+    await act(async () => {
+      saveButton().click()
+      await Promise.resolve()
+    })
+    expect(saved?.providers.litellm?.model).toBe('deepseek-flash')
+  })
+
   it('LiteLLM on a proxy without deepseek-flash picks the listed DeepSeek model', async () => {
     const s = defaultAiSettings()
     s.provider = 'litellm'

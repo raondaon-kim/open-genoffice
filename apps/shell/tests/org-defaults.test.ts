@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import {
   firstRunAiSettings,
   isUpstreamAiSettings,
+  lockOrgLitellmModel,
   orgDefaultsView,
   parseOrgDefaults,
   readOrgDefaults,
@@ -74,5 +75,60 @@ describe('orgDefaultsView', () => {
   })
   it('is null for a build without defaults', () => {
     expect(orgDefaultsView(null)).toBeNull()
+  })
+})
+
+describe('startup', () => {
+  it('rewrites a stored LiteLLM model to the company build one when there is nothing to seed', async () => {
+    const { readFileSync } = await import('node:fs')
+    const index = readFileSync(join(__dirname, '../src/main/index.ts'), 'utf8')
+    const block = index.slice(index.indexOf('const orgDefaultsPath = app.isPackaged'))
+    const head = block.slice(0, block.indexOf('\n}\n'))
+    expect(head).toMatch(/lockOrgLitellmModel\(existing, orgDefaults\)/)
+    expect(head).toMatch(/writeFileSync\(aiSettingsPath, JSON\.stringify\(locked, null, 2\)\)/)
+  })
+})
+
+describe('lockOrgLitellmModel', () => {
+  const defaults = {
+    provider: 'litellm' as const,
+    baseUrl: 'http://proxy.internal:4000/v1',
+    model: 'm-1',
+  }
+
+  it('rewrites a stored LiteLLM model that is not the build one, keeping the rest', () => {
+    const existing = {
+      provider: 'litellm',
+      maxOutputTokens: 9000,
+      providers: {
+        litellm: { apiKey: 'k', model: 'gpt-5', baseUrl: 'http://proxy.internal:4000/v1' },
+        anthropic: { apiKey: 'a', model: 'claude' },
+      },
+    }
+    expect(lockOrgLitellmModel(existing, defaults)).toEqual({
+      ...existing,
+      providers: {
+        ...existing.providers,
+        litellm: { ...existing.providers.litellm, model: 'm-1' },
+      },
+    })
+  })
+
+  it('leaves settings alone that already use the build model or have no LiteLLM entry', () => {
+    expect(
+      lockOrgLitellmModel(
+        { provider: 'litellm', providers: { litellm: { apiKey: '', model: 'm-1' } } },
+        defaults,
+      ),
+    ).toBeNull()
+    expect(lockOrgLitellmModel({ provider: 'anthropic', providers: {} }, defaults)).toBeNull()
+  })
+
+  it('does nothing in an open build or for unreadable settings', () => {
+    expect(
+      lockOrgLitellmModel({ provider: 'litellm', providers: { litellm: { model: 'x' } } }, null),
+    ).toBeNull()
+    expect(lockOrgLitellmModel(undefined, defaults)).toBeNull()
+    expect(lockOrgLitellmModel('junk', defaults)).toBeNull()
   })
 })

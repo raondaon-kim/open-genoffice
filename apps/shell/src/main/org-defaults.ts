@@ -80,3 +80,23 @@ export function firstRunAiSettings(
     },
   }
 }
+
+/**
+ * A company build fixes the LiteLLM model: settings whose LiteLLM entry names another model
+ * (saved before the build pinned it, or edited by hand) get the build's model, everything else
+ * unchanged. Null when nothing needs writing (open build, no LiteLLM entry, already the model).
+ */
+export function lockOrgLitellmModel(
+  existing: unknown,
+  defaults: OrgAiDefaults | null,
+): Record<string, unknown> | null {
+  if (!defaults || !existing || typeof existing !== 'object') return null
+  const settings = existing as { providers?: Record<string, unknown> }
+  const litellm = settings.providers?.litellm
+  if (!litellm || typeof litellm !== 'object') return null
+  if ((litellm as { model?: unknown }).model === defaults.model) return null
+  return {
+    ...settings,
+    providers: { ...settings.providers, litellm: { ...litellm, model: defaults.model } },
+  }
+}

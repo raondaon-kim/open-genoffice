@@ -245,7 +245,12 @@ import { configureHwpRuntime, flushHwpSave, requestHwpSaveAs } from '../../../hw
 import { loadFormFile } from './hwp-form-open'
 import { hwpTextExtractor, runRhwpWith } from './hwp-text'
 import { setHwpTextExtractor } from '@genoffice/file-parse'
-import { firstRunAiSettings, orgDefaultsView, readOrgDefaults } from './org-defaults'
+import {
+  firstRunAiSettings,
+  lockOrgLitellmModel,
+  orgDefaultsView,
+  readOrgDefaults,
+} from './org-defaults'
 import { registerCodexIpc, stopCodexLoginForQuit } from './codex-connection'
 import {
   addWikiMaterialFromDialog,
@@ -429,9 +434,17 @@ const orgDefaultsPath = app.isPackaged
       existing = null
     }
   }
-  const seeded = orgDefaultsPath
-    ? firstRunAiSettings(existing, readOrgDefaults(orgDefaultsPath))
-    : null
+  const orgDefaults = orgDefaultsPath ? readOrgDefaults(orgDefaultsPath) : null
+  const seeded = firstRunAiSettings(existing, orgDefaults)
+  // a company build's LiteLLM model is the only one: a different stored model is rewritten
+  const locked = seeded ? null : lockOrgLitellmModel(existing, orgDefaults)
+  if (locked) {
+    try {
+      writeFileSync(aiSettingsPath, JSON.stringify(locked, null, 2))
+    } catch (err) {
+      console.warn('[org-defaults] could not pin the LiteLLM model:', err)
+    }
+  }
   if (seeded) {
     try {
       mkdirSync(app.getPath('userData'), { recursive: true })
