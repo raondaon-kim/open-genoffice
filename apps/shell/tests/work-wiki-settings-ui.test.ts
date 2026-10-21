@@ -102,6 +102,29 @@ describe('work wiki settings block', () => {
     expect(set.openLlmWiki).toHaveBeenCalled()
   })
 
+  it('shows the saved-copies switch, on by default, and saves it', async () => {
+    const set = await render(
+      {
+        enabled: true,
+        folder: 'D:/wiki',
+        exclude: [],
+        mirrorSaved: true,
+        mirrorNoticeShown: false,
+      },
+      null,
+    )
+    expect(host.textContent).toContain('setWorkWikiMirrorSavedDesc')
+    const sw = [...host.querySelectorAll('[role="switch"]')].find(
+      (b) => b.getAttribute('aria-label') === 'setWorkWikiMirrorSaved',
+    ) as HTMLButtonElement
+    expect(sw.getAttribute('aria-checked')).toBe('true')
+    await act(async () => {
+      sw.click()
+      await Promise.resolve()
+    })
+    expect(set).toHaveBeenCalledWith({ mirrorSaved: false })
+  })
+
   it('says so when this install does not include LLM Wiki', async () => {
     await render({ enabled: true, folder: 'D:/wiki', exclude: [] }, null, {
       state: 'stopped',

@@ -213,6 +213,20 @@ export class LlmWikiProcess {
     }
   }
 
+  /** ask it to rebuild the wiki index from the pages on disk; false when it is not running */
+  async rebuildIndex(): Promise<boolean> {
+    if (this.state !== 'running') return false
+    try {
+      const r = await this.call(
+        `/projects/${encodeURIComponent(this.o.projectId)}/index/rebuild`,
+        'POST',
+      )
+      return r.ok
+    } catch {
+      return false
+    }
+  }
+
   /** its own search (keyword + vector), as wiki hits; empty when it is not running */
   async search(query: string, topK = 5): Promise<WikiHit[]> {
     if (this.state !== 'running') return []

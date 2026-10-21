@@ -46,6 +46,8 @@ function fakeWorld(opts: { healthyAfter?: number; neverHealthy?: boolean } = {})
     }
     if (url.endsWith('/app/show'))
       return { ok: true, status: 200, json: async () => ({ ok: true }) }
+    if (url.endsWith('/index/rebuild'))
+      return { ok: true, status: 200, json: async () => ({ ok: true, queued: true }) }
     if (url.includes('/search')) {
       return {
         ok: true,
@@ -192,6 +194,18 @@ describe('LlmWikiProcess', () => {
     ])
     const call = world.calls.find((c) => c.url.includes('/projects/p-1/search'))!
     expect(JSON.parse(call.body!)).toMatchObject({ query: '코이카' })
+  })
+
+  it('rebuildIndex posts to the project index route and is false when not running', async () => {
+    const world = fakeWorld()
+    const p = make(world)
+    expect(await p.rebuildIndex()).toBe(false)
+    expect(world.calls.some((c) => c.url.includes('/index/rebuild'))).toBe(false)
+    await p.start()
+    expect(await p.rebuildIndex()).toBe(true)
+    const call = world.calls.find((c) => c.url.endsWith('/projects/p-1/index/rebuild'))!
+    expect(call.method).toBe('POST')
+    expect(call.auth).toBe('Bearer tok')
   })
 
   it('a start that throws (spawn failure) is a failed state, not an exception', async () => {

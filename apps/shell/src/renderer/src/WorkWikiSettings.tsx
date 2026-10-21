@@ -113,6 +113,23 @@ export function WorkWikiSettingsBlock({ t }: { t: TFunc }) {
         <div className="set-field">
           <div className="set-field-text">
             <div className="set-field-stack">
+              <div className="set-field-label">{t('setWorkWikiMirrorSaved')}</div>
+              <div className="set-field-desc">{t('setWorkWikiMirrorSavedDesc')}</div>
+            </div>
+          </div>
+          <button
+            className="set-switch"
+            role="switch"
+            aria-checked={settings.mirrorSaved}
+            aria-label={t('setWorkWikiMirrorSaved')}
+            onClick={() => void save({ mirrorSaved: !settings.mirrorSaved })}
+          />
+        </div>
+      )}
+      {settings.enabled && (
+        <div className="set-field">
+          <div className="set-field-text">
+            <div className="set-field-stack">
               <div className="set-field-label">{t('setWorkWikiExclude')}</div>
               <div className="set-field-desc">{t('setWorkWikiExcludeDesc')}</div>
               {settings.exclude.map((folder) => (

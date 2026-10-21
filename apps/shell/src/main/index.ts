@@ -262,6 +262,7 @@ import {
   startWorkWiki,
   stopWorkWikiForQuit,
   workWikiDocumentSaved,
+  workWikiDocumentMoved,
 } from './work-wiki'
 import {
   configureHtmlRuntime,
@@ -3278,6 +3279,8 @@ function afterFileMoved(oldPath: string, newPath: string): void {
   // a PDF keeps its note, a moved note keeps its PDFs
   void movePdfNoteLink(oldPath, newPath)
   projectFileRenamed(oldPath, newPath)
+  // the document's copy in the work wiki keeps its name; its record follows the move
+  workWikiDocumentMoved(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
   const affected = tabManager?.renameTabFile(oldPath, newPath) ?? []
   const detachedAffected = detachedRenameFile(oldPath, newPath)

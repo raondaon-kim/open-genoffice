@@ -8,6 +8,8 @@ describe('normalizeWorkWikiSettings', () => {
         enabled: true,
         folder: 'C:/Users/u/Documents/GenOffice 업무위키',
         exclude: [],
+        mirrorSaved: true,
+        mirrorNoticeShown: false,
       },
     )
   })
@@ -20,7 +22,20 @@ describe('normalizeWorkWikiSettings', () => {
         { enabled: false, folder: `  ${root}/share/wiki `, exclude: [`${root}/private`, 3, ''] },
         'X',
       ),
-    ).toEqual({ enabled: false, folder: `${root}/share/wiki`, exclude: [`${root}/private`] })
+    ).toEqual({
+      enabled: false,
+      folder: `${root}/share/wiki`,
+      exclude: [`${root}/private`],
+      mirrorSaved: true,
+      mirrorNoticeShown: false,
+    })
     expect(normalizeWorkWikiSettings({ folder: 'relative/path' }, 'X').folder).toBe('X')
+  })
+
+  it('copies saved documents by default, and keeps a switched-off copy and the notice flag', () => {
+    expect(normalizeWorkWikiSettings({}, 'X').mirrorSaved).toBe(true)
+    expect(normalizeWorkWikiSettings({ mirrorSaved: 'no' }, 'X').mirrorSaved).toBe(true)
+    expect(normalizeWorkWikiSettings({ mirrorSaved: false }, 'X').mirrorSaved).toBe(false)
+    expect(normalizeWorkWikiSettings({ mirrorNoticeShown: true }, 'X').mirrorNoticeShown).toBe(true)
   })
 })

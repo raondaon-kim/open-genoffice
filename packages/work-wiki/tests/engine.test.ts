@@ -306,3 +306,39 @@ describe('WorkWikiEngine and the saved-document mirror', () => {
     expect(mirror.moved).toHaveBeenCalledWith('D:/docs/a.hwp', 'D:/docs/b.hwp')
   })
 })
+
+describe('WorkWikiEngine formats', () => {
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] }))
+  afterEach(() => vi.useRealTimers())
+
+  it('learns hwp, hwpx, docx, pptx, xlsx, pdf, md, html and htm, and not csv', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ww-fmt-'))
+    const learned: string[] = []
+    const engine = new WorkWikiEngine({
+      root,
+      complete: model(),
+      extractText: async (p) => {
+        learned.push(p.split('.').pop()!)
+        return '내용'
+      },
+      debounceMs: 10,
+    })
+    engine.start()
+    for (const ext of ['hwp', 'hwpx', 'docx', 'pptx', 'xlsx', 'pdf', 'md', 'html', 'htm', 'csv']) {
+      engine.onDocumentSaved(`D:/docs/a.${ext}`)
+    }
+    await vi.advanceTimersByTimeAsync(50)
+    await engine.runDue()
+    expect(learned.sort()).toEqual([
+      'docx',
+      'htm',
+      'html',
+      'hwp',
+      'hwpx',
+      'md',
+      'pdf',
+      'pptx',
+      'xlsx',
+    ])
+  })
+})

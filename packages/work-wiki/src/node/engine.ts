@@ -43,7 +43,18 @@ interface Job {
   kind: 'document' | 'note' | 'mirror'
 }
 
-const LEARNED = new Set(['.hwp', '.hwpx', '.docx', '.pptx'])
+/** the formats the seven editors save; their text comes from @genoffice/file-parse */
+const LEARNED = new Set([
+  '.hwp',
+  '.hwpx',
+  '.docx',
+  '.pptx',
+  '.xlsx',
+  '.pdf',
+  '.md',
+  '.html',
+  '.htm',
+])
 const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase()
 const DEFAULT_DEBOUNCE_MS = 120_000
 const INDEX_TTL_MS = 30_000

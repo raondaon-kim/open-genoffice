@@ -13,5 +13,12 @@ export function normalizeWorkWikiSettings(raw: unknown, defaultFolder: string): 
         .filter((e): e is string => typeof e === 'string' && isAbsolute(e.trim()))
         .map((e) => e.trim())
     : []
-  return { enabled: o.enabled !== false, folder, exclude }
+  return {
+    enabled: o.enabled !== false,
+    folder,
+    exclude,
+    // saved documents are copied into the wiki unless switched off
+    mirrorSaved: o.mirrorSaved !== false,
+    mirrorNoticeShown: o.mirrorNoticeShown === true,
+  }
 }

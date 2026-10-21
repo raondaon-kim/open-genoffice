@@ -139,6 +139,10 @@ export interface WorkWikiSettings {
   enabled: boolean
   folder: string
   exclude: string[]
+  /** also copy saved documents into the wiki's sources for LLM Wiki (default on) */
+  mirrorSaved: boolean
+  /** the one-time notice about those copies was shown */
+  mirrorNoticeShown: boolean
 }
 
 /** Codex as Settings shows it: who is signed in, or why it cannot be used */

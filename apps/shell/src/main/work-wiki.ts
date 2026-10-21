@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Notification } from 'electron'
 import { streamForProvider } from '@genoffice/ai-provider'
 import { format, getUiLang } from '@genoffice/i18n'
 import type { Lang } from '@genoffice/i18n'
 import { readAiSettingsFile } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { WIKI_CHANNELS, WIKI_UNAVAILABLE } from '@genoffice/work-wiki'
-import { WorkWikiEngine } from '@genoffice/work-wiki/node'
+import { createSavedMirror, WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
 import { hwpAttachmentGate } from '../../../hwp/src/main/attachments'
@@ -35,6 +35,7 @@ import {
 } from './llm-wiki-seed'
 import type { CodexBridgeEndpoint } from './llm-wiki-seed'
 import { normalizeWorkWikiSettings } from './work-wiki-settings'
+import { showMirrorNoticeOnce } from './work-wiki-notice'
 import type { WorkWikiSettings } from './work-wiki-settings'
 
 const LEARN_TIMEOUT_MS = 180_000
@@ -369,15 +370,30 @@ async function restart(): Promise<void> {
     return
   }
   const debounce = Number(process.env.GENOFFICE_WORK_WIKI_DEBOUNCE_MS)
+  // tests and drivers only: shorten the copy's once-an-hour limit
+  const mirrorInterval = Number(process.env.GENOFFICE_WIKI_MIRROR_INTERVAL_MS)
+  const stateDir = stateDirFor(s.folder)
+  const mirror = createSavedMirror({
+    root: s.folder,
+    stateDir,
+    materialIndexPath: join(stateDir, 'material-index.json'),
+    extractText,
+    enabled: () => readWorkWikiSettings().mirrorSaved,
+    ...(mirrorInterval > 0 ? { minIntervalMs: mirrorInterval } : {}),
+    onFirstMirror: showMirrorNotice,
+  })
   const next = new WorkWikiEngine({
     root: s.folder,
-    stateDir: stateDirFor(s.folder),
+    stateDir,
     exclude: s.exclude,
     complete: createWikiComplete(join(paths!.userData, 'ai-settings.json')),
     extractText,
     extraSearch: (q) => llmWiki?.search(q) ?? Promise.resolve([]),
     ...(debounce > 0 ? { debounceMs: debounce } : {}),
     log: (m) => console.warn(`[work-wiki] ${m}`),
+    mirror,
+    // GenOffice's own pages (work, methods, clients) changed: LLM Wiki's index lists them too
+    onPagesWritten: () => void llmWiki?.rebuildIndex(),
   })
   if (next.start()) engine = next
   void startLlmWiki()
@@ -390,6 +406,27 @@ export function startWorkWiki(opts: {
 }): void {
   paths = opts
   void restart()
+}
+
+/** the first saved copy ever: tell the person once, as an OS notification */
+function showMirrorNotice(): void {
+  showMirrorNoticeOnce({
+    shown: () => readWorkWikiSettings().mirrorNoticeShown,
+    markShown: () =>
+      writeAppSetting(paths!.appSettingsPath, 'workWiki', {
+        ...readWorkWikiSettings(),
+        mirrorNoticeShown: true,
+      }),
+    notify: (title, body) => {
+      if (Notification.isSupported()) new Notification({ title, body }).show()
+    },
+    lang: getUiLang(),
+  })
+}
+
+/** a document was moved or renamed in the app: its wiki copy follows; never throws */
+export function workWikiDocumentMoved(oldPath: string, newPath: string): void {
+  void engine?.documentMoved(oldPath, newPath).catch(() => undefined)
 }
 
 /** every saved document reaches the wiki through here; never throws */

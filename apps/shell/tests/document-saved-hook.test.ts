@@ -22,3 +22,11 @@ describe('document saves reach the work wiki', () => {
     )
   })
 })
+
+describe('moving a document in the app', () => {
+  it('afterFileMoved tells the work wiki, so the saved copy follows', () => {
+    const body = index.slice(index.indexOf('function afterFileMoved('))
+    const fn = body.slice(0, body.indexOf('\n}\n'))
+    expect(fn).toMatch(/workWikiDocumentMoved\(oldPath, newPath\)/)
+  })
+})

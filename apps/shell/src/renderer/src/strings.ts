@@ -181,6 +181,9 @@ export const strings = {
     setWorkWikiChange: '更改…',
     setWorkWikiExclude: '排除的文件夹',
     setWorkWikiExcludeDesc: '这些文件夹中的文档不会被记入工作维基。',
+    setWorkWikiMirrorSaved: '也把保存的文档放入维基',
+    setWorkWikiMirrorSavedDesc:
+      '保存的文档会按原样复制到维基文件夹（raw/sources/genoffice-saved），让 LLM Wiki 也能学习。',
     setWorkWikiExcludeAdd: '添加排除文件夹…',
     setWorkWikiExcludeRemove: '取消排除',
     setLlmWiki: 'LLM Wiki',
@@ -614,6 +617,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -1058,6 +1064,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -1516,6 +1525,9 @@ export const strings = {
     setWorkWikiChange: '変更…',
     setWorkWikiExclude: '除外フォルダー',
     setWorkWikiExcludeDesc: 'このフォルダー内の文書は業務ウィキに記憶しません。',
+    setWorkWikiMirrorSaved: '保存した文書もウィキに入れる',
+    setWorkWikiMirrorSavedDesc:
+      '保存した文書をそのままウィキフォルダー（raw/sources/genoffice-saved）にコピーし、LLM Wiki も学習します。',
     setWorkWikiExcludeAdd: '除外フォルダーを追加…',
     setWorkWikiExcludeRemove: '除外を解除',
     setLlmWiki: 'LLM Wiki',
@@ -1971,6 +1983,9 @@ export const strings = {
     setWorkWikiChange: '변경…',
     setWorkWikiExclude: '제외 폴더',
     setWorkWikiExcludeDesc: '이 폴더 안의 문서는 업무 위키에 기억하지 않습니다.',
+    setWorkWikiMirrorSaved: '저장한 문서도 위키에 넣기',
+    setWorkWikiMirrorSavedDesc:
+      '저장한 문서를 원본 그대로 위키 폴더(raw/sources/genoffice-saved)에 복사해 LLM Wiki도 배우게 합니다.',
     setWorkWikiExcludeAdd: '제외 폴더 추가…',
     setWorkWikiExcludeRemove: '제외 해제',
     setLlmWiki: 'LLM Wiki',
@@ -2428,6 +2443,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -2897,6 +2915,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -3363,6 +3384,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -3819,6 +3843,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -4271,6 +4298,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -4726,6 +4756,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -5181,6 +5214,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -5626,6 +5662,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -6079,6 +6118,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -6530,6 +6572,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -7182,6 +7227,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -7424,6 +7472,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -7874,6 +7925,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -8323,6 +8377,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -8762,6 +8819,9 @@ export const strings = {
     setWorkWikiChange: 'Change…',
     setWorkWikiExclude: 'Excluded folders',
     setWorkWikiExcludeDesc: 'Documents in these folders are not learned into the work wiki.',
+    setWorkWikiMirrorSaved: 'Also put saved documents into the wiki',
+    setWorkWikiMirrorSavedDesc:
+      'Saved documents are copied as they are into the wiki folder (raw/sources/genoffice-saved) so LLM Wiki learns them too.',
     setWorkWikiExcludeAdd: 'Add excluded folder…',
     setWorkWikiExcludeRemove: 'Remove from excluded',
     setLlmWiki: 'LLM Wiki',
@@ -9203,6 +9263,9 @@ export const strings = {
     setWorkWikiChange: '變更…',
     setWorkWikiExclude: '排除的資料夾',
     setWorkWikiExcludeDesc: '這些資料夾中的文件不會被記入工作維基。',
+    setWorkWikiMirrorSaved: '也把儲存的文件放入維基',
+    setWorkWikiMirrorSavedDesc:
+      '儲存的文件會按原樣複製到維基資料夾（raw/sources/genoffice-saved），讓 LLM Wiki 也能學習。',
     setWorkWikiExcludeAdd: '新增排除資料夾…',
     setWorkWikiExcludeRemove: '取消排除',
     setLlmWiki: 'LLM Wiki',
