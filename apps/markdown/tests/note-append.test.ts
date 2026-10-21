@@ -135,4 +135,16 @@ describe('wiring', () => {
     expect(block).not.toMatch(/markdownApi\.save|doSave/)
     expect(app).toContain('window.markdownApi.onNoteAppendReady?.(')
   })
+
+  it('takes the queued texts only once the editor is there, so none are dropped', () => {
+    const app = source('../src/renderer/App.tsx')
+    const start = app.indexOf('const takeNoteAppends = useCallback(')
+    const block = app.slice(start, app.indexOf('}, [markDirty])', start))
+    const editorCheck = block.indexOf('if (!current) return')
+    const take = block.indexOf('takeNoteAppend?.()')
+    expect(editorCheck).toBeGreaterThan(0)
+    expect(take).toBeGreaterThan(editorCheck)
+    // an append the editor refused is reported, not silently lost
+    expect(block).toMatch(/console\.warn\(/)
+  })
 })

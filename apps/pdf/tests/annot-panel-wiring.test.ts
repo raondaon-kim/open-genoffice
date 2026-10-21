@@ -6,6 +6,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { ANNOT_PANEL_MIN_W } from '../src/renderer/view-config'
 
 const app = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
 
@@ -31,6 +32,11 @@ describe('annotation list wiring', () => {
 
   it('keeps the sidebar resizer for the new view', () => {
     expect(app).toMatch(/sidebar === 'annots' \|\|/)
+  })
+
+  it('is never narrower than its filters need, whatever the thumbnail width', () => {
+    expect(app).toMatch(/width=\{Math\.max\(sidebarW, ANNOT_PANEL_MIN_W\)\}/)
+    expect(ANNOT_PANEL_MIN_W).toBeGreaterThanOrEqual(240)
   })
 
   it('flashes the clicked item on its page', () => {

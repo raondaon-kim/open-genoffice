@@ -3,6 +3,8 @@
  * each key, the same physical key under a Korean input method, and the cases that must be
  * left alone (composing, focus in a field, a modifier, a document that cannot be edited).
  */
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '@genoffice/i18n'
 import { strings } from '../src/renderer/i18n/strings'
@@ -49,6 +51,23 @@ describe('selection-bar shortcuts', () => {
 
   it('does nothing while the bar is hidden', () => {
     expect(selectionBarKey(key('KeyH'), { visible: false, readOnly: false })).toBeNull()
+  })
+
+  it('does nothing while a dialog is open or a redaction is being applied', () => {
+    for (const code of ['KeyH', 'KeyU', 'KeyS', 'KeyN']) {
+      expect(selectionBarKey(key(code), { ...editable, blocked: true })).toBeNull()
+      expect(
+        selectionBarKey(key(code), { visible: true, readOnly: true, blocked: true }),
+      ).toBeNull()
+    }
+  })
+
+  it('is blocked in the editor while a dialog is open or a redaction is in flight', () => {
+    const app = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    const start = app.indexOf('// Selection-bar shortcuts H/U/S/N')
+    const block = app.slice(start, app.indexOf('return () => window.removeEventListener', start))
+    expect(block).toMatch(/redactionRequestInFlightRef\.current/)
+    expect(block).toMatch(/document\.querySelector\('\.pdf-modal-mask, \[aria-modal="true"\]'\)/)
   })
 
   it('ignores a key while an input method is composing', () => {

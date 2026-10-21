@@ -785,6 +785,7 @@ export function pdfFileRenamed(contents: WebContents, oldPath: string, newPath: 
   if (allowed?.has(oldPath)) allowed.add(newPath)
   if (saveAsTargetByWc.get(wcId) === oldPath) saveAsTargetByWc.set(wcId, newPath)
   if (untitledPdfPaths.delete(oldPath)) untitledPdfPaths.add(newPath)
+  if (notesSavedUntitled.delete(oldPath)) notesSavedUntitled.add(newPath)
   const states = docDiskStates.get(wcId)
   const recorded = states?.get(oldPath)
   if (states && recorded) {

@@ -270,105 +270,111 @@ export function createNoteLinkService(deps: NoteLinkDeps): NoteLinkService {
 type NoteDialogKey = 'noteWord' | 'dialogTitle' | 'filterMarkdown'
 
 export const NOTE_DIALOG_TEXT: Record<Lang, Record<NoteDialogKey, string>> = {
-  zh: { noteWord: '笔记', dialogTitle: '选择此 PDF 的笔记文件', filterMarkdown: 'Markdown 文档' },
+  zh: {
+    noteWord: '笔记',
+    dialogTitle: '选择此 PDF 的笔记文件（已有文件会原样保留）',
+    filterMarkdown: 'Markdown 文档',
+  },
   en: {
     noteWord: 'Note',
-    dialogTitle: 'Choose the note file for this PDF',
+    dialogTitle: 'Choose the note file for this PDF (an existing file is kept as it is)',
     filterMarkdown: 'Markdown document',
   },
   ja: {
     noteWord: 'ノート',
-    dialogTitle: 'この PDF のノートファイルを選択',
+    dialogTitle: 'この PDF のノートファイルを選択（既存のファイルはそのまま使います）',
     filterMarkdown: 'Markdown 文書',
   },
   ko: {
     noteWord: '노트',
-    dialogTitle: '이 PDF의 노트 파일 고르기',
+    dialogTitle: '이 PDF의 노트 파일 고르기 (이미 있는 파일은 그대로 씁니다)',
     filterMarkdown: '마크다운 문서',
   },
   fr: {
     noteWord: 'Notes',
-    dialogTitle: 'Choisir le fichier de notes de ce PDF',
+    dialogTitle:
+      'Choisir le fichier de notes de ce PDF (un fichier existant est conservé tel quel)',
     filterMarkdown: 'Document Markdown',
   },
   de: {
     noteWord: 'Notizen',
-    dialogTitle: 'Notizdatei für dieses PDF wählen',
+    dialogTitle: 'Notizdatei für dieses PDF wählen (eine vorhandene Datei bleibt unverändert)',
     filterMarkdown: 'Markdown-Dokument',
   },
   es: {
     noteWord: 'Notas',
-    dialogTitle: 'Elegir el archivo de notas de este PDF',
+    dialogTitle:
+      'Elegir el archivo de notas de este PDF (un archivo existente se conserva tal cual)',
     filterMarkdown: 'Documento Markdown',
   },
   th: {
     noteWord: 'โน้ต',
-    dialogTitle: 'เลือกไฟล์โน้ตของ PDF นี้',
+    dialogTitle: 'เลือกไฟล์โน้ตของ PDF นี้ (ไฟล์ที่มีอยู่แล้วจะคงไว้ตามเดิม)',
     filterMarkdown: 'เอกสาร Markdown',
   },
   id: {
     noteWord: 'Catatan',
-    dialogTitle: 'Pilih file catatan untuk PDF ini',
+    dialogTitle: 'Pilih file catatan untuk PDF ini (file yang sudah ada dibiarkan apa adanya)',
     filterMarkdown: 'Dokumen Markdown',
   },
   ru: {
     noteWord: 'Заметки',
-    dialogTitle: 'Выберите файл заметок для этого PDF',
+    dialogTitle: 'Выберите файл заметок для этого PDF (существующий файл останется без изменений)',
     filterMarkdown: 'Документ Markdown',
   },
   ar: {
     noteWord: 'ملاحظات',
-    dialogTitle: 'اختر ملف الملاحظات لملف PDF هذا',
+    dialogTitle: 'اختر ملف الملاحظات لملف PDF هذا (يُحتفظ بالملف الموجود كما هو)',
     filterMarkdown: 'مستند Markdown',
   },
   pt: {
     noteWord: 'Notas',
-    dialogTitle: 'Escolher o arquivo de notas deste PDF',
+    dialogTitle: 'Escolher o arquivo de notas deste PDF (um arquivo existente é mantido como está)',
     filterMarkdown: 'Documento Markdown',
   },
   it: {
     noteWord: 'Note',
-    dialogTitle: 'Scegli il file di note di questo PDF',
+    dialogTitle: 'Scegli il file di note di questo PDF (un file esistente resta invariato)',
     filterMarkdown: 'Documento Markdown',
   },
   pl: {
     noteWord: 'Notatki',
-    dialogTitle: 'Wybierz plik notatek dla tego PDF',
+    dialogTitle: 'Wybierz plik notatek dla tego PDF (istniejący plik pozostaje bez zmian)',
     filterMarkdown: 'Dokument Markdown',
   },
   cs: {
     noteWord: 'Poznámky',
-    dialogTitle: 'Vyberte soubor poznámek k tomuto PDF',
+    dialogTitle: 'Vyberte soubor poznámek k tomuto PDF (existující soubor zůstane beze změny)',
     filterMarkdown: 'Dokument Markdown',
   },
   nl: {
     noteWord: 'Notities',
-    dialogTitle: 'Kies het notitiebestand voor deze pdf',
+    dialogTitle: 'Kies het notitiebestand voor deze pdf (een bestaand bestand blijft ongewijzigd)',
     filterMarkdown: 'Markdown-document',
   },
   ms: {
     noteWord: 'Nota',
-    dialogTitle: 'Pilih fail nota untuk PDF ini',
+    dialogTitle: 'Pilih fail nota untuk PDF ini (fail sedia ada dikekalkan seperti asal)',
     filterMarkdown: 'Dokumen Markdown',
   },
   he: {
     noteWord: 'הערות',
-    dialogTitle: 'בחירת קובץ ההערות של PDF זה',
+    dialogTitle: 'בחירת קובץ ההערות של PDF זה (קובץ קיים נשאר כפי שהוא)',
     filterMarkdown: 'מסמך Markdown',
   },
   hi: {
     noteWord: 'नोट',
-    dialogTitle: 'इस PDF की नोट फ़ाइल चुनें',
+    dialogTitle: 'इस PDF की नोट फ़ाइल चुनें (मौजूद फ़ाइल जैसी है वैसी ही रहती है)',
     filterMarkdown: 'Markdown दस्तावेज़',
   },
   'zh-TW': {
     noteWord: '筆記',
-    dialogTitle: '選擇此 PDF 的筆記檔案',
+    dialogTitle: '選擇此 PDF 的筆記檔案（已有檔案會原樣保留）',
     filterMarkdown: 'Markdown 文件',
   },
   vi: {
     noteWord: 'Ghi chú',
-    dialogTitle: 'Chọn tệp ghi chú cho PDF này',
+    dialogTitle: 'Chọn tệp ghi chú cho PDF này (tệp đã có được giữ nguyên)',
     filterMarkdown: 'Tài liệu Markdown',
   },
 }

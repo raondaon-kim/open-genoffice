@@ -29,6 +29,8 @@ export interface NoteAction {
 export interface NoteActions {
   /** why the buttons are off ('ntSaveFirst'), null when they work */
   blocked: 'ntSaveFirst' | null
+  /** why "Add to note" is off: the above, or page changes not saved yet */
+  insertBlocked: 'ntSaveFirst' | null
   open(): Promise<void>
   insert(request: PdfNoteInsertRequest | null): Promise<void>
 }
@@ -45,6 +47,11 @@ export function useNoteActions(o: {
   t: TFunc
   onNotice: (message: string, action?: NoteAction) => void
   api?: NoteApi | null
+  /**
+   * pages deleted or reordered and not saved yet: the list shows the new page numbers but
+   * the note's link points into the file on disk, so "Add to note" waits for the save
+   */
+  pageEditsPending?: boolean
 }): NoteActions {
   const live = useRef(o)
   live.current = o
@@ -94,7 +101,9 @@ export function useNoteActions(o: {
     [api, open],
   )
 
-  return { blocked, open, insert }
+  const insertBlocked = blocked ?? (o.pageEditsPending ? 'ntSaveFirst' : null)
+
+  return { blocked, insertBlocked, open, insert }
 }
 
 function NoteIcon() {
@@ -170,7 +179,7 @@ export function NoteInsertButton({
   className?: string
 }) {
   if (!request) return null
-  const reason = actions.blocked ? t(actions.blocked) : null
+  const reason = actions.insertBlocked ? t(actions.insertBlocked) : null
   return (
     <button
       type="button"

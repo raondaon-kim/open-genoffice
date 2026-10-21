@@ -237,13 +237,17 @@ export default function App() {
   const takeNoteAppends = useCallback(async () => {
     const path = filePathRef.current
     if (statusRef.current !== 'ready' || !path || isSourceMode(textModeForPath(path))) return
-    const texts = (await window.markdownApi.takeNoteAppend?.()) ?? []
+    // take only once the editor is there: texts taken without one would be dropped
     const current = editorRef.current
+    if (!current) return
+    const texts = (await window.markdownApi.takeNoteAppend?.()) ?? []
     const text = joinNoteAppends(texts)
-    if (!current || !text) return
+    if (!text) return
     if (appendMarkdownAtEnd(current, text)) {
       markDirty()
       current.chain().setTextSelection(current.state.doc.content.size).scrollIntoView().run()
+    } else {
+      console.warn('[markdown] the note text could not be appended to the editor')
     }
   }, [markDirty])
 

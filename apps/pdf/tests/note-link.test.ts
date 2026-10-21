@@ -10,10 +10,12 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { LANGS } from '@genoffice/i18n'
 import { createNoteLinkStore, type NoteLinkStore } from '../src/main/note-links'
 import {
   createNoteLinkService,
   defaultNotePath,
+  noteDialogText,
   noteInsertText,
   parseNoteInsertRequest,
   pdfLinkFromNote,
@@ -108,6 +110,21 @@ describe('parseNoteInsertRequest', () => {
     // the overview insert belongs to a feature this app does not have
     expect(parseNoteInsertRequest({ kind: 'overview', heading: 'h', body: 'b' })).toBeNull()
     expect(parseNoteInsertRequest({ kind: 'other' })).toBeNull()
+  })
+})
+
+describe('the note save dialog', () => {
+  // Windows asks "replace?" when an existing file is picked; the title says it is kept
+  it('says in its title that an existing file is kept as it is', () => {
+    expect(noteDialogText('en', 'dialogTitle')).toContain('an existing file is kept as it is')
+    expect(noteDialogText('ko', 'dialogTitle')).toContain('이미 있는 파일은 그대로 씁니다')
+  })
+
+  it('has a title in every language', () => {
+    for (const lang of LANGS) {
+      expect(noteDialogText(lang, 'dialogTitle').length).toBeGreaterThan(10)
+      expect(noteDialogText(lang, 'dialogTitle')).toMatch(/[(（]/)
+    }
   })
 })
 

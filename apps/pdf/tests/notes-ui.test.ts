@@ -227,6 +227,43 @@ describe('note buttons', () => {
   })
 })
 
+describe('unsaved page changes', () => {
+  it('turn "Add to note" off until saved, since its page link uses the file on disk; Open note stays', async () => {
+    const api = fakeApi()
+    function Harness() {
+      const actions = useNoteActions({
+        filePath: 'C:\\d\\a.pdf',
+        title: '',
+        t,
+        onNotice: () => undefined,
+        api,
+        pageEditsPending: true,
+      })
+      return createElement(
+        'div',
+        null,
+        createElement(NoteOpenRibbonButton, { actions, t }),
+        noteInsertAction(actions, { kind: 'quote', excerpt: 'x', page: 1 }, t),
+      )
+    }
+    await act(async () => {
+      root.render(createElement(Harness))
+    })
+    await act(async () => {})
+    expect(buttons('note-open')[0]!.disabled).toBe(false)
+    const [insert] = buttons('note-insert')
+    expect(insert!.disabled).toBe(true)
+    expect(insert!.title).toBe(t('ntSaveFirst'))
+  })
+
+  it('come from the editor: deleted or reordered pages not saved yet', () => {
+    const app = readFileSync(join(__dirname, '../src/renderer/App.tsx'), 'utf8')
+    expect(app).toMatch(
+      /pageEditsPending:\s+!!doc && \(visList\.length !== doc\.numPages \|\| visList\.some\(\(orig, i\) => orig !== i\)\)/,
+    )
+  })
+})
+
 describe('the annotation panel', () => {
   it('shows extra header content (the Open note bar) above the list', async () => {
     await act(async () => {

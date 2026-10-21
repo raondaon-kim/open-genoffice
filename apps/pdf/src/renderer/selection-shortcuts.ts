@@ -61,9 +61,10 @@ export function isEditableTarget(target: EventTarget | null): boolean {
  */
 export function selectionBarKey(
   e: SelectionBarKeyEvent,
-  ctx: { visible: boolean; readOnly: boolean },
+  /** blocked: a dialog is open or a redaction is being applied; the keys belong elsewhere */
+  ctx: { visible: boolean; readOnly: boolean; blocked?: boolean },
 ): SelectionBarKeyVerdict | null {
-  if (!ctx.visible) return null
+  if (!ctx.visible || ctx.blocked) return null
   // an IME keydown during composition reports isComposing, or key 'Process' in Chromium
   if (e.isComposing || e.key === 'Process') return null
   if (e.ctrlKey || e.altKey || e.metaKey) return null

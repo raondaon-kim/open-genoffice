@@ -155,6 +155,7 @@ import {
   SIDEBAR_CHROME,
   clampSidebarW,
   loadSidebarW,
+  ANNOT_PANEL_MIN_W,
   DOC_OPTS,
   PAPER_SIZES,
   STROKE_WIDTH,
@@ -2375,7 +2376,11 @@ export default function App() {
   useEffect(() => {
     if (!selPopup) return
     const onKey = (e: KeyboardEvent) => {
-      const verdict = selectionBarKey(e, { visible: true, readOnly })
+      // a dialog over the page, or a redaction being applied, owns the keys
+      const blocked =
+        redactionRequestInFlightRef.current ||
+        document.querySelector('.pdf-modal-mask, [aria-modal="true"]') !== null
+      const verdict = selectionBarKey(e, { visible: true, readOnly, blocked })
       if (!verdict) return
       e.preventDefault()
       if ('blocked' in verdict) {
@@ -3474,6 +3479,8 @@ export default function App() {
     title: (metadata ?? docInfo).title?.trim() || '',
     t,
     onNotice: showNotice,
+    pageEditsPending:
+      !!doc && (visList.length !== doc.numPages || visList.some((orig, i) => orig !== i)),
   })
 
   useEffect(() => {
@@ -7104,7 +7111,7 @@ export default function App() {
             {sidebar === 'annots' && (
               <AnnotPanelHost
                 doc={doc}
-                width={sidebarW}
+                width={Math.max(sidebarW, ANNOT_PANEL_MIN_W)}
                 title={(metadata ?? docInfo).title?.trim() || fileName}
                 t={t}
                 unsavedMarkups={markups}

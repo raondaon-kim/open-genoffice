@@ -12,6 +12,8 @@ export const SCROLL_PAD = 24
 export const SIDEBAR_W_KEY = 'genoffice-pdf-sidebar-width'
 export const SIDEBAR_W_DEFAULT = 150
 export const SIDEBAR_W_MIN = 120
+/** the Annotations view needs room for its filters, whatever the thumbnail width */
+export const ANNOT_PANEL_MIN_W = 240
 /** pane padding (10px × 2) + thumb box borders (2px × 2) */
 export const SIDEBAR_CHROME = 24
 

@@ -62,6 +62,7 @@ import {
   createPdfView,
   markPdfUntitledPath,
   movePdfNoteLink,
+  pdfFileRenamed,
   rebasePdfNoteLinks,
 } from '../src/main/pdf-main'
 import { createNoteLinkStore } from '../src/main/note-links'
@@ -154,6 +155,12 @@ describe('pdf:note-open', () => {
     showSaveDialog.mockResolvedValue({ canceled: true })
     expect(await call(PDF_CHANNELS.noteOpen, {})).toEqual({ ok: false, reason: 'cancelled' })
     expect(showSaveDialog).toHaveBeenCalledTimes(1)
+    // moved or renamed in the app afterwards: still saved for its note
+    const moved = join(dir, 'Moved.pdf')
+    const { renameSync } = await import('node:fs')
+    renameSync(blank, moved)
+    pdfFileRenamed(lastContents as never, blank, moved)
+    expect(await call(PDF_CHANNELS.noteOpen, {})).toEqual({ ok: false, reason: 'cancelled' })
   })
 
   it('answers with a reason and asks nothing when the shell did not inject the note calls', async () => {
