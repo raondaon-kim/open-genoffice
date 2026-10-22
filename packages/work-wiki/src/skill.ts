@@ -16,6 +16,7 @@ The user's work memory, kept automatically from saved documents and chat: past w
 - For company facts, people, track record and past material, search the wiki first: LLM Wiki's pages (sources, entities, concepts) hold what the user added.
 - Follow the method page's structure, emphasis and wording unless the user asks otherwise.
 - Use facts from work pages (track record, staff, client) instead of placeholders, and name the pages used (e.g. "업무 위키: koica-health").
+- A page's last section "## 활용 메모 (원문 아님)" is the wiki's own usage note, not the source: you may follow its advice, but never cite it as what the source says.
 - When the user states something durable about the work or how they want work done, call wiki_remember with short points — without being asked. Remember only what the user said (facts about the work, standing preferences), never your own drafts, plans or suggestions, one-off instructions or document text.
 - ${WIKI_FENCE_RULE}`
 

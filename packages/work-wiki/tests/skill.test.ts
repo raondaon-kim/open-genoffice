@@ -36,6 +36,12 @@ describe('work wiki skill', () => {
     ])
   })
 
+  it("tells the AI that a page's usage notes are not the source", () => {
+    const skill = createWorkWikiSkill(() => api())
+    expect(skill.systemPrompt).toContain('## 활용 메모 (원문 아님)')
+    expect(skill.systemPrompt).toMatch(/never cite/i)
+  })
+
   it('stripContext removes the catalog from an earlier message and keeps the rest', async () => {
     const skill = createWorkWikiSkill(() => api())
     const ctx = (await skill.buildContext?.('q')) as string

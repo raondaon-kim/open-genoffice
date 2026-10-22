@@ -13,16 +13,57 @@ import { PAGE_FOLDERS } from '../types'
 import type { WikiPage, WikiPageType } from '../types'
 import { maskSensitive } from './mask'
 
+/** usage notes in a page made from a source sit under this heading, never in the body */
+export const USAGE_NOTES_HEADING = '## 활용 메모 (원문 아님)'
+
 const PURPOSE = `# 업무 위키의 목적
+
+GenOffice와 LLM Wiki가 함께 쓰는 업무 기억입니다.
+
+## GenOffice 페이지 (wiki/work, wiki/methods, wiki/clients)
+저장된 문서와 대화에서 정리합니다. 문서 내용을 옮겨 적지 않고, 다음 업무에 다시 쓸 요점만 남깁니다.
+- 업무: 어떤 일을 했는지와 그 요약
+- 작업 방식: 문서를 어떤 구성·문체·순서로 쓰는지, 초안을 어떻게 고치는지
+- 기관: 발주처·고객의 선호와 평가 경향
+
+## 자료 페이지 (raw/sources의 자료로 LLM Wiki가 만드는 wiki/sources, wiki/entities, wiki/concepts)
+나중에 이 페이지만 보고 글을 쓸 수 있도록 원문의 사실을 정확하게 남깁니다.
+- 원문의 수치, 연도, 이름, 목록, 단계, 권고 내용은 빠짐없이 원문 그대로 옮깁니다.
+- 원문에 없는 해석·평가·활용 조언은 본문에 섞지 않고, 페이지 맨 끝 "${USAGE_NOTES_HEADING}" 섹션에만 씁니다.
+`
+
+const SCHEMA = `# 페이지 규칙
+
+이 폴더는 GenOffice와 LLM Wiki가 함께 씁니다.
+
+## GenOffice가 관리 (사람이 고치지 않습니다)
+- wiki/work/: 업무 하나에 한 페이지 (1,500자 이내). 섹션: 개요, 진행·결정, 관련 문서, 이력
+- wiki/methods/: 작업 방식 (2,000자 이내). 섹션: 방식, 수정 경향, 이력
+- wiki/clients/: 기관 (800자 이내). 섹션: 선호, 이력
+- raw/genoffice-notes/: 대화에서 기억한 메모
+
+## LLM Wiki가 관리
+- raw/sources/: 사용자가 넣은 자료 (회사소개서, 지난 제안서 등)
+- wiki/entities/: 인물·기관·사업, wiki/concepts/: 개념·방법, wiki/sources/: 자료 요약
+- wiki/queries, comparisons, synthesis, index.md, log.md, overview.md
+- 자료 페이지 본문에는 원문에 있는 내용만 씁니다. 원문에 없는 해석·활용 조언은 페이지 맨 끝 "${USAGE_NOTES_HEADING}" 섹션에만 쓰고, 이 섹션은 출처로 인용하지 않습니다.
+
+## 공통
+- 앞머리: type, title, aliases, summary, tags, related, sources, created, updated
+- 본문 링크는 [[이름]]
+`
+
+/** what 0.5.1 and earlier seeded: a file that still holds exactly this gets the current rules */
+const FIRST_SEED: Record<'purpose.md' | 'schema.md', string> = {
+  'purpose.md': `# 업무 위키의 목적
 
 GenOffice가 저장된 문서와 대화에서 자동으로 정리하는 업무 기억입니다.
 - 업무: 어떤 일을 했는지와 그 요약
 - 작업 방식: 문서를 어떤 구성·문체·순서로 쓰는지, 초안을 어떻게 고치는지
 - 기관: 발주처·고객의 선호와 평가 경향
 문서 내용을 옮겨 적지 않고, 다음 업무에 다시 쓸 요점만 남깁니다.
-`
-
-const SCHEMA = `# 페이지 규칙
+`,
+  'schema.md': `# 페이지 규칙
 
 이 폴더는 GenOffice와 LLM Wiki가 함께 씁니다.
 
@@ -40,7 +81,9 @@ const SCHEMA = `# 페이지 규칙
 ## 공통
 - 앞머리: type, title, aliases, summary, tags, related, sources, created, updated
 - 본문 링크는 [[이름]]
-`
+`,
+}
+const sameText = (a: string, b: string) => a.replace(/\r\n/g, '\n').trim() === b.replace(/\r\n/g, '\n').trim()
 
 /** page names are file names: letters, digits and hyphens only, so no name leaves its folder */
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]{0,79}$/u
@@ -71,11 +114,16 @@ export class WikiStore {
     ]
     for (const dir of dirs) mkdirSync(dir, { recursive: true })
     // index.md, log.md and raw/sources belong to LLM Wiki: not created or written here
-    const seed: Array<[string, string]> = [
-      [join(this.root, 'purpose.md'), PURPOSE],
-      [join(this.root, 'schema.md'), SCHEMA],
+    const seed: Array<['purpose.md' | 'schema.md', string]> = [
+      ['purpose.md', PURPOSE],
+      ['schema.md', SCHEMA],
     ]
-    for (const [path, text] of seed) if (!existsSync(path)) writeFileSync(path, text, 'utf8')
+    for (const [name, text] of seed) {
+      const path = join(this.root, name)
+      if (!existsSync(path)) writeFileSync(path, text, 'utf8')
+      // the first seed text is ours to update; a file the user changed is left alone
+      else if (sameText(readFileSync(path, 'utf8'), FIRST_SEED[name])) this.atomicWrite(path, text)
+    }
     // a read-only share fails here, not in the middle of a learn job
     this.atomicWrite(join(this.wikiDir, '.probe'), String(Date.now()))
     this.atomicWrite(join(this.stateDir, '.probe'), String(Date.now()))

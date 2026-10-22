@@ -73,6 +73,14 @@ The fork's material changes on top of upstream:
     model rewrite it: a top `wiki/index.md` (at most 4,000 chars) and one list per category in
     `wiki/index/`, split into groups and parts when large. Prompts get the part of the index
     that matches what they read.
+  - **Source pages keep the facts:** the seeded `purpose.md` and `schema.md` ask LLM Wiki to
+    carry a source's numbers, names, lists and recommendations over as they are, and to put its
+    own interpretation or usage advice only in a last section `## 활용 메모 (원문 아님)`, which
+    the assistants never cite as the source. A wiki that still holds the first seed text gets
+    the new rules; files the user changed are left alone.
+  - **Answers cut at the token limit:** the bundled LLM Wiki asks again with a larger budget
+    when an ingest answer stops at max_tokens (reasoning models spend hidden thinking inside
+    it), and dates new pages with today's date.
   - **Settings:** on/off and the folder, in Settings → AI media.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
