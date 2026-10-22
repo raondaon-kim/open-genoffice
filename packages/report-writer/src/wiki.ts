@@ -102,15 +102,40 @@ export interface WorkWikiLike {
   read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
 }
 
-/** `window.workWiki` as a WikiPort; no API (wiki not wired) means no wiki */
-export function wikiPortOf(api: WorkWikiLike | undefined): WikiPort | null {
+/** how long one wiki call may take before the run goes on without it */
+export const WIKI_CALL_MS = 8000
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('the work wiki did not answer in time')), ms)
+    p.then(
+      (v) => {
+        clearTimeout(timer)
+        resolve(v)
+      },
+      (e: unknown) => {
+        clearTimeout(timer)
+        reject(e instanceof Error ? e : new Error(String(e)))
+      },
+    )
+  })
+}
+
+/**
+ * `window.workWiki` as a WikiPort; no API (wiki not wired) means no wiki. Every call is limited
+ * to `timeoutMs`: a slow wiki gives nothing for that call and the run goes on without it.
+ */
+export function wikiPortOf(
+  api: WorkWikiLike | undefined,
+  timeoutMs = WIKI_CALL_MS,
+): WikiPort | null {
   if (!api) return null
   return {
-    catalog: (q) => api.catalog(q),
-    index: (c) => api.index(c),
+    catalog: (q) => withTimeout(api.catalog(q), timeoutMs),
+    index: (c) => withTimeout(api.index(c), timeoutMs),
     read: async (id) => {
-      const r = await api.read(id)
-      return r.ok ? r.page : null
+      const r = await withTimeout(api.read(id), timeoutMs).catch(() => null)
+      return r && r.ok ? r.page : null
     },
   }
 }

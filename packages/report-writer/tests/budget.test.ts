@@ -88,3 +88,14 @@ describe('askChapter', () => {
     expect(r).toEqual({ ok: false, error: 'HTTP 500' })
   })
 })
+
+describe('askChapter continuations', () => {
+  it('a continuation that comes back empty fails the chapter instead of landing cut text', async () => {
+    const replies: LlmReply[] = [
+      { status: 'max_tokens', text: '가'.repeat(800) },
+      { status: 'empty', text: '' },
+    ]
+    const r = await askChapter(async () => replies.shift()!, P)
+    expect(r.ok).toBe(false)
+  })
+})

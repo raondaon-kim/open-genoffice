@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { planWikiMaterial, readChapterPages, wikiPortOf } from '../src/wiki'
 import type { WikiPort } from '../src/types'
 
@@ -102,5 +102,22 @@ describe('wikiPortOf', () => {
 
   it('no API means no wiki', () => {
     expect(wikiPortOf(undefined)).toBeNull()
+  })
+})
+
+describe('wikiPortOf timeouts', () => {
+  it('a wiki that never answers does not hang the plan or a chapter', async () => {
+    vi.useFakeTimers()
+    try {
+      const never = () => new Promise<never>(() => undefined)
+      const port = wikiPortOf({ catalog: never, index: never, read: never }, 1000)!
+      const plan = planWikiMaterial(port, 'q')
+      const pages = readChapterPages(port, ['concepts/a'])
+      await vi.advanceTimersByTimeAsync(5000)
+      expect(await plan).toEqual({ text: '', pages: new Set() })
+      expect(await pages).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

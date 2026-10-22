@@ -149,3 +149,81 @@ describe('role maps', () => {
     expect(() => setup(true, 'press-release')).toThrow(/report/)
   })
 })
+
+describe('Hangul lander and model tables', () => {
+  it('evens out ragged rows and caps long cells before building', async () => {
+    const s = setup(true)
+    await s.lander.skeleton(skeleton)
+    await s.lander.chapter(1, [
+      {
+        type: 'table',
+        rows: [
+          ['단계', '내용', '비고'],
+          ['1', '데이터'],
+          ['2', '전략', '추가', '넘침'],
+          ['3', '가'.repeat(5000), ''],
+        ],
+      },
+    ])
+    const table = s.built.at(-1)!.find((b) => b.role === 'table') as { rows: string[][] }
+    expect(table.rows.map((r) => r.length)).toEqual([3, 3, 3, 3])
+    expect(table.rows[1]).toEqual(['1', '데이터', ''])
+    expect(table.rows[3]![1]!.length).toBeLessThanOrEqual(1900)
+  })
+
+  it('a build that still fails is retried with the tables as text lines', async () => {
+    const s = setup(true)
+    let calls = 0
+    s.deps.build.mockImplementation(async (blocks: StyledBlockInput[]) => {
+      calls++
+      if (blocks.some((b) => b.role === 'table'))
+        return { ok: false as const, error: 'block 9: bad table' }
+      s.built.push(blocks)
+      return { ok: true as const, data: new Uint8Array([calls]) }
+    })
+    await s.lander.skeleton(skeleton)
+    await s.lander.chapter(1, [
+      {
+        type: 'table',
+        rows: [
+          ['a', 'b'],
+          ['c', 'd'],
+        ],
+      },
+    ])
+    const t = textsOf(s.built.at(-1)!)
+    expect(t).toContain('a | b')
+    expect(t).toContain('c | d')
+  })
+
+  it('not live: a failing create is retried with the tables as text lines', async () => {
+    const s = setup(false)
+    s.deps.create.mockImplementation(async (blocks: StyledBlockInput[]) =>
+      blocks.some((b) => b.role === 'table') ? { ok: false, error: 'bad table' } : { ok: true },
+    )
+    await s.lander.skeleton(skeleton)
+    await s.lander.chapter(1, [{ type: 'table', rows: [['a', 'b']] }])
+    await s.lander.finish()
+    expect(s.deps.create).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Hangul lander when the user edits during a live run', () => {
+  it('stops reloading and puts the report into a new document instead', async () => {
+    const s = setup(true)
+    let edited = false
+    const lander = createHwpLander({ ...s.deps, changedSinceLoad: async () => edited })
+    await lander.skeleton(skeleton)
+    expect(s.deps.load).toHaveBeenCalledTimes(1)
+    edited = true
+    await lander.chapter(1, [{ type: 'paragraph', text: '1장 본문' }])
+    await lander.chapter(2, [{ type: 'paragraph', text: '2장 본문' }])
+    expect(s.deps.load).toHaveBeenCalledTimes(1)
+    await lander.finish()
+    expect(s.deps.load).toHaveBeenCalledTimes(1)
+    expect(s.deps.create).toHaveBeenCalledTimes(1)
+    const t = textsOf(s.deps.create.mock.calls[0]![0] as StyledBlockInput[])
+    expect(t).toContain('1장 본문')
+    expect(t).toContain('2장 본문')
+  })
+})

@@ -47,8 +47,10 @@ export function createHwpReportSkill(
       const r = await ctx.api().readDocStyle(id)
       return r.ok ? { style: r.style, description: r.description } : null
     },
-    lander: async (style, styleId) =>
-      createHwpLander({
+    lander: async (style, styleId) => {
+      /** the document state right after the last load: anything else is the user's edit */
+      let loadedSha: string | null = null
+      return createHwpLander({
         style,
         styleId,
         live: await isBlankDocument(ctx),
@@ -60,6 +62,13 @@ export function createHwpReportSkill(
             skipUnsavedGuard: true,
           })
           ctx.markAiDirty()
+          loadedSha = (await editor.getDocumentState()).documentSha256
+        },
+        changedSinceLoad: async () => {
+          if (loadedSha === null) return false
+          const editor = ctx.editor()
+          if (!editor) return true
+          return (await editor.getDocumentState()).documentSha256 !== loadedSha
         },
         saveUndo: async () => {
           const editor = ctx.editor()
@@ -71,6 +80,7 @@ export function createHwpReportSkill(
           const r = await ctx.api().createStyledDocument({ style: styleId, blocks, fileName })
           return r.ok ? { ok: true } : { ok: false, error: r.error }
         },
-      }),
+      })
+    },
   })
 }

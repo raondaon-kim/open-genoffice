@@ -122,8 +122,11 @@ export function createDocsLander(deps: DocsLanderDeps): Lander {
     const editor = deps.editor()
     const at = find(slot)
     if (at >= 0) {
-      if (nodes.length === 0) remove(at)
-      else replaceBlockRange(editor, at, at, nodes, deps.track?.())
+      // the chapter goes in after its placeholder (tracked when track changes is on), then the
+      // run's own placeholder is removed untracked: a tracked replace would keep the marker
+      // in the document as a deletion
+      if (nodes.length > 0) insertBlocksAfter(editor, at, nodes, deps.track?.())
+      remove(at)
     } else if (nodes.length > 0) {
       // the user deleted the placeholder: the text still lands, at the end
       insertBlocksAfter(editor, lastIndex(), nodes, deps.track?.())

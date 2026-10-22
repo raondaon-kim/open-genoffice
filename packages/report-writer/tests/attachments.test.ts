@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { describeParts, mapAttachment, mustSeeParts } from '../src/attachments'
+import {
+  MAP_CHARS,
+  MAX_PARTS,
+  describeParts,
+  mapAttachment,
+  mustSeeParts,
+  partCharsFor,
+} from '../src/attachments'
 
 describe('mapAttachment', () => {
   it('cuts a Word-like text at its headings', () => {
@@ -69,5 +76,25 @@ describe('describeParts', () => {
   it('writes one line per part with id, label, length and a one-line preview', () => {
     const parts = mapAttachment({ name: 'r.docx', text: '# 표지\n첫 줄\n둘째 줄' }, 0)
     expect(describeParts(parts)).toBe('A1-1 | 표지 | 13자 | # 표지 첫 줄 둘째 줄')
+  })
+})
+
+describe('very large attachments', () => {
+  it('cuts larger parts so there are at most MAX_PARTS of them', () => {
+    const text = Array.from({ length: 3000 }, (_, i) => `문단 ${i} ${'가'.repeat(990)}`).join(
+      '\n\n',
+    )
+    const parts = mapAttachment({ name: 'big.txt', text }, 0, partCharsFor(text.length))
+    expect(parts.length).toBeLessThanOrEqual(MAX_PARTS)
+  })
+
+  it('keeps the map within its cap by shortening previews', () => {
+    const parts = Array.from({ length: 200 }, (_, i) => ({
+      id: `A1-${i + 1}`,
+      attachment: 'big.xlsx',
+      label: `Sheet ${i} ${'긴 제목'.repeat(20)}`,
+      text: '나'.repeat(5000),
+    }))
+    expect(describeParts(parts).length).toBeLessThanOrEqual(MAP_CHARS)
   })
 })

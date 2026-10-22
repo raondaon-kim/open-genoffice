@@ -61,6 +61,11 @@ export interface HwpLanderDeps {
   saveUndo(): Promise<void>
   /** not live: the whole document as one new file at the end */
   create(blocks: StyledBlockInput[]): Promise<{ ok: boolean; error?: string }>
+  /**
+   * live: the user changed the document since the last load. The run then stops reloading
+   * (that would overwrite their edits) and creates the report as a new document at the end.
+   */
+  changedSinceLoad?(): Promise<boolean>
 }
 
 /** the engine's one-paragraph limit, with room for a role's lead and marker */
@@ -95,6 +100,24 @@ function splitText(text: string): string[] {
   return out
 }
 
+const MAX_TABLE_COLS = 256
+
+/**
+ * A model table the engine accepts: every row as wide as the header (short rows padded, long
+ * ones cut), one-line cells within the engine's limit. Null when there is nothing to show.
+ */
+function evenRows(rows: string[][]): string[][] | null {
+  const width = Math.min(rows[0]?.length ?? 0, MAX_TABLE_COLS)
+  if (width === 0) return null
+  const cell = (c: unknown): string => {
+    const t = String(c ?? '')
+      .replace(/[\t\n\r]/g, ' ')
+      .trim()
+    return t.length > MAX_TEXT ? `${t.slice(0, MAX_TEXT - 1)}…` : t
+  }
+  return rows.map((r) => Array.from({ length: width }, (_, i) => cell(r[i])))
+}
+
 /**
  * Lands a report in the Hangul editor. The document is kept as slots (title, summary, table of
  * contents, one per chapter, gaps); a placeholder slot shows "쓰는 중…". When the open document
@@ -120,6 +143,8 @@ export function createHwpLander(deps: HwpLanderDeps): Lander {
   const slots = new Map<string, StyledBlockInput[]>()
   const open = new Set<string>()
   let undoSaved = false
+  /** reload the tab after every step: the document was blank and the user has not edited it */
+  let live = deps.live
   /** chapters with text (not placeholders, not failures) */
   let written = 0
 
@@ -135,10 +160,8 @@ export function createHwpLander(deps: HwpLanderDeps): Lander {
     let n = 0
     for (const b of blocks) {
       if (b.type === 'table') {
-        out.push({
-          role: 'table',
-          rows: b.rows.map((r) => r.map((c) => c.replace(/[\t\n\r]/g, ' '))),
-        })
+        const rows = evenRows(b.rows)
+        if (rows) out.push({ role: 'table', rows })
         continue
       }
       if (b.type !== 'numbered') n = 0
@@ -156,14 +179,28 @@ export function createHwpLander(deps: HwpLanderDeps): Lander {
   }
   const all = (): StyledBlockInput[] => order.flatMap((slot) => slots.get(slot) ?? [])
   const refresh = async () => {
-    if (!deps.live) return
+    if (!live) return
+    if (undoSaved && deps.changedSinceLoad && (await deps.changedSinceLoad())) {
+      live = false
+      return
+    }
     if (!undoSaved) {
       await deps.saveUndo()
       undoSaved = true
     }
-    const built = await deps.build(all())
+    let built = await deps.build(all())
+    // a table the engine still refuses must not lose the report: write tables as text lines
+    if (!built.ok) built = await deps.build(tablesAsText(all()))
     if (!built.ok) throw new Error(`the document could not be rebuilt: ${built.error}`)
     await deps.load(built.data)
+  }
+  const tablesAsText = (blocks: StyledBlockInput[]): StyledBlockInput[] =>
+    blocks.flatMap((b) =>
+      'rows' in b ? b.rows.flatMap((r) => plain(map.paragraph, r.join(' | '))) : [b],
+    )
+  const createWithFallback = async () => {
+    const made = await deps.create(all())
+    return made.ok ? made : deps.create(tablesAsText(all()))
   }
   const placeholder = (slot: string, label: string) => {
     open.add(slot)
@@ -216,20 +253,20 @@ export function createHwpLander(deps: HwpLanderDeps): Lander {
     gaps: (blocks) => fill('gaps', toBlocks(blocks)),
     async abandon() {
       dropOpen()
-      if (deps.live) {
+      if (live) {
         await refresh()
-        return
+        if (live) return
       }
       // nothing is in a document yet: keep the chapters already written in a new one
-      if (written > 0) await deps.create(all())
+      if (written > 0) await createWithFallback()
     },
     async finish() {
       dropOpen()
-      if (deps.live) {
+      if (live) {
         await refresh()
-        return
+        if (live) return
       }
-      const made = await deps.create(all())
+      const made = await createWithFallback()
       if (!made.ok)
         throw new Error(`the document could not be created: ${made.error ?? 'unknown error'}`)
     },

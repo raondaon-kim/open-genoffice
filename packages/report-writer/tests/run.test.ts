@@ -154,7 +154,8 @@ describe('writeReport', () => {
     chapters.forEach((p, i) => {
       for (const id of ids) {
         const mine = id === `concepts/p${i + 1}`
-        expect(p.user.includes(`위키 페이지: ${id}\n`)).toBe(mine)
+        // pages arrive fenced: "⟦자료 <nonce> 시작: 위키 페이지: <id>⟧"
+        expect(p.user.includes(`위키 페이지: ${id}⟧`)).toBe(mine)
       }
       expect(p.user.length).toBeLessThan(60000)
     })
@@ -258,5 +259,17 @@ describe('writeReport', () => {
     const ch2 = big.prompts.filter((p) => p.kind === 'chapter')[1]!.user
     expect(ch1).toContain('A1-3 | 장1')
     expect(ch2).not.toContain('나'.repeat(100))
+  })
+})
+
+describe('writeReport with a huge attachment', () => {
+  it('keeps the plan prompt bounded', async () => {
+    const text = Array.from({ length: 3000 }, (_, i) => `문단 ${i} ${'가'.repeat(990)}`).join(
+      '\n\n',
+    )
+    const llm = fakeLlm()
+    await run({ llm, req: { attachments: [{ name: 'huge.txt', text }] } })
+    const plan = llm.prompts.find((p) => p.kind === 'plan')!
+    expect(plan.user.length).toBeLessThan(60000)
   })
 })

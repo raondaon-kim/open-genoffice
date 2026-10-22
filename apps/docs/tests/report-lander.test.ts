@@ -166,3 +166,23 @@ describe('docs lander', () => {
     expect(t.some((x) => x.includes('확인 필요 사항 — 쓰는 중'))).toBe(false)
   })
 })
+
+describe('docs lander with track changes on', () => {
+  it('leaves no placeholder marker behind, not even as a tracked deletion', async () => {
+    const editor = createEditor()
+    const l = createDocsLander({
+      editor: () => editor,
+      style,
+      numIds: () => ({ bullet: null, ordered: null }),
+      track: () => ({ author: 'AI' }),
+      runId: 'r2',
+    })
+    await l.skeleton(skeleton)
+    await l.chapter(1, [{ type: 'paragraph', text: '1장 본문' }])
+    await l.chapterFailed(2, '규제')
+    await l.abandon()
+    const all = editor.state.doc.textContent
+    expect(all).toContain('1장 본문')
+    expect(all).not.toContain('⟦r2')
+  })
+})

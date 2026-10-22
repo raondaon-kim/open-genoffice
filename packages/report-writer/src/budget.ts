@@ -81,6 +81,8 @@ export async function askChapter(
     reply = await llm({ ...continuePrompt(prompt, text), maxTokens: budget, signal })
     if (signal?.aborted || reply.status === 'stopped') return stopped
     if (reply.status === 'error') return { ok: false, error: reply.error ?? 'model error' }
+    // an empty continuation leaves the chapter cut mid-sentence: never land that
+    if (reply.status === 'empty') return { ok: false, error: 'the continuation came back empty' }
     text += reply.text
   }
   if (reply.status === 'max_tokens') {
