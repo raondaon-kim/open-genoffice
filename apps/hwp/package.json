@@ -39,6 +39,7 @@
     "vitest": "^4.1.11",
     "@genoffice/file-parse": "*",
     "cfb": "^1.2.2",
+    "@genoffice/report-writer": "*",
     "@genoffice/work-wiki": "*"
   },
   "author": "Serge Doub and Open GenOffice contributors"
