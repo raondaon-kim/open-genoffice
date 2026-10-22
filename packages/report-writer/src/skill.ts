@@ -113,6 +113,9 @@ export function createReportSkill<St>(deps: ReportSkillDeps<St>): AgentSkill {
         outcome.gaps
           ? `${outcome.gaps} item(s) the material could not support are listed in the "확인 필요 사항" table at the end.`
           : '',
+        // the assistant reads this last: it once tidied the document afterwards and deleted an
+        // earlier report the user had kept
+        'The document is complete. Do not change the document further (no deleting, merging or reformatting, including content that was there before) unless the user asks; reply to the user now.',
       ].filter(Boolean)
       return {
         output: lines.join('\n'),

@@ -186,3 +186,41 @@ describe('docs lander with track changes on', () => {
     expect(all).not.toContain('⟦r2')
   })
 })
+
+describe('docs lander after an earlier report', () => {
+  it('keeps every block of an earlier report (headings, lists, tables) and writes after it', async () => {
+    const editor = createEditor()
+    const first = lander(editor)
+    await first.skeleton(skeleton)
+    await first.chapter(1, [
+      { type: 'chapter', text: '1. 원칙' },
+      { type: 'paragraph', text: '첫 보고서 본문' },
+      { type: 'bullet', text: '항목' },
+      {
+        type: 'table',
+        rows: [
+          ['a', 'b'],
+          ['c', 'd'],
+        ],
+      },
+    ])
+    await first.chapter(2, [{ type: 'paragraph', text: '둘째 장' }])
+    await first.chapter(3, [{ type: 'paragraph', text: '셋째 장' }])
+    await first.summary([{ type: 'paragraph', text: '첫 요약' }])
+    await first.gaps([])
+    await first.finish()
+    const before = blocks(editor)
+    const second = createDocsLander({
+      editor: () => editor,
+      style,
+      numIds: () => ({ bullet: null, ordered: null }),
+      runId: 'r9',
+    })
+    await second.skeleton({ ...skeleton, title: '두 번째 보고서' })
+    await second.chapter(1, [{ type: 'paragraph', text: '두 번째 본문' }])
+    await second.finish()
+    const after = blocks(editor)
+    expect(after.slice(0, before.length)).toEqual(before)
+    expect(after.map((b) => b[1])).toContain('두 번째 보고서')
+  })
+})

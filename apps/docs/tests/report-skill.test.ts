@@ -76,3 +76,42 @@ describe('write_report guidance', () => {
     expect(skill.systemPrompt).toMatch(/never delete or rewrite existing content/i)
   })
 })
+
+describe('write_report result', () => {
+  it('tells the assistant to leave the document as it is and answer the user', async () => {
+    const llm = vi.fn(async (req: { system: string }) =>
+      req.system.includes('보고서 기획자')
+        ? {
+            status: 'complete' as const,
+            text: JSON.stringify({
+              brief: { purpose: 'p', reader: 'r', messages: [], terms: {} },
+              title: 'T',
+              chapters: [
+                {
+                  no: 1,
+                  title: '장',
+                  point: 'p',
+                  owns: [],
+                  stances: [],
+                  sections: [],
+                  attachmentParts: [],
+                  wikiPages: [],
+                },
+              ],
+            }),
+          }
+        : { status: 'complete' as const, text: '## 1. 장\n본문' },
+    )
+    const skill = createReportSkill({
+      lander: () => nullLander,
+      llm: () => llm,
+      wiki: () => null,
+      attachments: async () => [],
+      readStyle: async (id: string) => ({ style: { ...style, id }, description: '' }),
+      progress: () => undefined,
+    })
+    const r = await skill.executeTool({ id: '1', name: 'write_report', input: { request: 'r' } })
+    expect(r.isError).toBeFalsy()
+    expect(r.output).toMatch(/do not change the document further/i)
+  })
+})
