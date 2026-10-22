@@ -58,13 +58,13 @@ export interface PlanPromptInput {
   request: string
   kind: 'report' | 'proposal'
   styleRules: string
-  lengthHint?: string
+  lengthHint?: string | undefined
   /** all attachments, whole (small attachments) */
-  attachmentsWhole?: string
+  attachmentsWhole?: string | undefined
   /** one line per part (large attachments) */
-  attachmentMap?: string
+  attachmentMap?: string | undefined
   /** the parts the plan must see whole (large attachments) */
-  mustSee?: string
+  mustSee?: string | undefined
   /** the wiki's catalog and index lists */
   wiki: string
 }

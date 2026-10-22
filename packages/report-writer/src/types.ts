@@ -62,7 +62,7 @@ export type LlmPort = (req: {
   system: string
   user: string
   maxTokens: number
-  signal?: AbortSignal
+  signal?: AbortSignal | undefined
 }) => Promise<LlmReply>
 
 export interface WikiPort {
@@ -104,7 +104,7 @@ export interface ReportRequest {
   kind: 'report' | 'proposal'
   /** the style page's own rules and description */
   styleRules: string
-  lengthHint?: string
+  lengthHint?: string | undefined
   attachments: Attachment[]
 }
 
