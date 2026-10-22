@@ -26,6 +26,7 @@ export type HwpAiApi = Pick<
   | 'listDocStyles'
   | 'readDocStyle'
   | 'createStyledDocument'
+  | 'buildStyledBytes'
   | 'exportDocStyles'
 >
 

@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
+import {
+  createIpcLlm,
+  deriveReportProgressView,
+  type ReportProgress,
+} from '@genoffice/report-writer'
 import type { AgentTransport } from '@genoffice/agent-core'
 import type { AiSettings } from '@genoffice/ai-provider'
 import {
@@ -9,6 +14,7 @@ import {
   AiTypingIndicator,
   aiPanelWidthAtPointer,
   Markdown,
+  ReportProgressCard,
 } from '@genoffice/ui'
 import type { AiConversationIdentity, HwpAttachment, ProjectChatMessage } from '../../shared/ipc'
 import attachIcon from '../assets/attach-icon.png'
@@ -78,6 +84,8 @@ interface ChatEntry {
   streaming?: boolean
   isError?: boolean
   tools?: ToolActivity[]
+  /** progress of a write_report run in this turn, rendered as a card */
+  report?: ReportProgress[]
 }
 
 type Phase = 'thinking' | 'replying' | 'working'
@@ -153,6 +161,11 @@ export function HwpAiPanel({
         () => attachmentsRef.current,
         () => window.hwpApi,
         () => window.workWiki,
+        {
+          llm: () => createIpcLlm(window.hwpApi, () => settingsRef.current!),
+          progress: (e) => patchLast((last) => ({ report: [...(last.report ?? []), e] })),
+          readAttachment: (path, offset, max) => window.hwpApi.readAttachment(path, offset, max),
+        },
       ),
       maxTurns: HWP_MAX_TURNS,
       events: {
@@ -649,6 +662,13 @@ export function HwpAiPanel({
               )}
               {hasTools && (
                 <ToolSteps tools={entry.tools!} running={!!entry.streaming} lang={lang} />
+              )}
+              {entry.report && entry.report.length > 0 && (
+                <ReportProgressCard
+                  view={deriveReportProgressView(entry.report)}
+                  lang={lang}
+                  onCancel={entry.streaming ? () => loopRef.current?.cancel() : undefined}
+                />
               )}
             </div>
           )
