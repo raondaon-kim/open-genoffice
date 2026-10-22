@@ -1,7 +1,7 @@
 {
   "name": "@genoffice/shell",
   "productName": "Open GenOffice",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "license": "Apache-2.0",
   "homepage": "https://github.com/genspark-ai/genoffice",
   "private": true,
