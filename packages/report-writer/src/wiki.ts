@@ -84,12 +84,7 @@ export async function readChapterPages(
     if (left <= 0) break
     const tries = id.includes('/') ? [id] : [id, ...SOURCE_FOLDERS.map((f) => `${f}/${id}`)]
     for (const tryId of tries) {
-      let text: string | null = null
-      try {
-        text = await wiki.read(tryId)
-      } catch {
-        text = null
-      }
+      const text = await wiki.read(tryId).catch(() => null)
       if (text === null) continue
       const piece = text.slice(0, Math.min(perPage, left))
       out.push({ id: tryId, text: piece })
