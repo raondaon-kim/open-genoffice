@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planWikiMaterial, readChapterPages } from '../src/wiki'
+import { planWikiMaterial, readChapterPages, wikiPortOf } from '../src/wiki'
 import type { WikiPort } from '../src/types'
 
 const wikiOf = (pages: Record<string, string>, extra: Partial<WikiPort> = {}): WikiPort => ({
@@ -84,5 +84,23 @@ describe('planWikiMaterial', () => {
       'q',
     )
     expect(got).toEqual({ text: '', pages: new Set() })
+  })
+})
+
+describe('wikiPortOf', () => {
+  it('turns a work-wiki API into the port: a missing page reads as null', async () => {
+    const port = wikiPortOf({
+      catalog: async (q) => `catalog:${q}`,
+      index: async (c) => `index:${c ?? ''}`,
+      read: async (id) =>
+        id === 'concepts/a' ? { ok: true, page: '본문' } : { ok: false, error: 'no wiki page' },
+    })!
+    expect(await port.catalog('q')).toBe('catalog:q')
+    expect(await port.read('concepts/a')).toBe('본문')
+    expect(await port.read('concepts/b')).toBeNull()
+  })
+
+  it('no API means no wiki', () => {
+    expect(wikiPortOf(undefined)).toBeNull()
   })
 })

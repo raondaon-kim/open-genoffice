@@ -9,10 +9,10 @@ export interface AiStreamChunkLike {
   stopReason?: string
 }
 
-export interface AiStreamApi {
+export interface AiStreamApi<S = unknown> {
   aiStream(req: {
     requestId: string
-    settings: unknown
+    settings: S
     system: string
     messages: Array<{ role: 'user'; text: string }>
     maxTokens?: number
@@ -32,9 +32,9 @@ let seq = 0
  * kept (reasoning chunks are not), the budget goes as `maxTokens` and thinking is asked off.
  * Resolves, never rejects.
  */
-export function createIpcLlm(
-  api: AiStreamApi,
-  getSettings: () => unknown,
+export function createIpcLlm<S>(
+  api: AiStreamApi<S>,
+  getSettings: () => S,
   silenceMs = DEFAULT_SILENCE_MS,
 ): LlmPort {
   return (req) =>

@@ -1,4 +1,16 @@
-import { aiPanelWidthAtPointer, AiPanelSideButton, AttachmentWikiButton } from '@genoffice/ui'
+import {
+  aiPanelWidthAtPointer,
+  AiPanelSideButton,
+  AttachmentWikiButton,
+  ReportProgressCard,
+} from '@genoffice/ui'
+import {
+  createIpcLlm,
+  deriveReportProgressView,
+  readAllAttachments,
+  wikiPortOf,
+  type ReportProgress,
+} from '@genoffice/report-writer'
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { Block } from '@genoffice/docx-engine'
@@ -29,6 +41,8 @@ import {
   type DocWriteSpec,
 } from './doc-writer'
 import { EditQueueCard } from './EditQueueCard'
+import { createDocsLander } from './report/docs-lander'
+import { createReportSkill } from './report/report-skill'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -109,6 +123,8 @@ interface ChatEntry {
   attachments?: AttachmentMeta[]
   /** the selection this user message targeted, frozen at send */
   scope?: AiScopeQuoteData
+  /** progress of a write_report run in this turn, rendered as a card */
+  report?: ReportProgress[]
 }
 
 /** longest selection excerpt echoed on a user bubble */
@@ -778,6 +794,28 @@ export function AiPanel({
           () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
           () => window.desktop,
         ),
+        // a whole document from attachments and the work wiki: outline first, then chapter by chapter
+        createReportSkill({
+          lander: (style, runId) =>
+            createDocsLander({
+              editor: () => editorRef.current,
+              style,
+              numIds,
+              track: () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+              runId,
+            }),
+          llm: () => createIpcLlm(window.desktop, () => settingsRef.current),
+          wiki: () => wikiPortOf(window.workWiki),
+          attachments: () =>
+            readAllAttachments(availableAttachments(), (path, offset, max) =>
+              window.desktop.readAttachment(path, offset, max),
+            ),
+          readStyle: async (id) => {
+            const r = await window.desktop.readDocStyle(id)
+            return r.ok ? { style: r.style, description: r.description } : null
+          },
+          progress: (e) => patchLastAssistant((last) => ({ report: [...(last.report ?? []), e] })),
+        }),
         createFilesSkill(availableAttachments),
         createWorkWikiSkill(() => window.workWiki),
       ]),
@@ -1340,6 +1378,9 @@ export function AiPanel({
                   <SentAttachments atts={entry.attachments} previews={attachmentPreviews} />
                 )}
                 {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+                {entry.report && entry.report.length > 0 && (
+                  <ReportProgressCard view={deriveReportProgressView(entry.report)} lang={lang} />
+                )}
                 {entry.text && (
                   <div dir="auto">
                     <Markdown text={entry.text} nav={docNav} />
@@ -1420,6 +1461,13 @@ export function AiPanel({
                 <span dir="auto">{entry.text}</span>
               )}
               {entry.tools && entry.tools.length > 0 && <ToolChipList tools={entry.tools} />}
+              {entry.report && entry.report.length > 0 && (
+                <ReportProgressCard
+                  view={deriveReportProgressView(entry.report)}
+                  lang={lang}
+                  onCancel={busy && isLast ? cancel : undefined}
+                />
+              )}
               {entry.error && (
                 <div className="ai-msg-error">{t('aiErrorPrefix', { error: entry.error })}</div>
               )}

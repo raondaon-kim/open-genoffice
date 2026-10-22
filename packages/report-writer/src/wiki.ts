@@ -94,3 +94,23 @@ export async function readChapterPages(
   }
   return out
 }
+
+/** the slice of the work-wiki renderer API (`window.workWiki`) the port needs */
+export interface WorkWikiLike {
+  catalog(query?: string): Promise<string>
+  index(category?: string): Promise<string>
+  read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
+}
+
+/** `window.workWiki` as a WikiPort; no API (wiki not wired) means no wiki */
+export function wikiPortOf(api: WorkWikiLike | undefined): WikiPort | null {
+  if (!api) return null
+  return {
+    catalog: (q) => api.catalog(q),
+    index: (c) => api.index(c),
+    read: async (id) => {
+      const r = await api.read(id)
+      return r.ok ? r.page : null
+    },
+  }
+}

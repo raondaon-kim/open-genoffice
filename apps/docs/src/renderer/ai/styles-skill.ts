@@ -21,6 +21,7 @@ const MAX_BLOCK_CHARS = 4000
 type StylesApi = Pick<DesktopApi, 'listDocStyles' | 'readDocStyle'>
 
 const STYLES_SYSTEM_PROMPT = `## Document style wiki
+- A whole document built from attachments or the work wiki (report, proposal, plan) goes through write_report, which picks the style itself; the rules below are for the rest.
 - Before writing a NEW document or a large new section from scratch, ALWAYS call list_document_styles first.
 - When a style fits the kind of document, call read_document_style, then write_styled_document with the whole document as blocks of {role, text}. Pick roles from the role table; write only the text (with its own number or marker if the role uses one) — never choose sizes, fonts, spacing or indentation yourself, the role carries them. A style marked draft is still used.
 - Long documents are written in stages, never in one call: first fix the outline (chapters and sections), then call write_styled_document for the cover and table of contents, then once per chapter (each call appends at the end of the document), finishing every chapter before the next.
