@@ -40,7 +40,8 @@
     "@genoffice/file-parse": "*",
     "cfb": "^1.2.2",
     "@genoffice/report-writer": "*",
-    "@genoffice/work-wiki": "*"
+    "@genoffice/work-wiki": "*",
+    "jszip": "^3.10.1"
   },
   "author": "Serge Doub and Open GenOffice contributors"
 }

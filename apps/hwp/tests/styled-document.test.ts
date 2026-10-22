@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DocStyle, StyleRole } from '../src/shared/doc-style'
 import type { RunRhwpFn } from '../src/main/rhwp-cli'
 import { buildStyledDocument, MAX_STYLED_BLOCKS, stageBlocks } from '../src/main/styled-document'
+import { buildStyled } from '../src/main/styled-fast'
 
 const role = (id: string, over: Partial<StyleRole> = {}): StyleRole => ({
   id,
@@ -359,5 +360,19 @@ describe('stageBlocks', () => {
       ok: false,
       error: expect.stringMatching(/block 2: a table needs at least one row/),
     })
+  })
+})
+
+describe('buildStyled (one pass first, op by op when that fails)', () => {
+  it('falls back to the op-by-op build when the one-pass build cannot read the engine output', async () => {
+    const f = fake()
+    const result = await buildStyled(style, [{ role: 'org-name', text: '기관' }], {
+      run: f.run,
+      rhwpPath: '/bin/rhwp',
+      workDir: dir,
+    })
+    expect(result.ok).toBe(true)
+    // the op-by-op build ran: a scaffold, then the role's paragraph and character format
+    expect(f.calls.filter((c) => c[0] === 'edit').map((c) => c[1])).toContain('apply-para-format')
   })
 })

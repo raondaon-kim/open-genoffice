@@ -91,7 +91,7 @@ function opFor(role: StyleRole, index: number): EditOp {
   }
 }
 
-function missingParts(style: DocStyle, blocks: StyledBlock[]): string[] {
+export function missingParts(style: DocStyle, blocks: StyledBlock[]): string[] {
   const used = new Set(blocks.map((b) => b.role))
   const out: string[] = []
   for (const slot of style.skeleton) {
@@ -108,6 +108,56 @@ function withoutLeadingSpaces(text: string): string {
   let start = 0
   while (start < text.length && [0x20, 0x3000].includes(text.charCodeAt(start))) start++
   return text.slice(start)
+}
+
+/**
+ * The scaffold text of every block, checked against the style: a role's leading spaces go in
+ * front (the model's own are dropped) and a blank line is one space; a table block is ' '.
+ */
+export function prepareStyledTexts(
+  style: DocStyle,
+  blocks: StyledBlock[],
+): { ok: true; texts: string[] } | { ok: false; error: string } {
+  if (!Array.isArray(blocks) || blocks.length === 0)
+    return { ok: false, error: 'blocks must be a non-empty list' }
+  if (blocks.length > MAX_STYLED_BLOCKS) {
+    return {
+      ok: false,
+      error: `at most ${MAX_STYLED_BLOCKS} blocks per document (got ${blocks.length})`,
+    }
+  }
+  const roles = new Map(style.roles.map((r) => [r.id, r]))
+  const texts: string[] = []
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i] as { role?: unknown; text?: unknown }
+    const where = `block ${i + 1}`
+    if (isTableBlock(block)) {
+      const error = tableBlockError(block)
+      if (error) return { ok: false, error: `${where}: ${error}` }
+      texts.push(' ')
+      continue
+    }
+    if (typeof block?.role !== 'string' || !roles.has(block.role)) {
+      return {
+        ok: false,
+        error: `${where}: unknown role "${String(block?.role)}" — roles are ${[...roles.keys()].join(', ')}`,
+      }
+    }
+    if (
+      typeof block.text !== 'string' ||
+      block.text.length > MAX_BLOCK_CHARS ||
+      /[\n\r\t]/.test(block.text)
+    ) {
+      return {
+        ok: false,
+        error: `${where}: text must be one line without tabs (max ${MAX_BLOCK_CHARS} characters)`,
+      }
+    }
+    const role = roles.get(block.role)!
+    // a truly empty paragraph ignores apply-char-format (count 0), so a blank line is one space
+    texts.push(`${' '.repeat(role.lead)}${withoutLeadingSpaces(block.text)}` || ' ')
+  }
+  return { ok: true, texts }
 }
 
 export async function buildStyledDocument(

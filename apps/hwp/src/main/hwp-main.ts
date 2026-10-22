@@ -36,7 +36,8 @@ import { legacyHangulHwpChecked } from './hwp5-legacy'
 import { backupBeforeOverwrite, bytesMatchPath } from './save-guard'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
-import { buildStyledDocument, stageBlocks } from './styled-document'
+import { stageBlocks } from './styled-document'
+import { buildStyled } from './styled-fast'
 import { registerHwpAttachmentIpc, trackHwpAttachmentView } from './attachments'
 import { StyledDrafts } from './styled-drafts'
 import type { DraftBlock } from './styled-drafts'
@@ -759,7 +760,7 @@ function registerHwpIpc(): void {
     await mkdir(outDir, { recursive: true })
     const workDir = await mkdtemp(join(outDir, '.styled-'))
     try {
-      const built = await buildStyledDocument(page.style, blocks, {
+      const built = await buildStyled(page.style, blocks, {
         rhwpPath: bin.path,
         workDir,
       })
@@ -798,7 +799,7 @@ function registerHwpIpc(): void {
     await mkdir(outDir, { recursive: true })
     const workDir = await mkdtemp(join(outDir, '.styled-'))
     try {
-      const built = await buildStyledDocument(page.style, staged.blocks, {
+      const built = await buildStyled(page.style, staged.blocks, {
         rhwpPath: bin.path,
         workDir,
       })
