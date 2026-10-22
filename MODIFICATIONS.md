@@ -82,6 +82,29 @@ The fork's material changes on top of upstream:
     when an ingest answer stops at max_tokens (reasoning models spend hidden thinking inside
     it), and dates new pages with today's date.
   - **Settings:** on/off and the folder, in Settings → AI media.
+- **Whole documents from material** (`packages/report-writer`, Word and Hangul AI panels): a
+  `write_report` tool writes a report, proposal or plan from the attached files and the work
+  wiki.
+  - **Plan first:** every attachment is read in full (mandatory, first-priority material); the
+    plan reads the wiki's index (not the whole wiki) and fixes the title, the chapters, each
+    chapter's point, owned topics and stances, and the attachment parts and wiki pages it uses.
+  - **Then chapter by chapter:** the title and table of contents appear in the document at
+    once, and each chapter replaces its "쓰는 중…" placeholder. A chapter call carries the
+    topic, the whole outline, the claims of earlier chapters and only its own material.
+  - **Writing rules:** each section opens with its point; facts only from the material, with
+    the source named; the author's proposals marked "(제안)"; no blanks in a report's body —
+    what the material cannot support goes into a "확인 필요 사항" table (proposals keep
+    `[회사 실적 기재]` blanks instead). Attachment and wiki text is fenced as data.
+  - **Reasoning models:** budgets start at 16K (plan) / 32K (chapter) tokens and grow to 64K
+    when the answer stops at the limit; a cut chapter is continued or fails, never lands cut.
+  - **Word:** written into the open document with the style's roles (`docx-report` by
+    default, `docx-bid-proposal` for an RFP); tables as Word tables; tracked when track
+    changes is on.
+  - **Hangul:** a new narrative report style (`report`) is the default; the styled-document
+    builder gains tables. A blank document fills live (rebuilt and reloaded after each
+    chapter, one AI-undo step); otherwise, or once the user edits during the run, the report
+    is created as a new document.
+  - Progress card with cancel in both panels; chapters already written stay on cancel.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
   (`deck-bid-proposal`); PowerPoint pages may carry deck-type rules, and an A4
