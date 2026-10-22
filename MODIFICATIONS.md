@@ -103,7 +103,9 @@ The fork's material changes on top of upstream:
   - **Hangul:** a new narrative report style (`report`) is the default; the styled-document
     builder gains tables. A blank document fills live (rebuilt and reloaded after each
     chapter, one AI-undo step); otherwise, or once the user edits during the run, the report
-    is created as a new document.
+    is created as a new document. Styled Hangul documents are built in one engine pass: the
+    role formats are taken from the engine once per style and every paragraph points at its
+    role's format (same shapes as op-by-op formatting, seconds instead of minutes).
   - Progress card with cancel in both panels; chapters already written stay on cancel.
 - **Public bid proposals**: wiki pages for a Hangul technical proposal
   (`bid-proposal`) and an A4-landscape PowerPoint proposal
