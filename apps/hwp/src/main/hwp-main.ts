@@ -36,7 +36,7 @@ import { legacyHangulHwpChecked } from './hwp5-legacy'
 import { backupBeforeOverwrite, bytesMatchPath } from './save-guard'
 import { paragraphsResult } from './rhwp-paragraphs'
 import { buildQueryArgs, isAiQueryName } from './rhwp-queries'
-import { buildStyledDocument } from './styled-document'
+import { buildStyledDocument, stageBlocks } from './styled-document'
 import { registerHwpAttachmentIpc, trackHwpAttachmentView } from './attachments'
 import { StyledDrafts } from './styled-drafts'
 import type { DraftBlock } from './styled-drafts'
@@ -733,18 +733,9 @@ function registerHwpIpc(): void {
     const page = loadDocStyles(runtime.docStylesDir).pages.find((p) => p.style.id === req.style)
     if (!page) return bad(`hwp: no style "${req.style}"`)
     // a stage's blocks are checked when it arrives, so an error points at that stage
-    const roleIds = new Set(page.style.roles.map((r) => r.id))
-    const stage: DraftBlock[] = []
-    for (const [i, b] of (req.blocks as unknown[]).entries()) {
-      const block = b as { role?: unknown; text?: unknown } | null
-      if (typeof block?.role !== 'string' || !roleIds.has(block.role)) {
-        return bad(
-          `block ${i + 1}: unknown role "${String(block?.role)}" — roles are ${[...roleIds].join(', ')}`,
-        )
-      }
-      if (typeof block.text !== 'string') return bad(`block ${i + 1}: text must be a string`)
-      stage.push({ role: block.role, text: block.text })
-    }
+    const staged = stageBlocks(page.style, req.blocks as unknown[])
+    if (!staged.ok) return bad(staged.error)
+    const stage: DraftBlock[] = staged.blocks
     // staged writing: done:false keeps the blocks in a draft; the call with done (default) builds it
     const done = req.done !== false
     const draftId = typeof req.draftId === 'string' && req.draftId ? req.draftId : undefined
@@ -783,6 +774,35 @@ function registerHwpIpc(): void {
         roleCounts: built.roleCounts,
         warnings: built.warnings,
       }
+    } finally {
+      await rm(workDir, { recursive: true, force: true })
+    }
+  })
+
+  // write_report in a blank document: the whole document so far as bytes, loaded into the
+  // panel's own tab after every chapter; no file is written and no tab is opened
+  ipcMain.handle(HWP_CHANNELS.buildStyledBytes, async (_e, request: unknown) => {
+    const bad = (error: string) => ({ ok: false as const, error })
+    if (!runtime.docStylesDir) return bad('hwp: the style wiki is not available in this build')
+    const req = request as { style?: unknown; blocks?: unknown } | null
+    if (!req || typeof req.style !== 'string' || !Array.isArray(req.blocks)) {
+      return bad('hwp: buildStyledBytes needs a style id and blocks')
+    }
+    const page = loadDocStyles(runtime.docStylesDir).pages.find((p) => p.style.id === req.style)
+    if (!page) return bad(`hwp: no style "${req.style}"`)
+    const staged = stageBlocks(page.style, req.blocks as unknown[])
+    if (!staged.ok) return bad(staged.error)
+    const bin = rhwpBinary()
+    if (!bin.ok) return bad(bin.error)
+    const outDir = join(app.getPath('userData'), 'ai-created')
+    await mkdir(outDir, { recursive: true })
+    const workDir = await mkdtemp(join(outDir, '.styled-'))
+    try {
+      const built = await buildStyledDocument(page.style, staged.blocks, {
+        rhwpPath: bin.path,
+        workDir,
+      })
+      return built.ok ? { ok: true as const, data: built.data } : bad(built.error)
     } finally {
       await rm(workDir, { recursive: true, force: true })
     }

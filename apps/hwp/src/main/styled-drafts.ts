@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import type { StyledBlock } from './styled-document'
 
 /**
  * A long styled document written in stages: the assistant sends the cover and contents, then one
@@ -6,10 +7,7 @@ import { randomUUID } from 'node:crypto'
  * The drafts live here in main until then; nothing is written or opened before the last call.
  */
 
-export interface DraftBlock {
-  role: string
-  text: string
-}
+export type DraftBlock = StyledBlock
 
 interface Draft {
   style: string

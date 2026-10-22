@@ -21,6 +21,7 @@ const api: HwpApi = {
   listDocStyles: () => ipcRenderer.invoke(HWP_CHANNELS.listDocStyles),
   readDocStyle: (id) => ipcRenderer.invoke(HWP_CHANNELS.readDocStyle, id),
   createStyledDocument: (request) => ipcRenderer.invoke(HWP_CHANNELS.createStyledDocument, request),
+  buildStyledBytes: (request) => ipcRenderer.invoke(HWP_CHANNELS.buildStyledBytes, request),
   exportDocStyles: () => ipcRenderer.invoke(HWP_CHANNELS.exportDocStyles),
   getStudioUrl: () => ipcRenderer.invoke(HWP_CHANNELS.getStudioUrl),
   aiSnapshot: (request) => ipcRenderer.invoke(HWP_CHANNELS.aiSnapshot, request),

@@ -25,6 +25,7 @@ export const HWP_CHANNELS = {
   listDocStyles: 'hwp:list-doc-styles',
   readDocStyle: 'hwp:read-doc-style',
   createStyledDocument: 'hwp:create-styled-document',
+  buildStyledBytes: 'hwp:build-styled-bytes',
   exportDocStyles: 'hwp:export-doc-styles',
   getStudioUrl: 'hwp:get-studio-url',
   aiSnapshot: 'hwp:ai-snapshot',
@@ -110,9 +111,12 @@ export interface DocStyleSummary {
   evidence: { documents: number; note: string }
 }
 
+/** a styled block: a paragraph in a role of the style, or a table (rows[0] is the header) */
+export type StyledBlockInput = { role: string; text: string } | { role: 'table'; rows: string[][] }
+
 export interface CreateStyledDocumentRequest {
   style: string
-  blocks: Array<{ role: string; text: string }>
+  blocks: StyledBlockInput[]
   fileName?: string
   /** a long document in stages: continue this draft (from an earlier staged result) */
   draftId?: string
@@ -186,6 +190,11 @@ export interface HwpApi {
     id: string,
   ): Promise<{ ok: true; style: DocStyle; description: string } | { ok: false; error: string }>
   createStyledDocument(request: CreateStyledDocumentRequest): Promise<CreateStyledDocumentResult>
+  /** the whole styled document as hwpx bytes; nothing is written or opened (write_report reloads its own tab) */
+  buildStyledBytes(request: {
+    style: string
+    blocks: StyledBlockInput[]
+  }): Promise<{ ok: true; data: Uint8Array } | { ok: false; error: string }>
   exportDocStyles(): Promise<
     { ok: true; target: string; count: number } | { ok: false; canceled?: boolean; error?: string }
   >

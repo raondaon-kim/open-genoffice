@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DocStyle, StyleRole } from '../src/shared/doc-style'
 import type { RunRhwpFn } from '../src/main/rhwp-cli'
-import { buildStyledDocument, MAX_STYLED_BLOCKS } from '../src/main/styled-document'
+import { buildStyledDocument, MAX_STYLED_BLOCKS, stageBlocks } from '../src/main/styled-document'
 
 const role = (id: string, over: Partial<StyleRole> = {}): StyleRole => ({
   id,
@@ -257,5 +257,107 @@ describe('buildStyledDocument', () => {
     })
     expect(result).toMatchObject({ ok: false, error: expect.stringMatching(/block 1/) })
     expect(readdirSync(dir)).toEqual([])
+  })
+})
+
+describe('buildStyledDocument tables', () => {
+  const edits = (f: ReturnType<typeof fake>) => f.calls.filter((c) => c[0] === 'edit')
+  const flag = (c: string[], name: string) => c[c.indexOf(name) + 1]
+
+  it('a table block becomes a table at its paragraph with every cell filled', async () => {
+    const f = fake()
+    const result = await buildStyledDocument(
+      style,
+      [
+        { role: 'item-1', text: '1. 표 앞' },
+        {
+          role: 'table',
+          rows: [
+            ['단계', '내용', '비고'],
+            ['1', '데이터', ''],
+          ],
+        },
+      ],
+      { run: f.run, rhwpPath: '/bin/rhwp', workDir: dir },
+    )
+    expect(result.ok).toBe(true)
+    // the table's paragraph is scaffolded blank and gets no role style
+    expect(f.specs[0]!.blocks[1]).toEqual({ type: 'paragraph', text: ' ' })
+    const e = edits(f)
+    expect(e.filter((c) => c[1] === 'apply-para-format')).toHaveLength(1)
+    const insert = e.find((c) => c[1] === 'insert-table')!
+    expect([flag(insert, '--rows'), flag(insert, '--cols'), flag(insert, '--para')]).toEqual([
+      '2',
+      '3',
+      '1',
+    ])
+    const cells = e.filter((c) => c[1] === 'set-cell')
+    expect(cells).toHaveLength(6)
+    expect(
+      cells.map((c) => [flag(c, '--table'), flag(c, '--row'), flag(c, '--col')]),
+    ).toContainEqual(['0', '1', '1'])
+    expect(cells.find((c) => flag(c, '--row') === '1' && flag(c, '--col') === '1')).toContain(
+      '데이터',
+    )
+  })
+
+  it('two tables are addressed by their order', async () => {
+    const f = fake()
+    await buildStyledDocument(
+      style,
+      [
+        { role: 'table', rows: [['a']] },
+        { role: 'item-1', text: '사이' },
+        { role: 'table', rows: [['b']] },
+      ],
+      { run: f.run, rhwpPath: '/bin/rhwp', workDir: dir },
+    )
+    const cells = edits(f).filter((c) => c[1] === 'set-cell')
+    expect(cells.map((c) => [flag(c, '--table'), flag(c, '--text')])).toEqual([
+      ['0', 'a'],
+      ['1', 'b'],
+    ])
+  })
+
+  it('a table with ragged rows is refused, naming the block', async () => {
+    const result = await buildStyledDocument(
+      style,
+      [{ role: 'table', rows: [['a', 'b'], ['c']] }],
+      { run: fake().run, rhwpPath: '/bin/rhwp', workDir: dir },
+    )
+    expect(result).toEqual({ ok: false, error: expect.stringMatching(/block 1/) })
+  })
+})
+
+describe('stageBlocks', () => {
+  it('accepts text blocks with known roles and table blocks', () => {
+    expect(
+      stageBlocks(style, [
+        { role: 'item-1', text: '1. 가' },
+        { role: 'table', rows: [['a', 'b']] },
+      ]),
+    ).toEqual({
+      ok: true,
+      blocks: [
+        { role: 'item-1', text: '1. 가' },
+        { role: 'table', rows: [['a', 'b']] },
+      ],
+    })
+  })
+
+  it('names the block with an unknown role or a bad table', () => {
+    expect(stageBlocks(style, [{ role: 'nope', text: 'x' }])).toEqual({
+      ok: false,
+      error: expect.stringMatching(/block 1: unknown role "nope"/),
+    })
+    expect(
+      stageBlocks(style, [
+        { role: 'item-1', text: 'x' },
+        { role: 'table', rows: [] },
+      ]),
+    ).toEqual({
+      ok: false,
+      error: expect.stringMatching(/block 2: a table needs at least one row/),
+    })
   })
 })

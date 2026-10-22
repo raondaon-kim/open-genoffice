@@ -17,9 +17,43 @@ import { MAX_EDIT_OPS } from './rhwp-edit-ops'
 export const MAX_STYLED_BLOCKS = 1500
 const MAX_BLOCK_CHARS = 2000
 
-export interface StyledBlock {
+export interface StyledTextBlock {
   role: string
   text: string
+}
+
+/** a table: its paragraph is scaffolded blank, then the table is inserted there and filled */
+export interface StyledTableBlock {
+  role: 'table'
+  /** rows[0] is the header row; every row has the same number of cells */
+  rows: string[][]
+}
+
+export type StyledBlock = StyledTextBlock | StyledTableBlock
+
+export const isTableBlock = (b: unknown): b is StyledTableBlock =>
+  typeof b === 'object' &&
+  b !== null &&
+  (b as { role?: unknown }).role === 'table' &&
+  Array.isArray((b as { rows?: unknown }).rows)
+
+const MAX_TABLE_COLS = 256
+
+/** why a table block cannot be built, or null when it can */
+export function tableBlockError(block: StyledTableBlock): string | null {
+  const rows = block.rows
+  if (rows.length === 0) return 'a table needs at least one row'
+  const cols = Array.isArray(rows[0]) ? rows[0].length : 0
+  if (cols === 0 || cols > MAX_TABLE_COLS) return `a table row needs 1-${MAX_TABLE_COLS} cells`
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length !== cols)
+      return 'table rows must all have the same number of cells'
+    for (const cell of row) {
+      if (typeof cell !== 'string' || cell.length > MAX_BLOCK_CHARS || /[\n\r\t]/.test(cell))
+        return `a table cell must be one line without tabs (max ${MAX_BLOCK_CHARS} characters)`
+    }
+  }
+  return null
 }
 
 export type StyledResult =
@@ -95,6 +129,12 @@ export async function buildStyledDocument(
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i] as { role?: unknown; text?: unknown }
     const where = `block ${i + 1}`
+    if (isTableBlock(block)) {
+      const error = tableBlockError(block)
+      if (error) return { ok: false, error: `${where}: ${error}` }
+      texts.push(' ')
+      continue
+    }
     if (typeof block?.role !== 'string' || !roles.has(block.role)) {
       return {
         ok: false,
@@ -141,7 +181,26 @@ export async function buildStyledDocument(
       )
     }
 
-    const ops = blocks.map((b, i) => opFor(roles.get(b.role)!, i))
+    // role styles first (paragraph i is block i), then each table into its blank paragraph
+    const ops: EditOp[] = []
+    blocks.forEach((b, i) => {
+      if (!isTableBlock(b)) ops.push(opFor(roles.get(b.role)!, i))
+    })
+    let table = 0
+    blocks.forEach((b, i) => {
+      if (!isTableBlock(b)) return
+      ops.push({
+        op: 'insert_table',
+        section: 0,
+        paragraph: i,
+        rows: b.rows.length,
+        cols: b.rows[0]!.length,
+      })
+      b.rows.forEach((row, r) =>
+        row.forEach((text, c) => ops.push({ op: 'set_cell', table, row: r, col: c, text })),
+      )
+      table++
+    })
     for (let start = 0, k = 1; start < ops.length; start += MAX_EDIT_OPS, k++) {
       const chunk = ops.slice(start, start + MAX_EDIT_OPS)
       const result = await runEditChain({
@@ -176,4 +235,36 @@ export async function buildStyledDocument(
   } catch (err) {
     return fail(err instanceof Error ? err.message : String(err))
   }
+}
+
+/**
+ * Checks blocks sent over IPC against a style (createStyledDocument and buildStyledBytes): text
+ * blocks need a role of the style and a string text; table blocks need even rows of one-line
+ * cells. The error names the block.
+ */
+export function stageBlocks(
+  style: DocStyle,
+  raw: unknown[],
+): { ok: true; blocks: StyledBlock[] } | { ok: false; error: string } {
+  const roleIds = new Set(style.roles.map((r) => r.id))
+  const blocks: StyledBlock[] = []
+  for (const [i, b] of raw.entries()) {
+    if (isTableBlock(b)) {
+      const error = tableBlockError(b)
+      if (error) return { ok: false, error: `block ${i + 1}: ${error}` }
+      blocks.push({ role: 'table', rows: b.rows.map((r) => [...r]) })
+      continue
+    }
+    const block = b as { role?: unknown; text?: unknown } | null
+    if (typeof block?.role !== 'string' || !roleIds.has(block.role)) {
+      return {
+        ok: false,
+        error: `block ${i + 1}: unknown role "${String(block?.role)}" — roles are ${[...roleIds].join(', ')}`,
+      }
+    }
+    if (typeof block.text !== 'string')
+      return { ok: false, error: `block ${i + 1}: text must be a string` }
+    blocks.push({ role: block.role, text: block.text })
+  }
+  return { ok: true, blocks }
 }
