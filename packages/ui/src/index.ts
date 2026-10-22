@@ -1,5 +1,7 @@
 export { AiPanelSideButton } from './AiPanelSideButton'
 export { AttachmentWikiButton, resetAttachmentWikiStatus } from './AttachmentWikiButton'
+export { ReportProgressCard } from './ReportProgressCard'
+export type { ReportProgressCardProps } from './ReportProgressCard'
 export { ATTACHMENT_WIKI_LABELS } from './strings-attachment-wiki'
 export type { AttachmentWikiLabels } from './strings-attachment-wiki'
 export { AiComposer } from './AiComposer'

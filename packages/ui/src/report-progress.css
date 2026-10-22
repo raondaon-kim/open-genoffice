@@ -1,0 +1,72 @@
+/* write_report progress card in the Word and Hangul AI panels: one row per stage and chapter */
+.ai-report-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  font-size: 12px;
+}
+
+.ai-report-title {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ai-report-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-report-step {
+  position: relative;
+  padding-left: 16px;
+  color: var(--color-text-secondary);
+}
+
+.ai-report-step::before {
+  position: absolute;
+  left: 0;
+  content: '○';
+}
+
+.ai-report-step.is-done::before {
+  content: '✓';
+  color: var(--color-success, #2e7d32);
+}
+
+.ai-report-step.is-running {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.ai-report-step.is-running::before {
+  content: '●';
+  color: var(--color-accent, #2d6cdf);
+}
+
+.ai-report-step.is-failed::before {
+  content: '✕';
+  color: var(--color-danger, #c62828);
+}
+
+.ai-report-outcome.is-error {
+  color: var(--color-danger, #c62828);
+}
+
+.ai-report-cancel {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}

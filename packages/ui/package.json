@@ -18,6 +18,7 @@
     "./image-dialogs.css": "./src/image-dialogs.css",
     "./image-viewer.css": "./src/image-viewer.css",
     "./markdown.css": "./src/markdown.css",
+    "./report-progress.css": "./src/report-progress.css",
     "./ribbon-collapse.css": "./src/ribbon-collapse.css",
     "./screentip.css": "./src/screentip.css",
     "./tokens.css": "./src/tokens.css"
@@ -37,6 +38,7 @@
   "dependencies": {
     "@genoffice/i18n": "*",
     "@genoffice/pptx-render": "*",
+    "@genoffice/report-writer": "*",
     "@genoffice/work-wiki": "*"
   }
 }
