@@ -21,6 +21,7 @@ export interface ReportSkillDeps<St> {
 export const REPORT_PROMPT = `## Whole documents from material (write_report)
 - When the user asks for a whole document built from material — a report, proposal, plan or white paper from attached files and/or the work wiki — call write_report once with the request in the user's words. It reads every attachment, plans the outline from them and the wiki's index, puts the title and table of contents into the document, and writes the chapters one after another.
 - Pass style only when the user named a document style; pass length when the user said how long.
+- write_report adds the new document after what is already in the open document (a blank document is filled). Never delete or rewrite existing content before or after calling it unless the user asked to replace it; do not edit the written document afterwards unless asked.
 - Do not read the attachments or the wiki yourself first, and do not use write_document / write_styled_document for such requests; keep those for short pieces and edits.
 - After it returns, tell the user in one or two sentences what was written (chapters, any chapter that failed, the open items table).`
 

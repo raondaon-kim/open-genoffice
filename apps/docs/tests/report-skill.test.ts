@@ -68,3 +68,11 @@ describe('write_report (Word)', () => {
     expect(r.isError).toBe(true)
   })
 })
+
+describe('write_report guidance', () => {
+  it('tells the assistant to keep what is already in the document', () => {
+    const { skill } = setup()
+    expect(skill.systemPrompt).toMatch(/after what is already in the open document/)
+    expect(skill.systemPrompt).toMatch(/never delete or rewrite existing content/i)
+  })
+})
