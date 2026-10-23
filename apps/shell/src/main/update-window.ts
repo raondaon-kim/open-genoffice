@@ -95,6 +95,26 @@ export function currentUpdateUiState(): UpdateUiState | null {
   return currentState
 }
 
+/**
+ * A background check found an update: keep its state and actions and tell the shell (its tab
+ * bar shows the update button, which calls openForUpdate) without opening the window. An open
+ * window is kept in step.
+ */
+export function announceUpdate(
+  parent: BrowserWindow | null,
+  state: UpdateUiState,
+  windowActions: UpdateActions,
+): void {
+  currentState = state
+  actions = windowActions
+  if (parent && !parent.isDestroyed()) lastParent = parent
+  registerIpc()
+  broadcastState()
+  if (updateWin && !updateWin.isDestroyed()) {
+    updateWin.webContents.send(UPDATE_CHANNELS.changed, currentState)
+  }
+}
+
 export function showUpdateWindow(
   parent: BrowserWindow | null,
   state: UpdateUiState,

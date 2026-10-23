@@ -13,6 +13,7 @@ import type {
   UpdateUiStrings,
 } from '../shared/update-api'
 import {
+  announceUpdate,
   closeUpdateWindow,
   isUpdateWindowOpen,
   pushUpdateState,
@@ -36,6 +37,12 @@ import {
  * pipeline. On Linux only AppImage runs self-update (electron-updater
  * replaces the .AppImage file in place, no root needed); deb installs have
  * no updater — users upgrade via `apt install ./<new>.deb`.
+ *
+ * Open GenOffice: the feed is this fork's GitHub releases (latest.yml and the installer are
+ * release assets). Checks run at most once a day (the last check is kept in app settings, see
+ * UpdateCheckStore) and never open the window on their own: a found update is announced to the
+ * shell, whose tab bar shows an update button that opens the window. Help > Check for Updates…
+ * still checks at once and opens the window.
  *
  * Dev preview: GENOFFICE_FAKE_UPDATE=<version> in an unpacked run opens the
  * window with a simulated download so the UI can be exercised end to end.
@@ -397,7 +404,48 @@ const tUpd = createI18n({
 })
 
 const FIRST_CHECK_DELAY_MS = 15_000
-const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+/** how often the once-a-day rule is evaluated while the app runs */
+const RECHECK_INTERVAL_MS = 60 * 60 * 1000
+const CHECK_EVERY_MS = 24 * 60 * 60 * 1000
+
+/** the last successful check: when, and the newer version it found (null: none) */
+export interface UpdateCheckRecord {
+  at: number
+  found: string | null
+}
+
+/** where the last check is kept (app settings in the app; memory when not given) */
+export interface UpdateCheckStore {
+  get(): UpdateCheckRecord | null
+  set(record: UpdateCheckRecord): void
+}
+
+/** the record as kept in app-settings.json (lastUpdateCheck); null when missing or malformed */
+export function parseUpdateCheckRecord(raw: unknown): UpdateCheckRecord | null {
+  if (!raw || typeof raw !== 'object') return null
+  const { at, found } = raw as { at?: unknown; found?: unknown }
+  if (typeof at !== 'number' || !Number.isFinite(at)) return null
+  return { at, found: typeof found === 'string' ? found : null }
+}
+
+function memoryCheckStore(): UpdateCheckStore {
+  let record: UpdateCheckRecord | null = null
+  return {
+    get: () => record,
+    set: (r) => {
+      record = r
+    },
+  }
+}
+
+/** a check is due a day after the last one, after the clock went back, or at launch when the
+ * last check found a version that is not installed yet (its button must come back, and a
+ * download needs a fresh check) */
+function checkDue(record: UpdateCheckRecord | null, now: number, atLaunch: boolean): boolean {
+  if (!record) return true
+  if (now - record.at >= CHECK_EVERY_MS || now < record.at) return true
+  return atLaunch && record.found !== null && record.found !== app.getVersion()
+}
 
 // After this many failed download/apply attempts for the same version the
 // dialog stops offering "retry" and guides the user to a manual download
@@ -410,7 +458,7 @@ const MANUAL_FALLBACK_AFTER = 2
 // build. Preferred is the CDN installer derived from the user's own update
 // feed (see manualDownloadUrlFor), which matches channel, track, and arch.
 // Open GenOffice's own releases: never send users of this app to upstream GenOffice's installer
-const DOWNLOAD_PAGE_URL = 'https://github.com/scottnaddle/open-genoffice/releases/latest'
+const DOWNLOAD_PAGE_URL = 'https://github.com/raondaon-kim/open-genoffice/releases/latest'
 
 /// Trusted HTTPS base URL baked into resources/app-update.yml. Manual download
 /// links are always rebuilt from this base rather than trusting URLs supplied
@@ -591,6 +639,7 @@ export async function checkForUpdatesNow(): Promise<void> {
 export function initAutoUpdater(
   getWindow: () => BrowserWindow | null,
   initialChannel: UpdateChannel = 'stable',
+  checkStore: UpdateCheckStore = memoryCheckStore(),
 ): void {
   if (started) return
   started = true
@@ -617,8 +666,8 @@ export function initAutoUpdater(
   // back off since a beta user switching to stable must not downgrade
   autoUpdater.allowDowngrade = false
   autoUpdater.autoDownload = false
-  // if the user picked "later" after download, install on normal quit
-  autoUpdater.autoInstallOnAppQuit = true
+  // updates install only from the update button (Restart & Install), never on quit
+  autoUpdater.autoInstallOnAppQuit = false
   // full-package policy: never attempt blockmap differential downloads
   // (CI does not publish .blockmap files)
   autoUpdater.disableDifferentialDownload = true
@@ -687,7 +736,19 @@ export function initAutoUpdater(
     failDownload()
   })
 
+  // the window opens only when the user asked (Help > Check for Updates…); a background check
+  // announces the update to the shell, whose update button opens the window
+  const present = (state: UpdateUiState): void => {
+    if (manualCheckInFlight) showUpdateWindow(getWindow(), state, actions)
+    else announceUpdate(getWindow(), state, actions)
+  }
+
+  autoUpdater.on('update-not-available', () => {
+    checkStore.set({ at: Date.now(), found: null })
+  })
+
   autoUpdater.on('update-available', (info: UpdateInfo) => {
+    checkStore.set({ at: Date.now(), found: info.version })
     if (info.version === dismissedVersion) return
     const sameVersionRecheck = info.version === latestSeenVersion
     // progress/downloaded/error events carry no version, so a newer release
@@ -717,7 +778,7 @@ export function initAutoUpdater(
     // in-progress download or a terminal 'manual' fallback back to the
     // "Update Now" offer
     if (sameVersionRecheck && isUpdateWindowOpen()) return
-    showUpdateWindow(getWindow(), { ...initialState(info.version), phase, percent }, actions)
+    present({ ...initialState(info.version), phase, percent })
   })
 
   autoUpdater.on('download-progress', (progress) => {
@@ -731,11 +792,13 @@ export function initAutoUpdater(
     setPhase({ phase: 'downloaded', percent: 100 })
   })
 
-  const check = (): void => {
+  // a failed check records nothing, so the next hourly tick tries again
+  const check = (atLaunch: boolean): void => {
+    if (!checkDue(checkStore.get(), Date.now(), atLaunch)) return
     autoUpdater.checkForUpdates().catch((err) => log('check failed:', err?.message ?? err))
   }
-  setTimeout(check, FIRST_CHECK_DELAY_MS)
-  setInterval(check, RECHECK_INTERVAL_MS)
+  setTimeout(() => check(true), FIRST_CHECK_DELAY_MS)
+  setInterval(() => check(false), RECHECK_INTERVAL_MS)
 }
 
 /** unpacked-run simulation: real window + IPC, fake download that completes */

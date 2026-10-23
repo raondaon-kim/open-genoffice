@@ -140,6 +140,13 @@ The fork's material changes on top of upstream:
   installer name Open GenOffice, its own dev userData folder, Open GenOffice
   icons; the update feed comes from `OPEN_GENOFFICE_UPDATE_URL` only (HTTPS,
   never a Genspark feed), and the manual download page is this fork's releases.
+- **Manual updates from GitHub releases:** builds use this fork's latest release as the feed
+  (`…/releases/latest/download`, where `latest.yml` and the installer are release assets). The
+  app checks at most once a day (the last check is kept in app settings; a launch re-checks when
+  the last check found a version not yet installed) and never opens the update window on its
+  own: a found version shows an update button in the tab bar, which opens the window and starts
+  the download; the user then restarts to install. Nothing installs on quit. Help › Check for
+  Updates… checks at once and opens the window.
 - **Windows packaging**: `OPEN_GENOFFICE_WIN_SIDECAR_TARGET` selects the cargo
   target the Sheets sidecar is taken from (for example the MSVC target on a
   build machine without the GNU toolchain).

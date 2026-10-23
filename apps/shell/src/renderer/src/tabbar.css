@@ -320,6 +320,40 @@ body.overlay-title-bar .tab-bar-drag-spacer {
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* the update button: appears only when a newer version is known (UpdateButton.tsx) */
+.tab-update-btn {
+  -webkit-app-region: no-drag;
+  flex-shrink: 0;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  margin: 0 12px 0 6px;
+  padding: 0 10px;
+  border: 1px solid var(--accent);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab-update-btn:hover {
+  background: var(--accent-soft);
+}
+
+.tab-update-btn.ready {
+  background: var(--accent);
+  color: #fff;
+}
+
+.tab-update-btn.ready:hover {
+  background: var(--accent-hover);
+}
+
 .app-frame-content {
   padding-top: 40px;
 }

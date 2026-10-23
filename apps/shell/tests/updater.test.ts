@@ -92,18 +92,32 @@ interface UpdateActions {
 
 const showUpdateWindow =
   vi.fn<(parent: unknown, state: UpdateUiState, actions: UpdateActions) => void>()
+/** a background check only announces the update to the shell (the tab-bar button) */
+const announceUpdate =
+  vi.fn<(parent: unknown, state: UpdateUiState, actions: UpdateActions) => void>()
+/** either way of presenting an update: the window or the announcement */
+const presented = vi.fn<(parent: unknown, state: UpdateUiState, actions: UpdateActions) => void>()
 const pushUpdateState = vi.fn<(patch: Partial<UpdateUiState>) => void>()
 const closeUpdateWindow = vi.fn()
 
 vi.mock('../src/main/update-window', () => ({
-  showUpdateWindow: (...args: [unknown, UpdateUiState, UpdateActions]) => showUpdateWindow(...args),
+  showUpdateWindow: (...args: [unknown, UpdateUiState, UpdateActions]) => {
+    showUpdateWindow(...args)
+    presented(...args)
+  },
+  announceUpdate: (...args: [unknown, UpdateUiState, UpdateActions]) => {
+    announceUpdate(...args)
+    presented(...args)
+  },
   pushUpdateState: (patch: Partial<UpdateUiState>) => pushUpdateState(patch),
   closeUpdateWindow: () => closeUpdateWindow(),
   isUpdateWindowOpen: () => false,
 }))
 
 const FIRST_CHECK_DELAY_MS = 15_000
-const RECHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+/** the daily rule is evaluated every hour */
+const RECHECK_INTERVAL_MS = 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 
 let platformSpy: { restore: () => void } | null = null
 
@@ -125,11 +139,11 @@ async function flushAsync(): Promise<void> {
 }
 
 function lastShownState(): UpdateUiState {
-  return showUpdateWindow.mock.calls.at(-1)![1]
+  return presented.mock.calls.at(-1)![1]
 }
 
 function lastShownActions(): UpdateActions {
-  return showUpdateWindow.mock.calls.at(-1)![2]
+  return presented.mock.calls.at(-1)![2]
 }
 
 beforeEach(() => {
@@ -148,6 +162,8 @@ beforeEach(() => {
   downloadUpdate.mockImplementation(() => Promise.resolve([]))
   quitAndInstall.mockClear()
   showUpdateWindow.mockClear()
+  announceUpdate.mockClear()
+  presented.mockClear()
   pushUpdateState.mockClear()
   closeUpdateWindow.mockClear()
   openExternal.mockClear()
@@ -175,7 +191,7 @@ describe('initAutoUpdater', () => {
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(updaterState.listeners.size).toBe(0)
     expect(checkForUpdates).not.toHaveBeenCalled()
-    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(presented).not.toHaveBeenCalled()
   })
 
   it('does nothing on unsupported platforms', async () => {
@@ -192,18 +208,28 @@ describe('initAutoUpdater', () => {
     const { initAutoUpdater } = await loadUpdater()
     initAutoUpdater(() => null)
     expect(updaterState.autoDownload).toBe(false)
-    expect(updaterState.autoInstallOnAppQuit).toBe(true)
+    // the user installs from the update button; quitting never installs on its own
+    expect(updaterState.autoInstallOnAppQuit).toBe(false)
     expect(updaterState.disableDifferentialDownload).toBe(true)
     expect(checkForUpdates).not.toHaveBeenCalled()
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(checkForUpdates).toHaveBeenCalledTimes(1)
   })
 
-  it('re-checks on the periodic interval', async () => {
+  it('checks again once a day while the app keeps running', async () => {
+    checkForUpdates.mockImplementation(() => {
+      updaterState.listeners.get('update-not-available')?.({ version: '0.1.0' })
+      return Promise.resolve(null)
+    })
     const { initAutoUpdater } = await loadUpdater()
     initAutoUpdater(() => null)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    // the hourly ticks up to 24h after launch come just under a day after that first check
+    vi.advanceTimersByTime(RECHECK_INTERVAL_MS * 24 - FIRST_CHECK_DELAY_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(2)
     vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
     expect(checkForUpdates).toHaveBeenCalledTimes(2)
   })
@@ -220,7 +246,7 @@ describe('initAutoUpdater', () => {
     const { initAutoUpdater } = await loadUpdater()
     initAutoUpdater(() => null)
     updaterState.listeners.get('update-available')!({ version: '0.2.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     const state = lastShownState()
     expect(state.phase).toBe('available')
     expect(state.version).toBe('0.2.0')
@@ -273,16 +299,16 @@ describe('initAutoUpdater', () => {
     initAutoUpdater(() => null)
     const available = updaterState.listeners.get('update-available')!
     available({ version: '0.2.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     lastShownActions().onLater()
     expect(closeUpdateWindow).toHaveBeenCalledTimes(1)
 
     available({ version: '0.2.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
 
     // a newer version prompts again
     available({ version: '0.3.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(presented).toHaveBeenCalledTimes(2)
   })
 
   it('swallows background check failures', async () => {
@@ -291,7 +317,7 @@ describe('initAutoUpdater', () => {
     initAutoUpdater(() => null)
     vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
     await flushAsync()
-    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(presented).not.toHaveBeenCalled()
   })
 
   it('defaults to the stable (latest) feed channel', async () => {
@@ -333,6 +359,105 @@ describe('initAutoUpdater', () => {
     applyUpdateChannel('beta')
     expect(updaterState.channel).toBeNull()
     expect(checkForUpdates).not.toHaveBeenCalled()
+  })
+})
+
+describe('once-a-day check with a button in the main window', () => {
+  function memoryStore(record: { at: number; found: string | null } | null) {
+    const store = {
+      record,
+      get: () => store.record,
+      set: (r: { at: number; found: string | null }) => {
+        store.record = r
+      },
+    }
+    return store
+  }
+
+  it('a background check announces the update without opening the window', async () => {
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null)
+    updaterState.listeners.get('update-available')!({ version: '0.2.0' })
+    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(announceUpdate).toHaveBeenCalledTimes(1)
+    expect(announceUpdate.mock.calls[0]![1].phase).toBe('available')
+    expect(announceUpdate.mock.calls[0]![1].version).toBe('0.2.0')
+  })
+
+  it('an explicit check opens the window', async () => {
+    const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
+    initAutoUpdater(() => null)
+    checkForUpdates.mockImplementation(() => {
+      updaterState.listeners.get('update-available')!({ version: '0.2.0' })
+      return Promise.resolve({ isUpdateAvailable: true } as never)
+    })
+    await checkForUpdatesNow()
+    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks at launch when the last check is a day old and records the result', async () => {
+    const store = memoryStore({ at: Date.now() - DAY_MS, found: null })
+    checkForUpdates.mockImplementation(() => {
+      updaterState.listeners.get('update-not-available')!({ version: '0.1.0' })
+      return Promise.resolve(null)
+    })
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'stable', store)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+    expect(store.record).toEqual({ at: Date.now(), found: null })
+  })
+
+  it('skips the launch check within a day of the last one', async () => {
+    const store = memoryStore({ at: Date.now() - 2 * 60 * 60 * 1000, found: null })
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'stable', store)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS + RECHECK_INTERVAL_MS * 21)
+    expect(checkForUpdates).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks at launch when the last check found a version not yet installed', async () => {
+    // the button must come back on the next launch, and downloading needs a fresh check
+    const store = memoryStore({ at: Date.now() - 60_000, found: '0.2.0' })
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'stable', store)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  it('records the version a check found', async () => {
+    const store = memoryStore(null)
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'stable', store)
+    updaterState.listeners.get('update-available')!({ version: '0.2.0' })
+    expect(store.record).toEqual({ at: Date.now(), found: '0.2.0' })
+  })
+
+  it('a failed check is retried on the next hourly tick', async () => {
+    checkForUpdates.mockImplementation(() => Promise.reject(new Error('offline')))
+    const store = memoryStore(null)
+    const { initAutoUpdater } = await loadUpdater()
+    initAutoUpdater(() => null, 'stable', store)
+    vi.advanceTimersByTime(FIRST_CHECK_DELAY_MS)
+    await flushAsync()
+    expect(store.record).toBeNull()
+    vi.advanceTimersByTime(RECHECK_INTERVAL_MS)
+    expect(checkForUpdates).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('parseUpdateCheckRecord (app settings)', () => {
+  it('reads a stored record and rejects anything else', async () => {
+    const { parseUpdateCheckRecord } = await loadUpdater()
+    expect(parseUpdateCheckRecord({ at: 5, found: '0.2.0' })).toEqual({ at: 5, found: '0.2.0' })
+    expect(parseUpdateCheckRecord({ at: 5, found: null })).toEqual({ at: 5, found: null })
+    expect(parseUpdateCheckRecord({ at: 5 })).toEqual({ at: 5, found: null })
+    expect(parseUpdateCheckRecord(undefined)).toBeNull()
+    expect(parseUpdateCheckRecord({ at: 'x' })).toBeNull()
+    expect(parseUpdateCheckRecord({ at: Number.NaN })).toBeNull()
+    expect(parseUpdateCheckRecord('2026')).toBeNull()
   })
 })
 
@@ -474,7 +599,7 @@ describe('manual download fallback', () => {
     const actions = await failTwiceIntoManual(macFiles)
     actions.onOpenDownload()
     expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/scottnaddle/open-genoffice/releases/latest',
+      'https://github.com/raondaon-kim/open-genoffice/releases/latest',
     )
   })
 
@@ -485,7 +610,7 @@ describe('manual download fallback', () => {
     ])
     actions.onOpenDownload()
     expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/scottnaddle/open-genoffice/releases/latest',
+      'https://github.com/raondaon-kim/open-genoffice/releases/latest',
     )
   })
 })
@@ -501,7 +626,7 @@ describe('initAutoUpdater (fake update preview)', () => {
     expect(updaterState.listeners.size).toBe(0)
 
     vi.advanceTimersByTime(1500)
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     expect(lastShownState().version).toBe('9.9.9')
 
     lastShownActions().onDownload()
@@ -543,7 +668,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().buttons.length).toBe(2)
     expect(openExternal).toHaveBeenCalledWith(
-      'https://github.com/scottnaddle/open-genoffice/releases/latest',
+      'https://github.com/raondaon-kim/open-genoffice/releases/latest',
     )
     expect(checkForUpdates).not.toHaveBeenCalled()
   })
@@ -558,7 +683,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().type).toBe('info')
     expect(lastDialogOpts().message).toContain('0.1.0')
-    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(presented).not.toHaveBeenCalled()
   })
 
   it('does not report up-to-date when the updater skips the check', async () => {
@@ -567,7 +692,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     checkForUpdates.mockImplementation(() => Promise.resolve(null))
     await checkForUpdatesNow()
     expect(lastDialogOpts().type).toBe('warning')
-    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(presented).not.toHaveBeenCalled()
     expect(downloadUpdate).not.toHaveBeenCalled()
   })
 
@@ -596,11 +721,11 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     const { initAutoUpdater, checkForUpdatesNow } = await loadUpdater()
     initAutoUpdater(() => null)
     updaterState.listeners.get('update-available')!({ version: '0.2.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     lastShownActions().onLater()
     // background recheck stays quiet for the dismissed version…
     updaterState.listeners.get('update-available')!({ version: '0.2.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     // …but an explicit user check offers it again, with no extra dialog
     checkForUpdates.mockImplementation(() => {
       updaterState.listeners.get('update-available')!({ version: '0.2.0' })
@@ -609,7 +734,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     await checkForUpdatesNow()
 
-    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(presented).toHaveBeenCalledTimes(2)
     expect(showMessageBox).not.toHaveBeenCalled()
   })
 
@@ -628,7 +753,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     await checkForUpdatesNow()
 
-    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(presented).toHaveBeenCalledTimes(2)
     expect(lastShownState().phase).toBe('downloaded')
     expect(lastShownState().percent).toBe(100)
     lastShownActions().onDownload()
@@ -665,10 +790,10 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     available({ version: '0.2.0' })
     lastShownActions().onDownload()
     available({ version: '0.3.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     updaterState.listeners.get('update-downloaded')!({ version: '0.2.0' })
     available({ version: '0.3.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     lastShownActions().onDownload()
     expect(downloadUpdate).toHaveBeenCalledTimes(1)
   })
@@ -684,7 +809,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     lastShownActions().onLater()
     // background recheck with a newer version stays quiet…
     available({ version: '0.3.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     // …an explicit check re-opens the download that is already running
     checkForUpdates.mockImplementation(() => {
       available({ version: '0.3.0' })
@@ -693,7 +818,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     await checkForUpdatesNow()
 
-    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(presented).toHaveBeenCalledTimes(2)
     expect(lastShownState().version).toBe('0.2.0')
     expect(lastShownState().phase).toBe('downloading')
     expect(lastShownState().percent).toBe(58)
@@ -710,7 +835,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
     await flushAsync()
     expect(pushUpdateState).toHaveBeenCalledWith({ phase: 'error' })
     available({ version: '0.3.0' })
-    expect(showUpdateWindow).toHaveBeenCalledTimes(2)
+    expect(presented).toHaveBeenCalledTimes(2)
     expect(lastShownState().version).toBe('0.3.0')
     expect(lastShownState().phase).toBe('available')
     expect(lastShownState().percent).toBe(0)
@@ -725,7 +850,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(lastDialogOpts().type).toBe('warning')
-    expect(showUpdateWindow).not.toHaveBeenCalled()
+    expect(presented).not.toHaveBeenCalled()
   })
 
   it('re-shows the simulated update window in GENOFFICE_FAKE_UPDATE runs', async () => {
@@ -736,7 +861,7 @@ describe('checkForUpdatesNow (r148 manual check)', () => {
 
     await checkForUpdatesNow()
 
-    expect(showUpdateWindow).toHaveBeenCalledTimes(1)
+    expect(presented).toHaveBeenCalledTimes(1)
     expect(lastShownState().version).toBe('9.9.9')
     expect(showMessageBox).not.toHaveBeenCalled()
   })

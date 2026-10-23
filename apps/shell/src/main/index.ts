@@ -399,7 +399,12 @@ import {
   setDockHost,
   takeTornTab,
 } from './detached-windows'
-import { applyUpdateChannel, checkForUpdatesNow, initAutoUpdater } from './updater'
+import {
+  applyUpdateChannel,
+  checkForUpdatesNow,
+  initAutoUpdater,
+  parseUpdateCheckRecord,
+} from './updater'
 import { isUpdateChannel, type UpdateChannel } from '../shared/update-api'
 
 /**
@@ -6813,7 +6818,17 @@ app.whenReady().then(async () => {
   installBackToHomeItems()
   installDockMenu()
   setUpdateCheckInvoker(() => void checkForUpdatesNow())
-  initAutoUpdater(() => shellWindow, currentUpdateChannel())
+  // checks run at most once a day; the last one is kept in app settings
+  initAutoUpdater(() => shellWindow, currentUpdateChannel(), {
+    get: () => parseUpdateCheckRecord(readAppSettings(APP_SETTINGS_PATH()).lastUpdateCheck),
+    set: (record) => {
+      try {
+        writeAppSetting(APP_SETTINGS_PATH(), 'lastUpdateCheck', record)
+      } catch (err) {
+        console.warn('[updater] could not store the last check:', err)
+      }
+    },
+  })
   // resource watchdog: a renderer that stays hot for minutes gets diagnostics
   // recorded and the user an offer to close the document (headless exports
   // are short-lived and unattended)

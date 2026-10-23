@@ -5,6 +5,7 @@ import type { TabsApi, TabSummary } from '../../shared/tabs-api'
 import { TEAR_OFF_SLACK, insertionIndexForX, isBeyondBand } from '../../shared/tab-drag-geometry'
 import { notifyFilesChanged } from './file-events'
 import { useI18n } from './locale'
+import { UpdateButton } from './UpdateButton'
 
 declare global {
   interface Window {
@@ -662,6 +663,7 @@ export function TabBar({ split }: TabBarProps) {
           {t(splitHint.orientation === 'side' ? 'splitHintRight' : 'splitHintBottom')}
         </div>
       )}
+      <UpdateButton />
       <button
         className="tab-overflow-btn"
         title={t('tabList')}

@@ -162,4 +162,24 @@ describe('update window — settings-facing surface', () => {
     mod.showUpdateWindow(parent, s, actions())
     expect(mod.currentUpdateUiState()).toBe(s)
   })
+
+  it('announce tells the shell about an update without opening the window', async () => {
+    const mod = await loadModule()
+    mod.announceUpdate(parent, state('available'), actions())
+    expect(winOptions).toHaveLength(0)
+    expect(shown).not.toHaveBeenCalled()
+    const pushes = sent.filter((s) => s.channel === 'update:state-changed')
+    expect(pushes).toHaveLength(1)
+    expect(pushes[0]!.state!.version).toBe('1.2.3')
+    expect(mod.currentUpdateUiState()!.phase).toBe('available')
+  })
+
+  it("the shell's update button opens the window and starts the announced download", async () => {
+    const mod = await loadModule()
+    const act = actions()
+    mod.announceUpdate(parent, state('available'), act)
+    expect(handlers.get('update:open-for-update')!()).toBe(true)
+    expect(winOptions).toHaveLength(1)
+    expect(act.onDownload).toHaveBeenCalledTimes(1)
+  })
 })
