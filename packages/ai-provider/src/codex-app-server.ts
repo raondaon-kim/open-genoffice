@@ -379,6 +379,7 @@ class CodexAppServerClient {
   private readonly sessions = new Map<string, NativeSession>()
   private readonly initialized: Promise<void>
   private nextId = 1
+  private catalog: Promise<CodexModelCatalog> | null = null
   private stderr = ''
   private closed = false
   private users = 0
@@ -413,6 +414,17 @@ class CodexAppServerClient {
 
   get isClosed(): boolean {
     return this.closed
+  }
+
+  /** the account's model catalog, read once per app-server (a failed read is tried again) */
+  modelCatalog(): Promise<CodexModelCatalog> {
+    if (!this.catalog) {
+      this.catalog = readCodexModelCatalog(this).catch((error: unknown) => {
+        this.catalog = null
+        throw error
+      })
+    }
+    return this.catalog
   }
 
   retain(): void {
@@ -969,6 +981,9 @@ async function runCodexAppServer(
   // their thread and temp dir are dropped as soon as the turn ends.
   const ephemeral = cb.sessionId === undefined
   await withClient(config.cliPath, async (client) => {
+    // an empty saved model means GenOffice's default (Luna), read from the account's catalog
+    const model = await codexModelForTurn(config.model, () => client.modelCatalog())
+    if (model !== config.model) config = { ...config, model }
     const signature = sessionSignature(system, tools, config.model.trim())
     let session = client.getSession(nativeSessionId)
     let nextMessages = incrementalMessages(session, signature, messages)
@@ -1059,38 +1074,76 @@ export async function chatCodexAppServer(
     : { ok: false, error: 'Codex app-server returned no content' }
 }
 
+/** numeric parts of a model id, for ordering versions: gpt-6-luna → [6], gpt-5.6-luna → [5, 6] */
+function versionOf(id: string): number[] {
+  return (id.match(/\d+(?:\.\d+)*/)?.[0] ?? '').split('.').filter(Boolean).map(Number)
+}
+
+function newerFirst(a: string, b: string): number {
+  const va = versionOf(a)
+  const vb = versionOf(b)
+  for (let i = 0; i < Math.max(va.length, vb.length); i++) {
+    const d = (vb[i] ?? 0) - (va[i] ?? 0)
+    if (d !== 0) return d
+  }
+  return 0
+}
+
+/** GenOffice's default Codex model: the newest Luna the account offers, else Codex's own default.
+ *  Settings can pick any other model; this applies while the saved model is empty. */
+export function preferredCodexModel(models: string[], codexDefault: string): string {
+  const luna = models.filter((id) => /-luna$/i.test(id)).sort(newerFirst)
+  return luna[0] ?? codexDefault
+}
+
+/** the model for a turn: the saved one, else the catalog default; '' (Codex decides) when the
+ *  catalog cannot be read */
+export async function codexModelForTurn(
+  saved: string,
+  catalog: () => Promise<CodexModelCatalog>,
+): Promise<string> {
+  if (saved.trim()) return saved.trim()
+  try {
+    return (await catalog()).defaultModel
+  } catch {
+    return ''
+  }
+}
+
+/** the account's visible models, with GenOffice's default (Luna) as defaultModel */
+export async function readCodexModelCatalog(client: {
+  request(method: string, params: unknown): Promise<unknown>
+}): Promise<CodexModelCatalog> {
+  const models: string[] = []
+  let codexDefault = ''
+  let cursor: string | null = null
+  for (let page = 0; page < MAX_MODEL_PAGES; page++) {
+    const result = objectValue(
+      await client.request('model/list', { cursor, limit: 100, includeHidden: false }),
+    )
+    const data = Array.isArray(result?.data) ? result.data : []
+    for (const value of data) {
+      const entry = objectValue(value) as ModelEntry | undefined
+      if (!entry || entry.hidden === true) continue
+      const id =
+        typeof entry.id === 'string' ? entry.id : typeof entry.model === 'string' ? entry.model : ''
+      if (!id || models.includes(id)) continue
+      models.push(id)
+      if (entry.isDefault === true) codexDefault = id
+    }
+    cursor = typeof result?.nextCursor === 'string' ? result.nextCursor : null
+    if (!cursor) break
+  }
+  return { models, defaultModel: preferredCodexModel(models, codexDefault || (models[0] ?? '')) }
+}
+
 export async function listCodexModels(cliPath?: string): Promise<CodexModelCatalog> {
   return withClient(cliPath, async (client) => {
     const account = objectValue(await client.request('account/read', { refreshToken: false }))
     if (account?.requiresOpenaiAuth === true && account.account == null) {
       throw new Error('Codex CLI is not signed in. Run codex login, then try again.')
     }
-    const models: string[] = []
-    let defaultModel = ''
-    let cursor: string | null = null
-    for (let page = 0; page < MAX_MODEL_PAGES; page++) {
-      const result = objectValue(
-        await client.request('model/list', { cursor, limit: 100, includeHidden: false }),
-      )
-      const data = Array.isArray(result?.data) ? result.data : []
-      for (const value of data) {
-        const entry = objectValue(value) as ModelEntry | undefined
-        if (!entry || entry.hidden === true) continue
-        const id =
-          typeof entry.id === 'string'
-            ? entry.id
-            : typeof entry.model === 'string'
-              ? entry.model
-              : ''
-        if (!id || models.includes(id)) continue
-        models.push(id)
-        if (entry.isDefault === true) defaultModel = id
-      }
-      cursor = typeof result?.nextCursor === 'string' ? result.nextCursor : null
-      if (!cursor) break
-    }
-    if (!defaultModel) defaultModel = models[0] ?? ''
-    return { models, defaultModel }
+    return readCodexModelCatalog(client)
   })
 }
 

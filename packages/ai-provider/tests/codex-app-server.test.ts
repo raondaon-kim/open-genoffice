@@ -11,6 +11,9 @@ import {
   codexAppServerOutputSchema,
   codexThreadStartParams,
   parseCodexAppServerTurn,
+  codexModelForTurn,
+  preferredCodexModel,
+  readCodexModelCatalog,
   resolveCodexCliPath,
   waitForTurn,
   type CodexTurnTransport,
@@ -296,5 +299,48 @@ describe('Codex app-server bridge', () => {
         noopCallbacks,
       ),
     ).rejects.toThrow('boom')
+  })
+})
+
+describe('Codex default model (Luna)', () => {
+  const catalog = [
+    { id: 'gpt-6.1-sol', isDefault: true },
+    { id: 'gpt-6.1-terra' },
+    { id: 'gpt-5.6-luna' },
+    { id: 'gpt-6-luna' },
+    { id: 'gpt-reserve', hidden: true },
+  ]
+
+  it('prefers the newest Luna model over the Codex default', () => {
+    expect(preferredCodexModel(['gpt-6.1-sol', 'gpt-5.6-luna', 'gpt-6-luna'], 'gpt-6.1-sol')).toBe(
+      'gpt-6-luna',
+    )
+    expect(preferredCodexModel(['gpt-5.6-luna', 'gpt-5.10-luna'], '')).toBe('gpt-5.10-luna')
+  })
+
+  it("keeps Codex's own default when the account has no Luna model", () => {
+    expect(preferredCodexModel(['gpt-6.1-sol', 'gpt-6.1-terra'], 'gpt-6.1-sol')).toBe('gpt-6.1-sol')
+  })
+
+  it('lists the visible models with Luna as the default', async () => {
+    const result = await readCodexModelCatalog({
+      request: async (method) => (method === 'model/list' ? { data: catalog } : {}),
+    })
+    expect(result.models).toEqual(['gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-5.6-luna', 'gpt-6-luna'])
+    expect(result.defaultModel).toBe('gpt-6-luna')
+  })
+
+  it('a turn uses the saved model, else the default from the catalog', async () => {
+    const catalog = async () => ({ models: ['gpt-6-luna'], defaultModel: 'gpt-6-luna' })
+    expect(await codexModelForTurn('gpt-6.1-sol', catalog)).toBe('gpt-6.1-sol')
+    expect(await codexModelForTurn('  ', catalog)).toBe('gpt-6-luna')
+  })
+
+  it("a turn falls back to Codex's own choice when the catalog cannot be read", async () => {
+    expect(
+      await codexModelForTurn('', async () => {
+        throw new Error('offline')
+      }),
+    ).toBe('')
   })
 })
