@@ -224,3 +224,44 @@ describe('docs lander after an earlier report', () => {
     expect(after.map((b) => b[1])).toContain('두 번째 보고서')
   })
 })
+
+describe('docs lander highlight', () => {
+  // the AI-change highlight (yellow background, amber bar) suits a short edit; a report writes the
+  // whole document for minutes, so nothing it lands carries the highlight
+  const highlighted = (editor: Editor): string[] => {
+    const out: string[] = []
+    editor.state.doc.descendants((n) => {
+      if (n.attrs.aiChanged) out.push(`${n.type.name}:${n.textContent.slice(0, 20)}`)
+    })
+    return out
+  }
+
+  it('lands the skeleton, chapters, summary and gaps without the AI-change highlight', async () => {
+    const editor = createEditor()
+    const l = lander(editor)
+    await l.skeleton(skeleton)
+    await l.chapter(1, [
+      { type: 'chapter', text: '1. 원칙' },
+      { type: 'paragraph', text: '본문' },
+      { type: 'bullet', text: '항목' },
+      {
+        type: 'table',
+        rows: [
+          ['가', '나'],
+          ['1', '2'],
+        ],
+      },
+    ])
+    await l.summary([{ type: 'paragraph', text: '요약 문단' }])
+    await l.gaps([
+      {
+        type: 'table',
+        rows: [
+          ['항목', '사유'],
+          ['a', 'b'],
+        ],
+      },
+    ])
+    expect(highlighted(editor)).toEqual([])
+  })
+})

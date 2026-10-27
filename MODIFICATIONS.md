@@ -133,7 +133,15 @@ The fork's material changes on top of upstream:
   nothing extra is installed.
 - **Codex connection:** the Windows installer carries the unmodified Codex CLI (Apache-2.0,
   pinned and integrity-checked by `tools/fetch-codex-cli.mjs`) in `resources/codex/`; Settings
-  can sign in to it and connect, and the work wiki can learn through it.
+  can sign in to it and connect, and the work wiki can learn through it. The default Codex model
+  is the newest Luna model the account offers (Codex's own default when it has none); Settings
+  can pick another.
+- **Settings follow open documents:** saving Settings › AI signals every window (no settings in
+  the signal), and Word, PowerPoint and Excel, which keep a copy from when the document opened,
+  read the settings again, so a switch of connection or model applies without reopening.
+- **Reports without the AI-change highlight:** `write_report` in Word lands its paragraphs
+  without the yellow AI-change highlight, which suits short edits but covered the whole document
+  while a report was written.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and

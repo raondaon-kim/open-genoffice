@@ -11,6 +11,40 @@ import {
   type NumIds,
 } from '../protocol'
 import { styledBlockNodes } from '../styles-skill'
+import { TRACK_IGNORE } from '../../editor/revisions'
+
+/** a report lands without the AI-change highlight: that yellow background and amber bar mark a
+ *  short edit, but a report writes the whole document for minutes (nested cells included) */
+/** replaceBlockRange inherits the old block's formatting and flags the result as an AI change;
+ *  a report clears that flag again right away (outside undo history and change tracking) */
+function clearAiHighlight(editor: Editor): void {
+  let tr = editor.state.tr
+  editor.state.doc.descendants((node, pos) => {
+    if (node.attrs.aiChanged)
+      tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, aiChanged: false })
+  })
+  if (!tr.docChanged) return
+  tr.setMeta('addToHistory', false).setMeta(TRACK_IGNORE, true)
+  editor.view.dispatch(tr)
+}
+
+function replaceWithoutHighlight(
+  editor: Editor,
+  nodes: PmNode[],
+  track: AiTrack | undefined,
+): boolean {
+  const ok = replaceBlockRange(editor, 0, 0, withoutAiHighlight(nodes), track)
+  if (ok) clearAiHighlight(editor)
+  return ok
+}
+
+export function withoutAiHighlight(nodes: PmNode[]): PmNode[] {
+  return nodes.map((n) => {
+    const attrs = n.attrs && 'aiChanged' in n.attrs ? { ...n.attrs, aiChanged: false } : n.attrs
+    const content = n.content ? withoutAiHighlight(n.content as PmNode[]) : n.content
+    return { ...n, ...(attrs ? { attrs } : {}), ...(content ? { content } : {}) } as PmNode
+  })
+}
 
 export interface DocsLanderDeps {
   editor(): Editor
@@ -125,17 +159,17 @@ export function createDocsLander(deps: DocsLanderDeps): Lander {
       // the chapter goes in after its placeholder (tracked when track changes is on), then the
       // run's own placeholder is removed untracked: a tracked replace would keep the marker
       // in the document as a deletion
-      if (nodes.length > 0) insertBlocksAfter(editor, at, nodes, deps.track?.())
+      if (nodes.length > 0) insertBlocksAfter(editor, at, withoutAiHighlight(nodes), deps.track?.())
       remove(at)
     } else if (nodes.length > 0) {
       // the user deleted the placeholder: the text still lands, at the end
-      insertBlocksAfter(editor, lastIndex(), nodes, deps.track?.())
+      insertBlocksAfter(editor, lastIndex(), withoutAiHighlight(nodes), deps.track?.())
     }
   }
   const remove = (index: number) => {
     const editor = deps.editor()
     if (editor.state.doc.childCount <= 1) {
-      replaceBlockRange(editor, 0, 0, bodyNodes(['']), deps.track?.())
+      replaceWithoutHighlight(editor, bodyNodes(['']), deps.track?.())
       return
     }
     let from = -1
@@ -178,8 +212,8 @@ export function createDocsLander(deps: DocsLanderDeps): Lander {
         lines.push(...bodyNodes([placeholder(`c${c.no}`, `${c.no}. ${c.title}`)]))
       if (s.withSummary) lines.push(...bodyNodes([placeholder('gaps', '확인 필요 사항')]))
       const ok = isBlankDocument(editor)
-        ? replaceBlockRange(editor, 0, 0, lines, deps.track?.())
-        : insertBlocksAfter(editor, lastIndex(), lines, deps.track?.())
+        ? replaceWithoutHighlight(editor, lines, deps.track?.())
+        : insertBlocksAfter(editor, lastIndex(), withoutAiHighlight(lines), deps.track?.())
       if (!ok) throw new Error('the table of contents could not be inserted into the document')
     },
     async chapter(no, blocks) {
