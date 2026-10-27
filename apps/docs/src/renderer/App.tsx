@@ -1,5 +1,6 @@
 import { scriptFontHtml } from './editor/script-fonts'
 import { DOC_CSS_COMMITTED_EVENT } from './editor/cjk-punct-shrink'
+import { followAiSettings } from '@genoffice/ai-provider/browser'
 import { justifyShrinkPluginKey } from './editor/justify-shrink'
 import {
   useCallback,
@@ -1519,8 +1520,10 @@ export function App() {
 
   useEffect(() => {
     void window.desktop.getRecentFiles().then(setRecent)
-    void window.desktop.getAiSettings().then(setSettings)
   }, [])
+
+  // the AI settings, kept current: Settings › AI can switch the connection while this document is open
+  useEffect(() => followAiSettings(window.desktop, setSettings), [])
 
   useEffect(() => {
     rememberAiPanelOpen('aidocs.showAi', showAi)

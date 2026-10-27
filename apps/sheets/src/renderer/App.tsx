@@ -126,7 +126,11 @@ import {
   type AgentImage,
 } from '@genoffice/agent-core'
 import { createWorkWikiSkill } from '@genoffice/work-wiki'
-import { imageGenerationAvailable, type AiSettings } from '@genoffice/ai-provider/browser'
+import {
+  followAiSettings,
+  imageGenerationAvailable,
+  type AiSettings,
+} from '@genoffice/ai-provider/browser'
 import { type WorkbookOperation } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
 import {
   columnLabel,
@@ -1624,9 +1628,8 @@ export function App({
     }
   }
 
-  useEffect(() => {
-    void window.desktopApi.getAiSettings().then(setAiSettingsState)
-  }, [])
+  // the AI settings, kept current: Settings › AI can switch the connection while this workbook is open
+  useEffect(() => followAiSettings(window.desktopApi, setAiSettingsState), [])
 
   useEffect(() => {
     // Univer paints the grid on canvas, so it can't follow the CSS tokens —

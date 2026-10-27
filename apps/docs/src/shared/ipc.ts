@@ -456,6 +456,8 @@ export interface DesktopApi {
   /** vertical metrics of an installed family (exact name match), null when missing */
   fontMetrics(family: string): Promise<FaceVerticalMetrics | null>
   getAiSettings(): Promise<AiSettings>
+  /** Settings saved the AI settings; read them again. Returns an unsubscribe. */
+  onAiSettingsChanged(listener: () => void): () => void
   setAiSettings(settings: AiSettings): Promise<void>
   /** system print dialog for the current window; ok=false without error = canceled.
    *  scale: print scale inverting the preview's print zoom (print-zoom.ts) */

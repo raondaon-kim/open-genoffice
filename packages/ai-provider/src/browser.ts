@@ -27,3 +27,5 @@ export {
 export type { ConnectionMode } from './connection-modes'
 export { AI_MEDIA_PROVIDERS, imageGenerationAvailable, mediaAnalysisAvailable } from './media'
 export { AI_SEARCH_PROVIDERS } from './search-settings'
+export { AI_SETTINGS_CHANGED, followAiSettings } from './live-settings'
+export type { LiveSettingsApi } from './live-settings'

@@ -98,6 +98,7 @@ import {
   maxOutputTokensOf,
   sanitizeAiSettings,
   validCliPath,
+  broadcastAiSettingsChanged,
   setAiUserAgent,
   setRescueFetch,
   streamForProvider,
@@ -3833,6 +3834,8 @@ export function registerAiIpc(): void {
       return
     }
     writeJsonAtomic(SETTINGS_PATH(), sanitized)
+    // editors that keep a copy (Word, PowerPoint, Excel) read the settings again
+    broadcastAiSettingsChanged(webContents.getAllWebContents())
   })
 
   ipcMain.handle('ai:codex-models', async (_event, cliPath: unknown) => {

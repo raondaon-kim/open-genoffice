@@ -91,6 +91,8 @@ export const IPC_CHANNELS = {
   menuAction: 'menu:action',
   aiGetSettings: 'ai:get-settings',
   aiSetSettings: 'ai:set-settings',
+  /** main → renderer: the AI settings were saved (no payload; read them again) */
+  aiSettingsChanged: 'ai:settings-changed',
   aiChat: 'ai:chat',
   aiStream: 'ai:stream',
   aiStreamCancel: 'ai:stream-cancel',

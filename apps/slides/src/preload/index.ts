@@ -391,6 +391,11 @@ const api: SlidesApi = {
     return () => ipcRenderer.removeListener('slides:renamed', listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
+  onAiSettingsChanged: (listener: () => void) => {
+    const handler = () => listener()
+    ipcRenderer.on('ai:settings-changed', handler)
+    return () => ipcRenderer.removeListener('ai:settings-changed', handler)
+  },
   setAiSettings: (settings: AiSettings) => ipcRenderer.invoke('ai:set-settings', settings),
   aiStream: (request: AiStreamRequest) => ipcRenderer.invoke('ai:stream', request),
   aiStreamCancel: (requestId: string) => ipcRenderer.invoke('ai:stream-cancel', requestId),

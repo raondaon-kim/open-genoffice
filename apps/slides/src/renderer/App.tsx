@@ -1,3 +1,4 @@
+import { followAiSettings } from '@genoffice/ai-provider/browser'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   GroupRenderNode,
@@ -1262,9 +1263,8 @@ export function App() {
     [],
   )
 
-  useEffect(() => {
-    void window.slidesApi.getAiSettings().then(setAiSettings)
-  }, [])
+  // the AI settings, kept current: Settings › AI can switch the connection while this deck is open
+  useEffect(() => followAiSettings(window.slidesApi, setAiSettings), [])
 
   // Recent files for the start screen
   useEffect(() => {

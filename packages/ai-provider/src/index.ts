@@ -104,3 +104,5 @@ export {
   withConnectionMode,
 } from './connection-modes'
 export type { ConnectionMode } from './connection-modes'
+export { AI_SETTINGS_CHANGED, broadcastAiSettingsChanged, followAiSettings } from './live-settings'
+export type { LiveSettingsApi, SignalTarget } from './live-settings'

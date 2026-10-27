@@ -183,6 +183,11 @@ const api: DesktopApi = {
     return () => ipcRenderer.removeListener(VIEW_IMAGE_CHANNEL, listener)
   },
   getAiSettings: () => ipcRenderer.invoke('ai:get-settings'),
+  onAiSettingsChanged: (listener: () => void) => {
+    const handler = () => listener()
+    ipcRenderer.on('ai:settings-changed', handler)
+    return () => ipcRenderer.removeListener('ai:settings-changed', handler)
+  },
   setAiSettings: (settings: AiSettings) => ipcRenderer.invoke('ai:set-settings', settings),
   aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiStream: (request: AiStreamRequest) => ipcRenderer.invoke('ai:stream', request),
