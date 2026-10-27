@@ -1,3 +1,4 @@
+import { SAVE_KEY } from '../save-key'
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { AiEditResult, EditOp } from '../../../shared/ai-contract'
 import type { HwpAiContext, ToolModule } from '../context'
@@ -177,7 +178,7 @@ export function summarizeEdit(ops: EditOp[], result: Ok, focused: boolean): stri
       ? `The engine's save round-trip check always fails on this document, so the edit was checked against the document summary instead (form fields, table sizes and paragraph count are as expected; pages ${result.layoutTolerant.pagesBefore} → ${result.layoutTolerant.pagesAfter}).`
       : '',
     focused ? 'The view moved to the first edited paragraph.' : '',
-    'The document was reloaded with the change and is unsaved — the user saves with ⌘S. undo_ai_edit reverts this whole edit. Paragraph indices may have shifted: run find again before further edits.',
+    `The document was reloaded with the change and is unsaved — the user saves with ${SAVE_KEY}. undo_ai_edit reverts this whole edit. Paragraph indices may have shifted: run find again before further edits.`,
   ]
     .filter(Boolean)
     .join('\n')
@@ -293,7 +294,7 @@ export async function undoAiEdit(ctx: HwpAiContext): Promise<ToolExecution> {
   ctx.stack.noteRead(snapshot.sha)
   ctx.markAiDirty()
   return {
-    output: `Reverted the last AI edit (${ctx.stack.depth} more can be undone). The document is unsaved — ⌘S saves it.`,
+    output: `Reverted the last AI edit (${ctx.stack.depth} more can be undone). The document is unsaved — ${SAVE_KEY} saves it.`,
     mutated: true,
     summary: 'AI edit reverted',
   }

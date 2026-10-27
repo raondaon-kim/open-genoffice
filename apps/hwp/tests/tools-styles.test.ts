@@ -126,7 +126,8 @@ describe('document style tools', () => {
     })
     expect(result.output).toMatch(/2 paragraph/)
     expect(result.output).toMatch(/margins and fonts|여백|page margins/)
-    expect(result.output).toMatch(/⌘S/)
+    // the platform's save key: ⌘S on a Mac, Ctrl+S elsewhere
+    expect(result.output).toMatch(/⌘S|Ctrl\+S/)
   })
 
   it('refuses a call without done, so a first stage never becomes a half document', async () => {

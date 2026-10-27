@@ -1,3 +1,4 @@
+import { SAVE_KEY } from '../save-key'
 import type { AgentToolDef } from '@genoffice/agent-core'
 import type { ToolModule } from '../context'
 import { optStrArg, record, strArg, toExecution } from '../errors'
@@ -5,8 +6,7 @@ import { optStrArg, record, strArg, toExecution } from '../errors'
 const tools: AgentToolDef[] = [
   {
     name: 'create_document',
-    description:
-      'Create a NEW Hangul (.hwpx) document from Markdown and open it in a new tab: headings, paragraphs, bullet lists and GFM tables with filled cells (예: 강의 실라버스, 보고서, 계획서). Put the file name in file_name. The current document is not modified; the new tab is unsaved until ⌘S. Call list_document_styles first: when it has the document type, use create_styled_document instead; use this tool when no style page fits.',
+    description: `Create a NEW Hangul (.hwpx) document from Markdown and open it in a new tab: headings, paragraphs, bullet lists and GFM tables with filled cells (예: 강의 실라버스, 보고서, 계획서). Put the file name in file_name. The current document is not modified; the new tab is unsaved until ${SAVE_KEY}. Call list_document_styles first: when it has the document type, use create_styled_document instead; use this tool when no style page fits.`,
     inputSchema: {
       type: 'object',
       properties: {
@@ -37,7 +37,7 @@ export const createTools: ToolModule = {
       }
     }
     return {
-      output: `Created "${result.path.split(/[\\/]/).pop()}" and opened it in a new tab. Markdown tables became real Hangul tables with their cell text. The new document is unsaved — press ⌘S to save it.`,
+      output: `Created "${result.path.split(/[\\/]/).pop()}" and opened it in a new tab. Markdown tables became real Hangul tables with their cell text. The new document is unsaved — press ${SAVE_KEY} to save it.`,
       summary: 'document created and opened',
     }
   },

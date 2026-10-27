@@ -1,3 +1,4 @@
+import { SAVE_KEY } from './save-key'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent, ReactElement } from 'react'
 import { AgentLoop } from '@genoffice/agent-core'
@@ -488,8 +489,8 @@ export function HwpAiPanel({
       if (result.ok && result.path) {
         setModelNotice(
           lang === 'ko'
-            ? `「${template.name}」 문서를 새 탭에 만들었습니다. {학교명} 같은 자리표시자를 채우고 ⌘S로 저장하세요.`
-            : `Created "${template.name}" in a new tab. Replace placeholders like {school name} and press ⌘S to save.`,
+            ? `「${template.name}」 문서를 새 탭에 만들었습니다. {학교명} 같은 자리표시자를 채우고 ${SAVE_KEY}로 저장하세요.`
+            : `Created "${template.name}" in a new tab. Replace placeholders like {school name} and press ${SAVE_KEY} to save.`,
         )
       } else {
         setModelNotice(`양식 생성 실패: ${result.error ?? 'unknown error'}`)

@@ -1,3 +1,4 @@
+import { SAVE_KEY } from '../save-key'
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { ToolModule } from '../context'
 import { optStrArg, record, strArg, ToolError, toExecution } from '../errors'
@@ -164,7 +165,7 @@ export const stylesTools: ToolModule = {
           `Created "${result.path.split(/[\\/]/).pop()}" with ${result.paragraphs} paragraph(s) (${roles}) and opened it in a new tab.`,
           ...result.warnings.map((w) => `Warning: ${w}`),
           'Alignment, indentation, sizes and spacing follow the document type. The engine cannot set page margins or fonts: the user sets them in Hangul if the template needs it.',
-          'The new document is unsaved — press ⌘S to save it.',
+          `The new document is unsaved — press ${SAVE_KEY} to save it.`,
         ]
         return { output: lines.join('\n'), summary: 'styled document created' }
       }

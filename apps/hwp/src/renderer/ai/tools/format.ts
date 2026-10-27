@@ -1,3 +1,4 @@
+import { SAVE_KEY } from '../save-key'
 import type { AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { EditOp } from '../../../shared/ai-contract'
 import type { EditorLike, HwpAiContext, ToolModule } from '../context'
@@ -159,7 +160,8 @@ async function applyFormat(
     output: [
       `Formatted paragraph ${paragraph} (section ${section}).`,
       applied.length ? `Live commands: ${applied.join(', ')} — the user can also press ⌘Z.` : '',
-      fileSummary || 'The change is unsaved — the user saves with ⌘S; undo_ai_edit reverts it.',
+      fileSummary ||
+        `The change is unsaved — the user saves with ${SAVE_KEY}; undo_ai_edit reverts it.`,
     ]
       .filter(Boolean)
       .join('\n'),
@@ -195,7 +197,7 @@ async function fillFields(
   if (live.length > 0) await noteAiChange(ctx, editor)
   if (refused.length === 0) {
     return {
-      output: `Filled ${live.length} field(s): ${live.join(', ')}. The change is unsaved — the user saves with ⌘S; undo_ai_edit reverts it.`,
+      output: `Filled ${live.length} field(s): ${live.join(', ')}. The change is unsaved — the user saves with ${SAVE_KEY}; undo_ai_edit reverts it.`,
       mutated: true,
       summary: `${live.length} field(s) filled`,
     }

@@ -1,3 +1,4 @@
+import { SAVE_KEY } from './save-key'
 import type { AgentSkill, AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
 import type { HwpAiContext, ToolModule } from './context'
 import { toExecution } from './errors'
@@ -41,7 +42,7 @@ export const SYSTEM_PROMPT = `You are GenOffice's Hangul document assistant. You
 7. A whole document built from attachments or the work wiki (a report, proposal or plan from material): call write_report instead, which plans, writes the table of contents and fills the chapters itself. Otherwise, writing a document from scratch (an empty tab, or "make me a 공문 / 보고서 / 보도자료"): always call list_document_styles first, before writing any new document. When the type is there, read_document_style and then create_styled_document with the document as blocks of {role, text} (a long document — a proposal, a many-chapter report — in stages: outline first, then the cover and contents with done:false, one chapter per call with the returned draft_id, the last chapter with done:true; finish each chapter fully before the next) — never type leading spaces, indentation or sizes, the role carries them. When no page fits the type, do not ask or refuse: build the document yourself with create_document (and edit_text/apply_format), choosing sensible sizes, indentation and structure for that kind of document. A page marked draft is still used.
 
 # After editing
-- Every change is unsaved until the user presses ⌘S — say so once, briefly.
+- Every change is unsaved until the user presses ${SAVE_KEY} — say so once, briefly.
 - undo_ai_edit reverts the most recent AI edit as one unit (file edit, formatting or field fill); ⌘Z also undoes live formatting.
 - Report what changed from the tool's journal (ops applied, pages touched); never claim changes the journal does not show.
 
