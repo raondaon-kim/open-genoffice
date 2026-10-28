@@ -3,6 +3,7 @@ import type { AgentSkill, ToolExecution } from '@genoffice/agent-core'
 import type { DocxStyle } from '@genoffice/doc-styles'
 import type { TemplateForRun } from '@genoffice/report-writer'
 import { parseTemplateMd, templateForRun } from '@genoffice/team-templates/md'
+import { isFilled, locateHeadings } from './template-lander'
 
 /** the `[label]` placeholders of the form's cover (the paragraphs before the first heading) */
 export function coverLabelsOf(editor: Editor): string[] {
@@ -34,7 +35,11 @@ export async function templateRunFor(
   if (!md) return null
   const parsed = parseTemplateMd(md)
   if (!parsed.ok) return null
-  return { run: templateForRun(parsed.def, coverLabelsOf(editor)), style: parsed.def.style }
+  const run: TemplateForRun = templateForRun(parsed.def, coverLabelsOf(editor))
+  // the form and its definition must have the same headings in the same order
+  const { missing } = locateHeadings(editor, run.headings ?? [])
+  if (missing) return { run: { ...run, problem: missing }, style: parsed.def.style }
+  return { run: { ...run, filled: isFilled(editor, run) }, style: parsed.def.style }
 }
 
 const LIST_PROMPT = `## Team templates (list_team_templates)
