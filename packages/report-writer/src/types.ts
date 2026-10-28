@@ -118,3 +118,39 @@ export interface ReportPorts {
 export type ReportOutcome =
   | { ok: true; written: number; failed: number[]; gaps: number }
   | { ok: false; error: string; written: number }
+
+/** one leaf section of a team template: the writer fills it under its existing heading */
+export interface TemplateSection {
+  /** 0-based position among the template's leaf sections */
+  index: number
+  /** headings above it, outermost first */
+  path: string[]
+  heading: string
+  level: number
+  guidance: string
+}
+
+/** a team template as the writer needs it: a fixed outline and the cover's placeholders */
+export interface TemplateForRun {
+  title: string
+  purpose: string
+  sections: TemplateSection[]
+  /** names of the cover placeholders (`[사업명]` → 사업명) */
+  coverLabels: string[]
+  /** work-wiki pages the template says to read first */
+  wikiPages: string[]
+  /** the template's own prose and formatting notes */
+  styleRules: string
+}
+
+/** lands a template fill in the opened form */
+export interface TemplateLander {
+  cover(values: Record<string, string>): Promise<void>
+  section(index: number, blocks: ReportBlock[]): Promise<void>
+  sectionFailed(index: number, heading: string): Promise<void>
+  gaps(blocks: ReportBlock[]): Promise<void>
+  finish(): Promise<void>
+}
+
+/** same shape as @genoffice/work-wiki's WikiReadiness (this package does not depend on it) */
+export type WikiReadiness = { ok: true } | { ok: false; off: boolean; reason: string }
