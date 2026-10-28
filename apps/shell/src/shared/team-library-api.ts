@@ -131,7 +131,8 @@ export interface TeamLibraryApi {
   ): Promise<TeamResult<TeamTemplateDraftView>>
   /** writes the set (the only NAS write besides remove) */
   templateConfirm(draftId: string, markdown: string): Promise<TeamResult<TeamTemplateSet>>
-  templateRemove(path: string): Promise<TeamResult<void>>
+  /** keptFolder: other files were in the set folder, so only the template files went */
+  templateRemove(path: string): Promise<TeamResult<{ keptFolder: boolean }>>
   /** a local working copy of the set's form, opened in Word; folder = a home folder */
   templateOpen(
     path: string,

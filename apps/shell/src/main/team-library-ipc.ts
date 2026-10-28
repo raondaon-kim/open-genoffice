@@ -160,7 +160,7 @@ export function registerTeamLibraryIpc(options: {
   ipcMain.handle(CHANNELS.templateRemove, (event, path: unknown) =>
     teamResult(async () => {
       homeWindow(event)
-      await templates.remove(text(path))
+      return templates.remove(text(path))
     }),
   )
   ipcMain.handle(CHANNELS.templateOpen, (event, path: unknown, folder: unknown) =>

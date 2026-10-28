@@ -106,7 +106,7 @@ export function TeamTemplateSets({
     void run(text.writingNas, async () => {
       const result = await api.templateRemove(path)
       if (!result.ok) return fail(result)
-      setNotice(text.removed)
+      setNotice(result.value.keptFolder ? text.removedKeptFolder : text.removed)
       await load()
     })
   }

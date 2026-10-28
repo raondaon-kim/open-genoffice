@@ -92,7 +92,7 @@ function fakeApi(overrides: Partial<TeamLibraryApi> = {}): TeamLibraryApi {
       error: 'source-words' as const,
       detail: '자카르타 보건소',
     })),
-    templateRemove: vi.fn(async () => ({ ok: true as const, value: undefined })),
+    templateRemove: vi.fn(async () => ({ ok: true as const, value: { keptFolder: false } })),
     templateOpen: vi.fn(async () => ({
       ok: true as const,
       value: { path: 'C:/x.docx', status: 'ok' as const },
@@ -201,5 +201,17 @@ describe('TeamTemplateSets open status', () => {
     await render(api)
     await act(async () => buttons('이 양식으로 작성')[0]!.click())
     expect(host.textContent).toContain('이 템플릿은 형태 파일이 정의와 다릅니다')
+  })
+})
+
+describe('TeamTemplateSets delete result', () => {
+  it('says when the folder was kept because other files are in it', async () => {
+    const api = fakeApi({
+      templateRemove: vi.fn(async () => ({ ok: true as const, value: { keptFolder: true } })),
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    await render(api)
+    await act(async () => buttons('삭제')[0]!.click())
+    expect(host.textContent).toContain('다른 파일이 있어 폴더는 남겼습니다')
   })
 })

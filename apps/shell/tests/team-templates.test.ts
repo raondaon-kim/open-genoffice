@@ -376,3 +376,92 @@ describe('review fixes (shell)', () => {
     expect(filled.coveredBy).toBe(set.path)
   })
 })
+
+describe('NAS safety: confirm, remake and delete', () => {
+  const realIo = () => import('node:fs/promises')
+
+  it('a confirm that fails while writing leaves no half-made set and no staging folder', async () => {
+    const fs = await realIo()
+    let writes = 0
+    const svc = service({
+      io: {
+        ...fs,
+        writeFile: (async (...args: Parameters<typeof fs.writeFile>) => {
+          // the second file of the set fails
+          if (String(args[0]).endsWith('template.md') && ++writes === 1)
+            throw new Error('NAS dropped')
+          return fs.writeFile(...args)
+        }) as typeof fs.writeFile,
+      },
+    })
+    const [candidate] = await svc.candidates()
+    const draft = await svc.draft({ candidateKey: candidate!.key })
+    await expect(svc.confirm(draft.draftId, draft.markdown)).rejects.toThrow()
+    const word = await readdir(join(tpl, 'Word')).catch(() => [] as string[])
+    expect(word).toEqual([])
+    // a retry works and takes the plain name
+    const set = await svc.confirm(draft.draftId, draft.markdown)
+    expect(set.path).toBe('Word/KOICA ODA 기술제안서/')
+  })
+
+  it('two sets with the same title get distinct folders', async () => {
+    const svc = service()
+    await makeSet(svc)
+    const [candidate] = await svc.candidates()
+    const again = await svc.draft({ candidateKey: candidate!.key })
+    const second = await svc.confirm(again.draftId, again.markdown)
+    expect(second.path).toBe('Word/KOICA ODA 기술제안서 (2)/')
+  })
+
+  it('a 다시 만들기 that fails half way keeps the old set intact', async () => {
+    const fs = await realIo()
+    const svc0 = service()
+    const { set } = await makeSet(svc0)
+    const folder = join(tpl, 'Word', 'KOICA ODA 기술제안서')
+    const oldMd = await readFile(join(folder, 'template.md'), 'utf8')
+    const oldForm = await readFile(join(folder, 'form.docx'))
+    let renames = 0
+    const svc = service({
+      io: {
+        ...fs,
+        rename: (async (from: string, to: string) => {
+          // the new md cannot be moved into place
+          if (
+            to.endsWith('template.md') &&
+            String(from).includes('.genoffice-') &&
+            ++renames === 1
+          ) {
+            throw new Error('NAS dropped')
+          }
+          return fs.rename(from, to)
+        }) as typeof fs.rename,
+      },
+    })
+    const [candidate] = await svc.candidates()
+    const again = await svc.draft({ candidateKey: candidate!.key }, set.path)
+    await expect(
+      svc.confirm(again.draftId, again.markdown.replace('내용을 글머리로', '내용을 표로')),
+    ).rejects.toThrow()
+    expect(await readFile(join(folder, 'template.md'), 'utf8')).toBe(oldMd)
+    expect(Buffer.compare(await readFile(join(folder, 'form.docx')), oldForm)).toBe(0)
+    expect((await readdir(folder)).sort()).toEqual(['form.docx', 'template.md'])
+  })
+
+  it('delete removes only the template files and keeps a folder that holds other files', async () => {
+    const svc = service()
+    const { set } = await makeSet(svc)
+    const folder = join(tpl, 'Word', 'KOICA ODA 기술제안서')
+    await writeFile(join(folder, '메모.txt'), '팀원이 둔 파일')
+    await expect(svc.remove(set.path)).resolves.toEqual({ keptFolder: true })
+    expect(await readdir(folder)).toEqual(['메모.txt'])
+    expect(await readFile(join(tpl, 'index.md'), 'utf8')).not.toContain('KOICA')
+  })
+
+  it('delete refuses a folder that is not a template set', async () => {
+    const svc = service()
+    await mkdir(join(tpl, 'Word', '다른 폴더'), { recursive: true })
+    await writeFile(join(tpl, 'Word', '다른 폴더', '자료.docx'), 'x')
+    await expect(svc.remove('Word/다른 폴더/')).rejects.toMatchObject({ code: 'invalid-path' })
+    expect(await readdir(join(tpl, 'Word', '다른 폴더'))).toEqual(['자료.docx'])
+  })
+})

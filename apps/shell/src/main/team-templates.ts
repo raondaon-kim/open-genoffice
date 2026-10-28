@@ -11,6 +11,7 @@ import {
   stat,
   writeFile,
 } from 'node:fs/promises'
+import * as fsp from 'node:fs/promises'
 import { basename, extname, join, relative, sep } from 'node:path'
 import { detectSensitive, maskDocument, type MaskOutcome } from '@genoffice/doc-mask'
 import {
@@ -77,6 +78,8 @@ export interface TeamTemplatesDeps {
   canWrite?(dir: string): Promise<boolean>
   /** the write probe run before a draft or a delete (default: create and remove a staged file) */
   probe?(dir: string): Promise<boolean>
+  /** file operations on the NAS (tests pass a failing stand-in) */
+  io?: Pick<typeof fsp, 'writeFile' | 'rename' | 'rm' | 'mkdir' | 'rmdir' | 'readdir'>
   mask?(fileName: string, bytes: Uint8Array): Promise<MaskOutcome>
 }
 
@@ -146,7 +149,11 @@ export class TeamTemplates {
   /** what reading a set found: a changed form or an unreadable md */
   private readonly statuses = new Map<string, TeamTemplateSet['status']>()
 
-  constructor(private readonly deps: TeamTemplatesDeps) {}
+  private readonly io: NonNullable<TeamTemplatesDeps['io']>
+
+  constructor(private readonly deps: TeamTemplatesDeps) {
+    this.io = deps.io ?? fsp
+  }
 
   private now(): Date {
     return this.deps.now?.() ?? new Date()
@@ -192,10 +199,10 @@ export class TeamTemplates {
   private async stagedWrite(path: string, data: Uint8Array | string): Promise<void> {
     const staged = join(path, '..', `.genoffice-${randomUUID()}.tmp`)
     try {
-      await writeFile(staged, data, { flag: 'wx' })
-      await rename(staged, path)
+      await this.io.writeFile(staged, data, { flag: 'wx' })
+      await this.io.rename(staged, path)
     } finally {
-      await rm(staged, { force: true }).catch(() => {})
+      await this.io.rm(staged, { force: true }).catch(() => {})
     }
   }
 
@@ -669,23 +676,10 @@ export class TeamTemplates {
       if (current === null || sha256(current) !== draft.replacesMdHash) {
         throw new TeamLibraryError('changed')
       }
+      await this.replaceSetFiles(join(root, folder), form, md)
     } else {
-      await mkdir(join(root, 'Word'), { recursive: true })
-      const base = teamFolderName(def.title)
-      folder = ''
-      for (let n = 1; n <= 1000 && !folder; n++) {
-        const name = n === 1 ? base : `${base} (${n})`
-        try {
-          await mkdir(join(root, 'Word', name))
-          folder = join('Word', name)
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
-        }
-      }
-      if (!folder) throw new TeamLibraryError('copy-failed')
+      folder = await this.createSetFolder(root, teamFolderName(def.title), form, md)
     }
-    await this.stagedWrite(join(root, folder, FORM), form)
-    await this.stagedWrite(join(root, folder, MD), md)
     const path = `${folder.split(sep).join('/')}/`
     const set: IndexSet = {
       title: def.title,
@@ -700,13 +694,138 @@ export class TeamTemplates {
     return this.view(set)
   }
 
-  async remove(setPath: string): Promise<void> {
+  /**
+   * A new set appears whole or not at all: both files are written into a hidden staging folder,
+   * which then takes the set's name in one rename; a failure removes the staging folder.
+   */
+  private async createSetFolder(
+    root: string,
+    base: string,
+    form: Uint8Array,
+    md: string,
+  ): Promise<string> {
+    const io = this.io
+    const exists = (p: string) =>
+      access(p).then(
+        () => true,
+        () => false,
+      )
+    await io.mkdir(join(root, 'Word'), { recursive: true })
+    const staging = join(root, 'Word', `.genoffice-new-${randomUUID()}`)
+    await io.mkdir(staging)
+    try {
+      await Promise.all([
+        io.writeFile(join(staging, FORM), form, { flag: 'wx' }),
+        io.writeFile(join(staging, MD), md, { flag: 'wx' }),
+      ])
+      for (let n = 1; n <= 1000; n++) {
+        const name = n === 1 ? base : `${base} (${n})`
+        const target = join(root, 'Word', name)
+        // a folder never replaces another one (rename onto an empty folder succeeds on POSIX)
+        if (await exists(target)) continue
+        try {
+          await io.rename(staging, target)
+          return join('Word', name)
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code
+          if (
+            (code === 'EEXIST' || code === 'ENOTEMPTY' || code === 'EPERM') &&
+            (await exists(target))
+          ) {
+            continue
+          }
+          throw error
+        }
+      }
+      throw new TeamLibraryError('copy-failed')
+    } catch (error) {
+      await io.rm(staging, { recursive: true, force: true }).catch(() => {})
+      throw error
+    }
+  }
+
+  /**
+   * 다시 만들기: both new files are written first; then the old ones step aside, the new ones move
+   * in, and the old ones go. Any failure moves the old files back, so the set stays as it was.
+   */
+  private async replaceSetFiles(dir: string, form: Uint8Array, md: string): Promise<void> {
+    const io = this.io
+    const id = randomUUID()
+    const next = {
+      form: join(dir, `.genoffice-${id}-form.tmp`),
+      md: join(dir, `.genoffice-${id}-md.tmp`),
+    }
+    const old = {
+      form: join(dir, `.genoffice-${id}-form.old`),
+      md: join(dir, `.genoffice-${id}-md.old`),
+    }
+    const live = { form: join(dir, FORM), md: join(dir, MD) }
+    const cleanup = () =>
+      Promise.all(
+        [next.form, next.md, old.form, old.md].map((p) =>
+          io.rm(p, { force: true }).catch(() => {}),
+        ),
+      )
+    try {
+      await Promise.all([
+        io.writeFile(next.form, form, { flag: 'wx' }),
+        io.writeFile(next.md, md, { flag: 'wx' }),
+      ])
+    } catch (error) {
+      await cleanup()
+      throw error
+    }
+    const steps: Array<[from: string, to: string]> = [
+      [live.form, old.form],
+      [live.md, old.md],
+      [next.form, live.form],
+      [next.md, live.md],
+    ]
+    const done: Array<[string, string]> = []
+    try {
+      for (const [from, to] of steps) {
+        await io.rename(from, to)
+        done.push([from, to])
+      }
+    } catch (error) {
+      for (const [from, to] of done.reverse()) await io.rename(to, from).catch(() => {})
+      await cleanup()
+      throw error
+    }
+    await cleanup()
+  }
+
+  /**
+   * Deletes a set's own files (template.md, form.docx, leftovers of its writes) and then the
+   * folder only when nothing else is in it; a folder that is not a set is refused.
+   */
+  async remove(setPath: string): Promise<{ keptFolder: boolean }> {
     const root = await this.deps.library.root('templates')
     const folder = this.setFolder(setPath)
+    const dir = join(root, folder)
+    const isSet = await readFile(join(dir, MD), 'utf8').then(
+      () => true,
+      () => false,
+    )
+    if (!isSet) throw new TeamLibraryError('invalid-path')
     await this.requireWritable(root)
-    await rm(join(root, folder), { recursive: true, force: true })
+    for (const name of await this.io.readdir(dir)) {
+      if (name === MD || name === FORM || name.startsWith('.genoffice-')) {
+        await this.io.rm(join(dir, name), { force: true })
+      }
+    }
+    let keptFolder = false
+    try {
+      await this.io.rmdir(dir)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code !== 'ENOTEMPTY' && code !== 'EEXIST' && code !== 'EPERM') throw error
+      keptFolder = true
+    }
     const { index } = await this.reconcile(root, false)
     await this.writeIndex(root, removeSet(index, setPath))
+    this.statuses.delete(setPath)
+    return { keptFolder }
   }
 
   // ── open ──────────────────────────────────────────────
