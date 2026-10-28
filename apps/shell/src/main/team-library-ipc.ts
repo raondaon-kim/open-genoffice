@@ -171,7 +171,7 @@ export function registerTeamLibraryIpc(options: {
       }
       const opened = await templates.openSet(text(path), folder as string | undefined)
       options.openTemplateCopy(opened.workingCopy, opened.templateMd)
-      return opened.workingCopy
+      return { path: opened.workingCopy, status: opened.status }
     }),
   )
   ipcMain.handle(CHANNELS.syncFolder, (event, folder: unknown) =>

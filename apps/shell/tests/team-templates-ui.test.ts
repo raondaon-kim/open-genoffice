@@ -93,7 +93,10 @@ function fakeApi(overrides: Partial<TeamLibraryApi> = {}): TeamLibraryApi {
       detail: '자카르타 보건소',
     })),
     templateRemove: vi.fn(async () => ({ ok: true as const, value: undefined })),
-    templateOpen: vi.fn(async () => ({ ok: true as const, value: 'C:/x.docx' })),
+    templateOpen: vi.fn(async () => ({
+      ok: true as const,
+      value: { path: 'C:/x.docx', status: 'ok' as const },
+    })),
     templateRebuild: vi.fn(async () => ({ ok: true as const, value: LIST })),
     useEntry: vi.fn(async () => ({ ok: true as const, value: 'C:/y.docx' })),
     ...overrides,
@@ -184,5 +187,19 @@ describe('TeamTemplateSets', () => {
     expect(buttons('다른 문서로 다시 만들기')).toHaveLength(0)
     expect(buttons('삭제')).toHaveLength(0)
     expect(buttons('이 양식으로 작성').length).toBeGreaterThan(0)
+  })
+})
+
+describe('TeamTemplateSets open status', () => {
+  it('says when the opened template needs its md updated', async () => {
+    const api = fakeApi({
+      templateOpen: vi.fn(async () => ({
+        ok: true as const,
+        value: { path: 'C:/x.docx', status: 'stale-md' as const },
+      })),
+    })
+    await render(api)
+    await act(async () => buttons('이 양식으로 작성')[0]!.click())
+    expect(host.textContent).toContain('이 템플릿은 형태 파일이 정의와 다릅니다')
   })
 })

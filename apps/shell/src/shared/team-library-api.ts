@@ -133,7 +133,10 @@ export interface TeamLibraryApi {
   templateConfirm(draftId: string, markdown: string): Promise<TeamResult<TeamTemplateSet>>
   templateRemove(path: string): Promise<TeamResult<void>>
   /** a local working copy of the set's form, opened in Word; folder = a home folder */
-  templateOpen(path: string, folder?: string): Promise<TeamResult<string>>
+  templateOpen(
+    path: string,
+    folder?: string,
+  ): Promise<TeamResult<{ path: string; status: TeamTemplateSet['status'] }>>
   /** index.md rebuilt from the sets on disk */
   templateRebuild(): Promise<TeamResult<TeamTemplateList>>
 }

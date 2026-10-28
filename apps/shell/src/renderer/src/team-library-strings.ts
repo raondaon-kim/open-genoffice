@@ -85,6 +85,8 @@ const en = {
   formHeadings: 'Headings in the form',
   coverLabels: 'Cover placeholders',
   headerFooter: 'Header and footer',
+  staleOpened:
+    'The form of this template differs from its definition (md needs updating). Check the result after filling, or make the template again.',
 }
 
 const ko: typeof en = {
@@ -171,6 +173,8 @@ const ko: typeof en = {
   formHeadings: '형태 파일의 제목',
   coverLabels: '표지 자리',
   headerFooter: '머리글·바닥글',
+  staleOpened:
+    '이 템플릿은 형태 파일이 정의와 다릅니다(md 갱신 필요). 채운 뒤 결과를 확인하거나 템플릿을 다시 만드세요.',
 }
 
 export function teamStrings(lang: string): typeof en {

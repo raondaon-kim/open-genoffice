@@ -306,3 +306,73 @@ describe('TeamTemplates source-words detail', () => {
     })
   })
 })
+
+describe('review fixes (shell)', () => {
+  it('a read-only templates folder is found before the AI draft and the list hides writes', async () => {
+    let asked = 0
+    const svc = service({
+      probe: async () => false,
+      complete: async (s, u) => {
+        asked++
+        return complete(s, u)
+      },
+    })
+    const [candidate] = await svc.candidates()
+    await expect(svc.draft({ candidateKey: candidate!.key })).rejects.toMatchObject({
+      code: 'permission',
+    })
+    expect(asked).toBe(0)
+    expect((await svc.list()).writable).toBe(false)
+  })
+
+  it('a set whose md does not parse is listed as broken; a changed form as stale after opening', async () => {
+    const svc = service()
+    const { set } = await makeSet(svc)
+    await mkdir(join(tpl, 'Word', '깨짐'))
+    await writeFile(join(tpl, 'Word', '깨짐', 'template.md'), '# 아무거나')
+    await writeFile(join(tpl, 'Word', '깨짐', 'form.docx'), 'x')
+    expect((await svc.list()).sets.find((s) => s.path === 'Word/깨짐/')!.status).toBe('broken')
+    await writeFile(
+      join(tpl, 'Word', 'KOICA ODA 기술제안서', 'form.docx'),
+      await makeDocx(ODA_BLOCKS),
+    )
+    expect((await svc.openSet(set.path)).status).toBe('stale-md')
+    expect((await svc.list()).sets.find((s) => s.path === set.path)!.status).toBe('stale-md')
+  })
+
+  it('a filled copy with an extra chapter and tables still counts as covered', async () => {
+    const svc = service()
+    const { set } = await makeSet(svc)
+    const md = await readFile(join(tpl, 'Word', 'KOICA ODA 기술제안서', 'template.md'), 'utf8')
+    const headings = [
+      ...md
+        .split('## 목차')[1]!
+        .split('```')[0]!
+        .matchAll(/^( *)- (.+?)(?: — .*)?$/gm),
+    ].map((m) => ({ level: m[1]!.length / 2 + 1, text: m[2]! }))
+    await mkdir(join(docs, 'R', '공용', 'Word'), { recursive: true })
+    await writeFile(
+      join(docs, 'R', '공용', 'Word', 'filled.docx'),
+      await makeDocx([
+        { text: '르완다 사업', style: 'Title' },
+        ...headings.flatMap((h) => [
+          { text: h.text, style: `Heading${h.level}` },
+          { text: '채운 본문' },
+          {
+            table: [
+              ['열1', '열2'],
+              ['a', 'b'],
+            ],
+          },
+        ]),
+        { text: '확인 필요 사항', style: 'Heading1' },
+        { text: '남은 항목' },
+      ]),
+    )
+    // the source document is gone: coverage must not rest on grouping with it
+    await rm(join(docs, 'P'), { recursive: true })
+    const candidates = await svc.candidates()
+    const filled = candidates.find((c) => c.docs.some((d) => d.name === 'filled.docx'))!
+    expect(filled.coveredBy).toBe(set.path)
+  })
+})

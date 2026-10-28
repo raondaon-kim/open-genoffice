@@ -117,7 +117,10 @@ export function TeamTemplateSets({
       if (!result.ok) {
         fail(result)
         if (result.error === 'moved') await load()
-      } else setNotice(text.opened)
+      } else {
+        setNotice(result.value.status === 'ok' ? text.opened : `${text.opened} ${text.staleOpened}`)
+        if (result.value.status !== 'ok') await load()
+      }
     })
 
   const openLoose = (id: string) =>

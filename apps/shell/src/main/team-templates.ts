@@ -15,11 +15,12 @@ import { basename, extname, join, relative, sep } from 'node:path'
 import { detectSensitive, maskDocument, type MaskOutcome } from '@genoffice/doc-mask'
 import {
   buildFormDocx,
-  docxTexts,
+  packageTexts,
   draftPrompt,
   groupCandidates,
   headerFooterTexts,
   measureDocxStyle,
+  normalizeHeading,
   outlineSignature,
   parseDraft,
   parseIndexMd,
@@ -30,7 +31,10 @@ import {
   renderTemplateMd,
   setFormHeadings,
   signatureHash,
+  similarity,
   sourceContentTexts,
+  strictContentTexts,
+  validateDocxXml,
   sourceWordsHits,
   upsertSet,
   type CandidateDoc,
@@ -71,6 +75,8 @@ export interface TeamTemplatesDeps {
   now?(): Date
   /** can this member write to the templates folder (default: fs.access W_OK) */
   canWrite?(dir: string): Promise<boolean>
+  /** the write probe run before a draft or a delete (default: create and remove a staged file) */
+  probe?(dir: string): Promise<boolean>
   mask?(fileName: string, bytes: Uint8Array): Promise<MaskOutcome>
 }
 
@@ -80,6 +86,8 @@ const MD = 'template.md'
 const FORM = 'form.docx'
 const DRAFT_TTL_MS = 60 * 60 * 1000
 const MAX_GROUP_DOCS = 5
+/** how alike a document's outline must be to a set's to count as that template's form */
+const COVERED_SIMILARITY = 0.8
 
 const sha256 = (data: Uint8Array | string) => createHash('sha256').update(data).digest('hex')
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -93,6 +101,8 @@ interface Draft {
   outlines: DocxOutline[]
   /** the source's own form texts: headings and table header rows */
   allowed: string[]
+  /** the source's header/footer texts (checked against what the form keeps) */
+  headerFooter: string[]
   docHashes: string[]
   replaces?: string
   replacesMdHash?: string
@@ -131,6 +141,10 @@ export class TeamTemplates {
   private readonly drafts = new Map<string, Draft>()
   private lastGroups: CandidateGroup[] = []
   private lastDocPaths = new Map<string, string>()
+  /** templates roots a write probe found read-only (Windows access() ignores ACLs) */
+  private readonly readOnlyRoots = new Set<string>()
+  /** what reading a set found: a changed form or an unreadable md */
+  private readonly statuses = new Map<string, TeamTemplateSet['status']>()
 
   constructor(private readonly deps: TeamTemplatesDeps) {}
 
@@ -139,6 +153,7 @@ export class TeamTemplates {
   }
 
   private async writable(root: string): Promise<boolean> {
+    if (this.readOnlyRoots.has(root)) return false
     if (this.deps.canWrite) return this.deps.canWrite(root)
     try {
       await access(root, constants.W_OK)
@@ -146,6 +161,32 @@ export class TeamTemplates {
     } catch {
       return false
     }
+  }
+
+  /**
+   * A real write test: a staged file created and removed. Only user actions that will write run
+   * it (a draft, a delete), never a listing; a read-only result is remembered for the list.
+   */
+  private async requireWritable(root: string): Promise<void> {
+    const ok = this.deps.probe
+      ? await this.deps.probe(root)
+      : await (async () => {
+          const staged = join(root, `.genoffice-probe-${randomUUID()}.tmp`)
+          try {
+            await writeFile(staged, '', { flag: 'wx' })
+            await rm(staged, { force: true })
+            return true
+          } catch (error) {
+            const code = (error as NodeJS.ErrnoException).code
+            if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') return false
+            throw error
+          }
+        })()
+    if (!ok) {
+      this.readOnlyRoots.add(root)
+      throw new TeamLibraryError('permission')
+    }
+    this.readOnlyRoots.delete(root)
   }
 
   private async stagedWrite(path: string, data: Uint8Array | string): Promise<void> {
@@ -182,6 +223,7 @@ export class TeamTemplates {
       return null
     }
     const parsed = parseTemplateMd(text)
+    if (!parsed.ok) this.statuses.set(`${kind}/${name}/`, 'broken')
     return {
       title: parsed.ok ? parsed.def.title : name,
       path: `${kind}/${name}/`,
@@ -278,7 +320,7 @@ export class TeamTemplates {
       title: s.title,
       kind: s.kind,
       purpose: s.purpose,
-      status: 'ok',
+      status: this.statuses.get(s.path) ?? 'ok',
       hash8: s.hash8,
     }
   }
@@ -324,24 +366,35 @@ export class TeamTemplates {
     }
   }
 
-  /** signature hashes each set was made from (cached per set and form hash) */
-  private async setSignatures(root: string, sets: IndexSet[]): Promise<Map<string, string[]>> {
+  /**
+   * Per set: the signature hashes it was made from and its outline as a signature (level and
+   * normalized heading), cached per set and form hash.
+   */
+  private async setSignatures(
+    root: string,
+    sets: IndexSet[],
+  ): Promise<Map<string, { hashes: string[]; outline: string[] }>> {
     const file = join(this.deps.cacheDir, 'sets.json')
-    let cache: Record<string, string[]>
+    let cache: Record<string, { hashes: string[]; outline: string[] }>
     try {
       cache = JSON.parse(await readFile(file, 'utf8'))
     } catch {
       cache = {}
     }
-    const out = new Map<string, string[]>()
+    const out = new Map<string, { hashes: string[]; outline: string[] }>()
     let changed = false
     for (const s of sets) {
-      const key = `${s.path}|${s.hash8}`
+      const key = `v2|${s.path}|${s.hash8}`
       if (!cache[key]) {
         const parsed = parseTemplateMd(
           await readFile(join(root, s.path, MD), 'utf8').catch(() => ''),
         )
-        cache[key] = parsed.ok ? parsed.def.signatures : []
+        cache[key] = parsed.ok
+          ? {
+              hashes: parsed.def.signatures,
+              outline: parsed.def.outline.map((e) => `${e.level}:${normalizeHeading(e.heading)}`),
+            }
+          : { hashes: [], outline: [] }
         changed = true
       }
       out.set(s.path, cache[key]!)
@@ -389,7 +442,7 @@ export class TeamTemplates {
     const groups = groupCandidates(docs, { minDocs: this.deps.minDocs() })
     this.lastGroups = groups
 
-    let covered = new Map<string, string[]>()
+    let covered = new Map<string, { hashes: string[]; outline: string[] }>()
     try {
       const root = await this.deps.library.root('templates')
       const index = (await this.readIndex(root)) ?? (await this.reconcile(root, false)).index
@@ -399,8 +452,13 @@ export class TeamTemplates {
     }
     return groups.map((g) => {
       const hashes = new Set(g.docs.map((d) => signatureHash(d.signature)))
-      const coveredBy = [...covered.entries()].find(([, sigs]) =>
-        sigs.some((s) => hashes.has(s)),
+      // the same form: a source it was made from, or an outline at least as alike as a group
+      // (a filled copy adds a 확인 필요 사항 chapter and its own tables)
+      const coveredBy = [...covered.entries()].find(
+        ([, set]) =>
+          set.hashes.some((s) => hashes.has(s)) ||
+          (set.outline.length > 0 &&
+            g.docs.some((d) => similarity(d.signature, set.outline) >= COVERED_SIMILARITY)),
       )?.[0]
       return {
         key: g.signatureHash,
@@ -430,6 +488,8 @@ export class TeamTemplates {
   }
 
   async draft(source: TeamTemplateSource, replaces?: string): Promise<TeamTemplateDraftView> {
+    // a read-only member learns it before waiting for the AI
+    await this.requireWritable(await this.deps.library.root('templates'))
     const paths = await this.sourceFiles(source)
     const bytes = await Promise.all(paths.map(async (p) => new Uint8Array(await readFile(p))))
     const outlines = await Promise.all(bytes.map((b) => readDocxOutline(b)))
@@ -506,6 +566,7 @@ export class TeamTemplates {
         ...o.tables.flatMap((t) => t.header),
       ]),
       docHashes,
+      headerFooter: Object.values(headerFooter),
       ...(replaces ? { replaces, replacesMdHash } : {}),
     })
     return {
@@ -543,11 +604,15 @@ export class TeamTemplates {
     const contentLines = mdLines.filter(
       (l) => !/^- (근거 서명|형태 파일|참고할 업무 위키):/.test(l),
     )
+    const broken = await validateDocxXml(form)
+    if (broken) throw new TeamLibraryError('invalid-template', `form.docx: ${broken}`)
     const hits = sourceWordsHits(
-      draft.outlines.flatMap(sourceContentTexts),
-      [...(await docxTexts(form)), ...contentLines],
+      [...draft.outlines.flatMap(sourceContentTexts), ...draft.headerFooter],
+      // every XML part of the form, not only the body: charts, properties, anything unknown
+      [...(await packageTexts(form)), ...contentLines],
       8,
       draft.allowed,
+      draft.outlines.flatMap(strictContentTexts),
     )
     // every offending line at once (up to 10), so the reviewer fixes them in one pass
     if (hits.length) {
@@ -596,7 +661,7 @@ export class TeamTemplates {
     await this.gates(draft, form, md)
 
     const root = await this.deps.library.root('templates')
-    if (!(await this.writable(root))) throw new TeamLibraryError('permission')
+    await this.requireWritable(root)
     let folder: string
     if (draft.replaces) {
       folder = this.setFolder(draft.replaces)
@@ -638,7 +703,7 @@ export class TeamTemplates {
   async remove(setPath: string): Promise<void> {
     const root = await this.deps.library.root('templates')
     const folder = this.setFolder(setPath)
-    if (!(await this.writable(root))) throw new TeamLibraryError('permission')
+    await this.requireWritable(root)
     await rm(join(root, folder), { recursive: true, force: true })
     const { index } = await this.reconcile(root, false)
     await this.writeIndex(root, removeSet(index, setPath))
@@ -671,6 +736,7 @@ export class TeamTemplates {
     if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.error)
     const status: TeamTemplateSet['status'] =
       sha256(form) === parsed.def.formSha256 ? 'ok' : 'stale-md'
+    this.statuses.set(setPath, status)
     const stem = teamFolderName(parsed.def.title)
     if (targetDir !== undefined) {
       for (let n = 1; n <= 1000; n++) {
