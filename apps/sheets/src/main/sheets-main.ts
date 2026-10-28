@@ -1975,13 +1975,17 @@ export function setSheetsWorkbookOpenedHook(
 }
 
 /** Fired after every successful save to a user file (not the temp file of an unsaved new workbook); the shell feeds the work wiki. */
-let documentSavedHook: ((filePath: string) => void) | null = null
-export function setSheetsDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+/** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
+export type SaveOrigin = 'user' | 'auto' | 'agent'
+let documentSavedHook: ((filePath: string, origin: SaveOrigin) => void) | null = null
+export function setSheetsDocumentSavedHook(
+  fn: ((filePath: string, origin: SaveOrigin) => void) | null,
+): void {
   documentSavedHook = fn
 }
-function notifyDocumentSaved(filePath: string): void {
+function notifyDocumentSaved(filePath: string, origin: SaveOrigin): void {
   try {
-    documentSavedHook?.(filePath)
+    documentSavedHook?.(filePath, origin)
   } catch {
     // the wiki never blocks a save
   }
@@ -3473,7 +3477,10 @@ export function registerSheetsIpc(): void {
     // Restored session saved (possibly Save As elsewhere): the unsaved work is
     // persisted, so the original's recovery copy must not re-offer it.
     if (session.restoreTarget !== undefined) clearWorkbookRecovery(session.restoreTarget)
-    notifyDocumentSaved((csvInPlace ? session.csvSourcePath : undefined) ?? targetPath)
+    notifyDocumentSaved(
+      (csvInPlace ? session.csvSourcePath : undefined) ?? targetPath,
+      request.targetPath !== undefined ? 'agent' : request.quiet === true ? 'auto' : 'user',
+    )
     return { canceled: false, file, touchedEntries: mutation.touchedEntries }
   })
 

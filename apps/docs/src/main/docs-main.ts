@@ -4089,13 +4089,17 @@ function getProjectStore(): ProjectStore {
 }
 
 /** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
-let documentSavedHook: ((filePath: string) => void) | null = null
-export function setDocsDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+/** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
+export type SaveOrigin = 'user' | 'auto' | 'agent'
+let documentSavedHook: ((filePath: string, origin: SaveOrigin) => void) | null = null
+export function setDocsDocumentSavedHook(
+  fn: ((filePath: string, origin: SaveOrigin) => void) | null,
+): void {
   documentSavedHook = fn
 }
-function notifyDocumentSaved(filePath: string): void {
+function notifyDocumentSaved(filePath: string, origin: SaveOrigin): void {
   try {
-    documentSavedHook?.(filePath)
+    documentSavedHook?.(filePath, origin)
   } catch {
     // the wiki never blocks a save
   }
@@ -4548,7 +4552,7 @@ export function registerDocsIpc(): void {
         )
         clearRecoveryCopy(filePath)
         pushRecent(filePath)
-        notifyDocumentSaved(filePath)
+        notifyDocumentSaved(filePath, auto === true ? 'auto' : 'user')
         return {
           ok: true,
           passwordIntentPending,
@@ -4755,7 +4759,7 @@ export function registerDocsIpc(): void {
           result.filePath,
         )
         pushRecent(result.filePath)
-        notifyDocumentSaved(result.filePath)
+        notifyDocumentSaved(result.filePath, 'user')
         // the renderer has no path yet to match a rename notification against,
         // so the reply must carry the path it may save to next
         const savedPath = notifyFileSaved(event.sender, result.filePath)
@@ -4771,48 +4775,57 @@ export function registerDocsIpc(): void {
     },
   )
 
-  ipcMain.handle('docs:save-new', async (event, defaultName: string, data: ArrayBuffer) => {
-    try {
-      // a discarded draft in an orphaned renderer must not silently persist
-      // itself to the default folder after the user chose Don't Save
-      if (tornDownWcIds.has(event.sender.id)) return { ok: false }
-      const filePath = uniquePathIn(defaultSaveDir(), defaultName)
-      const passwordState = snapshotDocPassword(event.sender.id, null)
-      const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
-      const bytes = passwordState.password ? encryptDocx(plain, passwordState.password) : plain
-      await atomicWriteFile(filePath, bytes)
-      // teardown may have happened while the write was in flight — the path is
-      // freshly created, so rolling it back is safe (mirrors docs:write-recovery)
-      if (tornDownWcIds.has(event.sender.id)) {
-        await unlink(filePath).catch(() => {})
-        return { ok: false }
+  // auto: the renderer's own flag (AutoSave tick, recovery, the AI's create_document); a missing
+  // flag counts as automatic, so only a save the user started is collected
+  ipcMain.handle(
+    'docs:save-new',
+    async (event, defaultName: string, data: ArrayBuffer, auto?: boolean) => {
+      try {
+        // a discarded draft in an orphaned renderer must not silently persist
+        // itself to the default folder after the user chose Don't Save
+        if (tornDownWcIds.has(event.sender.id)) return { ok: false }
+        const filePath = uniquePathIn(defaultSaveDir(), defaultName)
+        const passwordState = snapshotDocPassword(event.sender.id, null)
+        const { bytes: plain, hashes } = await materializeLazyDocx(Buffer.from(data))
+        const bytes = passwordState.password ? encryptDocx(plain, passwordState.password) : plain
+        await atomicWriteFile(filePath, bytes)
+        // teardown may have happened while the write was in flight — the path is
+        // freshly created, so rolling it back is safe (mirrors docs:write-recovery)
+        if (tornDownWcIds.has(event.sender.id)) {
+          await unlink(filePath).catch(() => {})
+          return { ok: false }
+        }
+        allowDocWrite(event.sender.id, filePath)
+        await rememberDiskState(event.sender.id, filePath, sha256Hex(bytes))
+        pointLazyMediaAt(
+          hashes,
+          filePath,
+          event.sender.id,
+          passwordState.password ? plain : undefined,
+        )
+        if (tornDownWcIds.has(event.sender.id)) {
+          await unlink(filePath).catch(() => {})
+          return { ok: false }
+        }
+        const passwordIntentPending = commitDocPasswordSave(
+          event.sender.id,
+          passwordState,
+          filePath,
+        )
+        pushRecent(filePath)
+        notifyDocumentSaved(filePath, auto === false ? 'user' : 'auto')
+        const savedPath = notifyFileSaved(event.sender, filePath)
+        return {
+          ok: true,
+          path: savedPath,
+          passwordIntentPending,
+          ...reissuedDoc(!!passwordState.password, hashes, plain),
+        }
+      } catch (err) {
+        return { ok: false, error: String(err) }
       }
-      allowDocWrite(event.sender.id, filePath)
-      await rememberDiskState(event.sender.id, filePath, sha256Hex(bytes))
-      pointLazyMediaAt(
-        hashes,
-        filePath,
-        event.sender.id,
-        passwordState.password ? plain : undefined,
-      )
-      if (tornDownWcIds.has(event.sender.id)) {
-        await unlink(filePath).catch(() => {})
-        return { ok: false }
-      }
-      const passwordIntentPending = commitDocPasswordSave(event.sender.id, passwordState, filePath)
-      pushRecent(filePath)
-      notifyDocumentSaved(filePath)
-      const savedPath = notifyFileSaved(event.sender, filePath)
-      return {
-        ok: true,
-        path: savedPath,
-        passwordIntentPending,
-        ...reissuedDoc(!!passwordState.password, hashes, plain),
-      }
-    } catch (err) {
-      return { ok: false, error: String(err) }
-    }
-  })
+    },
+  )
 
   ipcMain.handle(
     'docs:create-document',
@@ -4872,7 +4885,7 @@ export function registerDocsIpc(): void {
           filePath,
         )
         pushRecent(filePath)
-        notifyDocumentSaved(filePath)
+        notifyDocumentSaved(filePath, 'agent')
         rememberOpenDoc(event.sender.id, filePath)
         notifyFileSaved(event.sender, filePath)
         return {

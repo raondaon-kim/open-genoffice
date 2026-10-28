@@ -899,13 +899,17 @@ export function setHtmlFileSavedHook(hook: (wc: WebContents, path: string) => vo
 }
 
 /** Fired after every successful write (manual or automatic) with the written path; the shell feeds the work wiki. */
-let documentSavedHook: ((filePath: string) => void) | null = null
-export function setHtmlDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+/** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
+export type SaveOrigin = 'user' | 'auto' | 'agent'
+let documentSavedHook: ((filePath: string, origin: SaveOrigin) => void) | null = null
+export function setHtmlDocumentSavedHook(
+  fn: ((filePath: string, origin: SaveOrigin) => void) | null,
+): void {
   documentSavedHook = fn
 }
-function notifyDocumentSaved(filePath: string): void {
+function notifyDocumentSaved(filePath: string, origin: SaveOrigin): void {
   try {
-    documentSavedHook?.(filePath)
+    documentSavedHook?.(filePath, origin)
   } catch {
     // the wiki never blocks a save
   }
@@ -1551,7 +1555,7 @@ function registerHtmlIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
-        notifyDocumentSaved(target)
+        notifyDocumentSaved(target, auto ? 'auto' : 'user')
         return done({
           ok: true,
           path: target,

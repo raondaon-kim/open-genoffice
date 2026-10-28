@@ -212,9 +212,10 @@ describe('saves reach the work wiki (markdown)', () => {
     const contents = await openedView(path)
     await save(contents, { text: '# Mine', imageSources: [], mode: 'save' })
     expect(saved).toHaveBeenCalledTimes(1)
-    expect(saved).toHaveBeenLastCalledWith(path)
+    expect(saved).toHaveBeenLastCalledWith(path, 'user')
     await save(contents, { text: '# Mine 2', imageSources: [], mode: 'save', auto: true })
     expect(saved).toHaveBeenCalledTimes(2)
+    expect(saved).toHaveBeenLastCalledWith(path, 'auto')
   })
 
   it('does not report a save that did not write', async () => {

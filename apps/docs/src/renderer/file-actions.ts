@@ -1034,7 +1034,7 @@ async function saveOnce(
       // folder. The source path identifies the desired password state to snapshot.
       const result = saveAs
         ? await window.desktop.saveDocxAs(autoName ?? doc.fileName, buffer, doc.filePath)
-        : await window.desktop.saveDocxNew(newDocName ?? autoName ?? doc.fileName, buffer)
+        : await window.desktop.saveDocxNew(newDocName ?? autoName ?? doc.fileName, buffer, auto)
       if (!result.ok) {
         if (result.error) {
           ctx.setStatus(t('appSaveFailed', { error: result.error }))

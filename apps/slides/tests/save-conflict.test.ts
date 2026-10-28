@@ -71,7 +71,7 @@ vi.mock('../src/main/shaped-metrics', () => ({
 
 import { createBlankPptx } from '@genoffice/pptx-engine'
 import { setOpenPathProbe } from '@genoffice/electron-utils'
-import { registerSlidesIpc } from '../src/main/slides-main'
+import { registerSlidesIpc, setSlidesDocumentSavedHook } from '../src/main/slides-main'
 import { sessions } from '../src/main/session-state'
 
 const WC = 7
@@ -229,5 +229,21 @@ describe('split-view save guard (slides)', () => {
     expect(await saveDeck()).toEqual({ ok: false, reason: 'external-modified' })
     expect(showMessageBox).toHaveBeenCalledTimes(1)
     expect(readFileSync(path)).toEqual(externalBytes)
+  })
+})
+
+describe('saves tell the shell who saved (slides)', () => {
+  afterEach(() => setSlidesDocumentSavedHook(null))
+
+  it('reports the user save as user and the AutoSave pass as auto', async () => {
+    const saved = vi.fn()
+    setSlidesDocumentSavedHook(saved)
+    const path = makeDeckFile()
+    await openDeck(path)
+    setOpenPathProbe(() => false)
+    expect((await saveDeck()).ok).toBe(true)
+    expect(saved).toHaveBeenLastCalledWith(path, 'user')
+    expect((await saveDeck(true)).ok).toBe(true)
+    expect(saved).toHaveBeenLastCalledWith(path, 'auto')
   })
 })

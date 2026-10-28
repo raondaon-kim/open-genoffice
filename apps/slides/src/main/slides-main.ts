@@ -445,13 +445,17 @@ let elementClipboard: {
 /** Shell hook: a view opened a file (including ⌘O inside a tab) — used to update tab titles and de-duplicate paths */
 let slidesOpenedHook: ((wc: WebContents, path: string) => void) | null = null
 /** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
-let documentSavedHook: ((filePath: string) => void) | null = null
-export function setSlidesDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+/** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
+export type SaveOrigin = 'user' | 'auto' | 'agent'
+let documentSavedHook: ((filePath: string, origin: SaveOrigin) => void) | null = null
+export function setSlidesDocumentSavedHook(
+  fn: ((filePath: string, origin: SaveOrigin) => void) | null,
+): void {
   documentSavedHook = fn
 }
-function notifyDocumentSaved(filePath: string): void {
+function notifyDocumentSaved(filePath: string, origin: SaveOrigin): void {
   try {
-    documentSavedHook?.(filePath)
+    documentSavedHook?.(filePath, origin)
   } catch {
     // the wiki never blocks a save
   }
@@ -496,7 +500,7 @@ export async function saveSessionDeckTo(session: Session, filePath: string): Pro
   await mkdir(dirname(filePath), { recursive: true })
   const metaRevAtSave = session.metaRev ?? 0
   await savePptxToFile(session.opened, filePath)
-  notifyDocumentSaved(filePath)
+  notifyDocumentSaved(filePath, 'agent')
   session.path = filePath
   session.diskState = (await recordDiskState(filePath)) ?? undefined
   autosaveBackoff.delete(filePath)
@@ -4499,7 +4503,7 @@ export function registerSlidesIpc(): void {
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, session.path)
-      notifyDocumentSaved(session.path)
+      notifyDocumentSaved(session.path, auto === true ? 'auto' : 'user')
       // the saved bytes are the new baseline for the split-view guard
       session.diskState = (await recordDiskState(session.path)) ?? undefined
       autosaveBackoff.delete(session.path)
@@ -4534,7 +4538,7 @@ export function registerSlidesIpc(): void {
     try {
       const metaRevAtSave = session.metaRev ?? 0
       await savePptxToFile(session.opened, r.filePath)
-      notifyDocumentSaved(r.filePath)
+      notifyDocumentSaved(r.filePath, 'user')
       session.path = r.filePath
       session.diskState = (await recordDiskState(r.filePath)) ?? undefined
       autosaveBackoff.delete(r.filePath)

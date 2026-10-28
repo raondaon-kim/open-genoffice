@@ -382,7 +382,7 @@ interface RuntimePaths {
   rendererUrl?: string
   rendererFile?: string
   /** called after a successful save so the shell can retitle the tab and record the file */
-  onSaved?: (webContentsId: number, path: string) => void
+  onSaved?: (webContentsId: number, path: string, origin: 'user' | 'auto' | 'agent') => void
   /** called when the HwpForge generator created a new document so the shell can open it in a tab */
   onCreateDocument?: (path: string) => void
   /** HwpForge MCP platform binary; the shell injects it, dev falls back to node_modules */
@@ -628,7 +628,7 @@ function registerHwpIpc(): void {
       await rename(tmp, path)
       await rememberDiskState(e.sender.id, path)
       // first save of an untitled doc / title + recent-file updates
-      runtime.onSaved?.(e.sender.id, path)
+      runtime.onSaved?.(e.sender.id, path, 'user')
       return backupPath ? { ok: true, backupPath } : { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }

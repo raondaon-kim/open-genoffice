@@ -135,8 +135,8 @@ const api: DesktopApi = {
   spellSetLanguages: (langs: string[]) => ipcRenderer.invoke('docs:spell-set-languages', langs),
   saveDocxAs: (defaultName: string, data: ArrayBuffer, sourcePath?: string | null) =>
     ipcRenderer.invoke('docs:save-as', defaultName, data, sourcePath ?? null),
-  saveDocxNew: (defaultName: string, data: ArrayBuffer) =>
-    ipcRenderer.invoke('docs:save-new', defaultName, data),
+  saveDocxNew: (defaultName: string, data: ArrayBuffer, auto?: boolean) =>
+    ipcRenderer.invoke('docs:save-new', defaultName, data, auto),
   saveDocxTo: (path: string, data: ArrayBuffer, overwrite: boolean) =>
     ipcRenderer.invoke('docs:save-to', path, data, overwrite === true),
   onMcpCommand: (handler) => {

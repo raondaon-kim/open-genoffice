@@ -435,6 +435,8 @@ export interface DesktopApi {
   saveDocxNew(
     defaultName: string,
     data: ArrayBuffer,
+    /** false = the user saved; true or missing = AutoSave, recovery or the AI */
+    auto?: boolean,
   ): Promise<{
     ok: boolean
     path?: string

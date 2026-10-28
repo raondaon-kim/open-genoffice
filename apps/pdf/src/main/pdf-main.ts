@@ -692,13 +692,17 @@ export function setPdfRedactionSavedHook(hook: (wc: WebContents, path: string) =
 }
 
 /** Fired after every successful write (in place, Save As or a redacted copy) with the written path; the shell feeds the work wiki. */
-let documentSavedHook: ((filePath: string) => void) | null = null
-export function setPdfDocumentSavedHook(fn: ((filePath: string) => void) | null): void {
+/** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
+export type SaveOrigin = 'user' | 'auto' | 'agent'
+let documentSavedHook: ((filePath: string, origin: SaveOrigin) => void) | null = null
+export function setPdfDocumentSavedHook(
+  fn: ((filePath: string, origin: SaveOrigin) => void) | null,
+): void {
   documentSavedHook = fn
 }
-function notifyDocumentSaved(filePath: string): void {
+function notifyDocumentSaved(filePath: string, origin: SaveOrigin): void {
   try {
-    documentSavedHook?.(filePath)
+    documentSavedHook?.(filePath, origin)
   } catch {
     // the wiki never blocks a save
   }
@@ -1233,7 +1237,7 @@ function registerPdfIpc(): void {
           console.warn('[pdf] redaction saved hook failed:', err)
         }
       }
-      notifyDocumentSaved(target)
+      notifyDocumentSaved(target, (request as { auto?: unknown }).auto === true ? 'auto' : 'user')
       return {
         ok: true,
         ...(skippedTextEdits.length > 0 ? { skippedTextEdits } : {}),

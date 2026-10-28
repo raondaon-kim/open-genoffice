@@ -333,14 +333,14 @@ describe('saves reach the work wiki (sheets)', () => {
     const opened = await openWorkbook(path)
     await saveWorkbook(opened.sessionId)
     expect(saved).toHaveBeenCalledTimes(1)
-    expect(saved).toHaveBeenCalledWith(path)
+    expect(saved).toHaveBeenCalledWith(path, 'user')
   })
 
   it('reports an automatic (quiet) save too', async () => {
     const path = writeWorkbook()
     const opened = await openWorkbook(path)
     await saveWorkbook(opened.sessionId, { quiet: true })
-    expect(saved).toHaveBeenCalledWith(path)
+    expect(saved).toHaveBeenCalledWith(path, 'auto')
   })
 
   it('does not report a save that was refused', async () => {

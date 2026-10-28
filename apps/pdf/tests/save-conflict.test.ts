@@ -213,9 +213,10 @@ describe('saves reach the work wiki (pdf)', () => {
     const wcId = await openedView(path)
     expect(await save(wcId, savedRequest(path))).toMatchObject({ ok: true })
     expect(saved).toHaveBeenCalledTimes(1)
-    expect(saved).toHaveBeenLastCalledWith(path)
+    expect(saved).toHaveBeenLastCalledWith(path, 'user')
     expect(await save(wcId, savedRequest(path, { auto: true }))).toMatchObject({ ok: true })
     expect(saved).toHaveBeenCalledTimes(2)
+    expect(saved).toHaveBeenLastCalledWith(path, 'auto')
   })
 
   it('does not report a save that did not write', async () => {

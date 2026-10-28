@@ -155,7 +155,7 @@ describe('redacted copies reach the work wiki', () => {
     try {
       const s = await setup()
       expect(await s.call(PDF_CHANNELS.requestRedactionCopy, s.source)).toBe(true)
-      expect(saved).toHaveBeenCalledWith(s.copy)
+      expect(saved).toHaveBeenCalledWith(s.copy, 'user')
       expect(saved).not.toHaveBeenCalledWith(s.source)
     } finally {
       setPdfDocumentSavedHook(null)
