@@ -1,5 +1,7 @@
 # Collecting saved documents on the company NAS, masked, as a template library
 
+> **Status (2026-10-28):** only the masking package (`packages/doc-mask`, plan Tasks 1–6) and the save-origin hooks (Task 7) were built. Collection and delivery to the NAS (Tasks 8–11: collector, outbox, SMB client, build config, Settings statement, wiring) are on hold and nothing sends documents anywhere. Before resuming: the company's privacy/security owner should confirm how employees are told about the collection (a statement in Settings only was judged too weak; names and addresses are not masked).
+
 ## Intent
 
 The company wants a library of its own documents to learn its document formats from later:
