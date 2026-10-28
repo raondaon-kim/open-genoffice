@@ -465,3 +465,25 @@ describe('NAS safety: confirm, remake and delete', () => {
     expect(await readdir(join(tpl, 'Word', '다른 폴더'))).toEqual(['자료.docx'])
   })
 })
+
+describe('listing depth and cost', () => {
+  it('목록 다시 만들기 finds loose files deep in plain folders; the list keeps them', async () => {
+    const svc = service()
+    await mkdir(join(tpl, 'Word', 'a', 'b', 'c'), { recursive: true })
+    await writeFile(join(tpl, 'Word', 'a', 'b', 'c', '깊은 양식.docx'), await makeDocx(ODA_BLOCKS))
+    expect((await svc.list()).loose.map((l) => l.id)).not.toContain('Word/a/b/c/깊은 양식.docx')
+    expect((await svc.rebuildIndex()).loose.map((l) => l.id)).toContain('Word/a/b/c/깊은 양식.docx')
+    expect((await svc.list()).loose.map((l) => l.id)).toContain('Word/a/b/c/깊은 양식.docx')
+  })
+
+  it('a listing takes loose file sizes from index.md instead of asking the NAS again', async () => {
+    const svc = service()
+    await mkdir(join(tpl, 'Word'))
+    const file = join(tpl, 'Word', '옛 양식.docx')
+    await writeFile(file, 'x'.repeat(100))
+    expect((await svc.list()).loose[0]!.sizeBytes).toBe(100)
+    await writeFile(file, 'x'.repeat(250))
+    expect((await svc.list()).loose[0]!.sizeBytes).toBe(100)
+    expect((await svc.rebuildIndex()).loose[0]!.sizeBytes).toBe(250)
+  })
+})

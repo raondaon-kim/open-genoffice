@@ -77,3 +77,23 @@ describe('index.md', () => {
     expect(removeSet(changed, index.sets[0]!.path).sets).toHaveLength(2)
   })
 })
+
+describe('index.md loose files carry size and time', () => {
+  it('round trips size and mtime; older lines without them still read', () => {
+    const withMeta: TemplateIndex = {
+      ...index,
+      loose: [
+        {
+          name: '옛 양식.docx',
+          path: 'Word/a/b/옛 양식.docx',
+          sizeBytes: 18261,
+          mtimeMs: 1793156125865,
+        },
+      ],
+    }
+    const text = renderIndexMd(withMeta)
+    expect(text).toContain('- [옛 양식.docx](<Word/a/b/옛 양식.docx>) · 18261 · 1793156125865')
+    expect(parseIndexMd(text)!.loose).toEqual(withMeta.loose)
+    expect(parseIndexMd(renderIndexMd(index))!.loose).toEqual(index.loose)
+  })
+})

@@ -89,6 +89,8 @@ const MD = 'template.md'
 const FORM = 'form.docx'
 const DRAFT_TTL_MS = 60 * 60 * 1000
 const MAX_GROUP_DOCS = 5
+/** how deep 목록 다시 만들기 looks into plain folders for loose files (0.5.7 listed to 6) */
+const LOOSE_DEPTH = 6
 /** how alike a document's outline must be to a set's to count as that template's form */
 const COVERED_SIMILARITY = 0.8
 
@@ -269,18 +271,47 @@ export class TeamTemplates {
       TEAM_TEMPLATE_EXTENSIONS.includes(extname(name).slice(1).toLowerCase()) &&
       !name.startsWith('~$') &&
       !name.startsWith('.')
+    const skipFolder = (name: string) =>
+      name.startsWith('.') || name.toLowerCase() === 'network trashes folder'
+    // sizes and dates come from index.md when it has them: a listing does not stat every file
+    const indexed = new Map(index.loose.map((l) => [l.path, l]))
+    const seen = new Set<string>()
+    const addLoose = async (path: string) => {
+      const id = toId(root, path)
+      seen.add(id)
+      const known = indexed.get(id)
+      if (known?.sizeBytes !== undefined && known.mtimeMs !== undefined) {
+        loose.push({
+          id,
+          name: basename(path),
+          ext: extname(path).slice(1).toLowerCase(),
+          sizeBytes: known.sizeBytes,
+          mtimeMs: known.mtimeMs,
+        })
+      } else {
+        loose.push(await this.looseEntry(root, path))
+      }
+    }
+    /** a plain folder's documents: one level when listing, down to LOOSE_DEPTH when rebuilding */
+    const walkPlain = async (dir: string, depth: number): Promise<void> => {
+      for (const f of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+        if (f.isFile() && supported(f.name)) await addLoose(join(dir, f.name))
+        else if (full && f.isDirectory() && !skipFolder(f.name) && depth < LOOSE_DEPTH) {
+          await walkPlain(join(dir, f.name), depth + 1)
+        }
+      }
+    }
     const rootEntries = await readdir(root, { withFileTypes: true })
     for (const e of rootEntries) {
-      if (e.isFile() && supported(e.name))
-        loose.push(await this.looseEntry(root, join(root, e.name)))
+      if (e.isFile() && supported(e.name)) await addLoose(join(root, e.name))
     }
     for (const kind of KINDS) {
       if (!rootEntries.some((e) => e.isDirectory() && e.name === kind)) continue
       const entries = await readdir(join(root, kind), { withFileTypes: true })
       for (const e of entries) {
-        if (e.name.startsWith('.') || e.name.toLowerCase() === 'network trashes folder') continue
+        if (skipFolder(e.name)) continue
         if (e.isFile()) {
-          if (supported(e.name)) loose.push(await this.looseEntry(root, join(root, kind, e.name)))
+          if (supported(e.name)) await addLoose(join(root, kind, e.name))
           continue
         }
         if (!e.isDirectory()) continue
@@ -297,24 +328,38 @@ export class TeamTemplates {
           continue
         }
         // a plain folder of the 0.5.7 layout: its documents are loose files
-        for (const f of await readdir(join(root, kind, e.name), { withFileTypes: true }).catch(
-          () => [],
-        )) {
-          if (f.isFile() && supported(f.name)) {
-            loose.push(await this.looseEntry(root, join(root, kind, e.name, f.name)))
-          }
-        }
+        await walkPlain(join(root, kind, e.name), 1)
+      }
+    }
+    if (!full) {
+      // files a rebuild found deeper than one listing reaches stay listed from index.md
+      for (const l of index.loose) {
+        if (seen.has(l.path) || l.path.split('/').length <= 3) continue
+        if (l.sizeBytes === undefined || l.mtimeMs === undefined) continue
+        loose.push({
+          id: l.path,
+          name: l.name,
+          ext: extname(l.name).slice(1).toLowerCase(),
+          sizeBytes: l.sizeBytes,
+          mtimeMs: l.mtimeMs,
+        })
       }
     }
     if (sets.length !== index.sets.length) repaired = true
     const looseIds = loose.map((l) => l.id).sort()
     const indexLoose = index.loose.map((l) => l.path).sort()
     if (looseIds.join('\n') !== indexLoose.join('\n')) repaired = true
+    if (index.loose.some((l) => l.sizeBytes === undefined)) repaired = true
     return {
       index: {
         ...index,
         sets,
-        loose: loose.map((l) => ({ name: l.name, path: l.id })),
+        loose: loose.map((l) => ({
+          name: l.name,
+          path: l.id,
+          sizeBytes: l.sizeBytes,
+          mtimeMs: l.mtimeMs,
+        })),
       },
       loose,
       repaired,

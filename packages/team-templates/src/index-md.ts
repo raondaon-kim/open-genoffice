@@ -10,6 +10,9 @@ export interface IndexSet {
 export interface IndexLoose {
   name: string
   path: string
+  /** kept so a listing does not stat every file on the NAS */
+  sizeBytes?: number
+  mtimeMs?: number
 }
 export interface TemplateIndex {
   updatedAt: string
@@ -49,7 +52,11 @@ export function renderIndexMd(index: TemplateIndex): string {
   if (index.loose.length) {
     lines.push('', `## ${LOOSE}`)
     for (const l of [...index.loose].sort((a, b) => cmp(a.path, b.path))) {
-      lines.push(`- ${link(l.name, l.path)}`)
+      const meta =
+        l.sizeBytes !== undefined && l.mtimeMs !== undefined
+          ? ` · ${l.sizeBytes} · ${Math.round(l.mtimeMs)}`
+          : ''
+      lines.push(`- ${link(l.name, l.path)}${meta}`)
     }
   }
   return `${lines.join('\n')}\n`
@@ -80,7 +87,12 @@ export function parseIndexMd(text: string): TemplateIndex | null {
     const title = unescTitle(m[1]!)
     const path = m[2] ?? m[3]!
     if (section === LOOSE) {
-      index.loose.push({ name: title, path })
+      const meta = /^ · (\d+) · (\d+)$/.exec(m[4]!)
+      index.loose.push(
+        meta
+          ? { name: title, path, sizeBytes: Number(meta[1]), mtimeMs: Number(meta[2]) }
+          : { name: title, path },
+      )
       continue
     }
     const rest = /^ — (.*) · 확정 · ([0-9a-f]{8})$/.exec(m[4]!)
