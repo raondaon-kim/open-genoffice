@@ -215,3 +215,22 @@ describe('writeFromTemplate concurrency', () => {
     expect(chapters.every((e) => e.of === 9)).toBe(true)
   })
 })
+
+describe('template section prompt rules (live findings)', () => {
+  it('forbids restating the guidance and citing writing-method pages as sources', async () => {
+    const { templateSectionPrompt } = await import('../src/template-prompts')
+    const { system } = templateSectionPrompt({
+      template: TEMPLATE,
+      section: TEMPLATE.sections[0]!,
+      point: '',
+      brief: { purpose: '', reader: '', messages: [], terms: {} },
+      ledger: [],
+      attachment: '',
+      wikiPages: [],
+      kind: 'proposal',
+    })
+    expect(system).toContain('안내를 본문에 옮기거나 설명하지 않는다')
+    expect(system).toContain('methods/')
+    expect(system).toContain('출처로 인용하지 않는다')
+  })
+})

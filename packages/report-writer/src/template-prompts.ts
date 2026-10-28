@@ -76,6 +76,8 @@ export function templateSectionPrompt(input: TemplateSectionInput): {
   const system = `너는 템플릿 집필자다. 팀 템플릿의 한 절만 쓴다. 요청과 같은 언어로 쓴다.
 
 ${rulesFor(input.kind)}
+- 템플릿 안내는 이 절에 무엇을 어떤 형태로 쓸지에 대한 지시다. 안내를 본문에 옮기거나 설명하지 않는다("이 표는 ~를 보여 준다", "~는 확정 후 기입한다" 같은 문장 금지). 지시대로 실제 내용만 쓴다.
+- 작성 방식 위키 페이지(methods/…)는 쓰는 방법의 지침이다. 따르기만 하고 내용의 출처로 인용하지 않는다.
 - ${FENCE_RULE}${t.styleRules ? `\n\n템플릿의 규칙:\n${t.styleRules}` : ''}
 
 ${SECTION_ANSWER}`
