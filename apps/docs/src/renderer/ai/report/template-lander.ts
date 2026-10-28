@@ -33,6 +33,39 @@ const isEmptyFormTable = (n: ProseNode) => {
 const key = (text: string) => normalizeHeading(text) || text.replace(/\s+/g, '')
 
 /**
+ * The form table with written values: same column count required. A header the form kept stays;
+ * an emptied first row takes the written header; every written body row is a copy of the form's
+ * empty row (its cell widths and shading) holding the values. Null when the columns differ.
+ */
+function filledTable(table: ProseNode, rows: string[][]): ProseNode | null {
+  const formRows: ProseNode[] = []
+  table.forEach((row) => void formRows.push(row))
+  const [head, ...body] = rows
+  if (!head || formRows.length === 0) return null
+  const pattern = formRows[1] ?? formRows[0]!
+  if (formRows[0]!.childCount !== head.length || pattern.childCount !== head.length) return null
+  const schema = table.type.schema
+  const fill = (row: ProseNode, values: string[]): ProseNode => {
+    const cells: ProseNode[] = []
+    row.forEach((cell, _o, i) => {
+      const para = cell.firstChild
+      const text = values[i] ?? ''
+      cells.push(
+        para
+          ? cell.type.create(
+              cell.attrs,
+              para.type.create(para.attrs, text ? schema.text(text) : null),
+            )
+          : cell,
+      )
+    })
+    return row.type.create(row.attrs, cells)
+  }
+  const first = formRows[0]!.textContent.trim() ? formRows[0]! : fill(formRows[0]!, head)
+  return table.type.create(table.attrs, [first, ...body.map((values) => fill(pattern, values))])
+}
+
+/**
  * The top-level index of each outline heading in the open document, found in order by its text
  * (numbering ignored), whatever node type Word's import gave it. `missing` is the first outline
  * heading the document does not have.
@@ -98,7 +131,8 @@ export function createTemplateLander(
     return { heading, end: at[ordinal + 1] ?? tops(editor()).length }
   }
 
-  const land = (ordinal: number, blocks: ReportBlock[]) => {
+  const land = (ordinal: number, written: ReportBlock[]) => {
+    let blocks = written
     const range = sectionRange(ordinal)
     if (!range) {
       // the heading is gone: the text still lands, at the end
@@ -106,11 +140,39 @@ export function createTemplateLander(
       return
     }
     if (blocks.some((b) => b.type === 'table')) {
+      // the n-th written table fills the n-th empty form table when the columns match, keeping
+      // the form's widths, shading and header; other form tables of the section give way
+      const formTables = tops(editor()).filter(
+        (t) => t.index > range.heading && t.index < range.end && isEmptyFormTable(t.node),
+      )
+      const edits: Array<{ top: Top; node: ProseNode | null }> = []
+      const rest: ReportBlock[] = []
+      let next = 0
+      for (const b of blocks) {
+        const form = b.type === 'table' ? formTables[next] : undefined
+        const filled = form && b.type === 'table' ? filledTable(form.node, b.rows) : null
+        if (form && filled) {
+          edits.push({ top: form, node: filled })
+          next++
+        } else rest.push(b)
+      }
+      for (const t of formTables) {
+        if (!edits.some((e) => e.top.index === t.index)) edits.push({ top: t, node: null })
+      }
       // bottom-up so earlier offsets stay valid
-      for (const t of tops(editor())
-        .filter((t) => t.index > range.heading && t.index < range.end && isEmptyFormTable(t.node))
-        .reverse()) {
-        remove(t.offset, t.offset + t.node.nodeSize)
+      for (const { top, node } of edits.sort((a, b) => b.top.offset - a.top.offset)) {
+        const e = editor()
+        const end = top.offset + top.node.nodeSize
+        e.view.dispatch(
+          node ? e.state.tr.replaceWith(top.offset, end, node) : e.state.tr.delete(top.offset, end),
+        )
+      }
+      blocks = rest
+      if (blocks.length === 0) {
+        const fresh = tops(editor())[range.heading + 1]
+        if (fresh && isEmptySlot(fresh.node))
+          remove(fresh.offset, fresh.offset + fresh.node.nodeSize)
+        return
       }
     }
     const after = tops(editor())[range.heading + 1]

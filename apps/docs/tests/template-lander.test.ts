@@ -180,3 +180,82 @@ describe('template lander', () => {
     expect(b.at(-1)).toEqual(['docParagraph', '확인 필요 사항 표'])
   })
 })
+
+describe('template lander fills the form table', () => {
+  const formTable = () =>
+    parseHtmlFragment(
+      '<table><tr><th>구분</th><th>내용</th></tr><tr><td></td><td></td></tr></table>',
+      NUM,
+    )
+  const editorWith = (content: PmNode[]) => {
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: editorExtensions,
+      content: { type: 'doc', content },
+    })
+    editors.push(editor)
+    return editor
+  }
+  const tableRowsOf = (editor: Editor) => {
+    const out: string[][] = []
+    editor.state.doc.forEach((n) => {
+      if (!/table/i.test(n.type.name)) return
+      n.forEach((row) => {
+        const cells: string[] = []
+        row.forEach((cell) => void cells.push(cell.textContent))
+        out.push(cells)
+      })
+    })
+    return out
+  }
+
+  it('same number of columns: the form table keeps its header and gets the rows', async () => {
+    const editor = editorWith([
+      heading(1, 'Ⅰ. 소개'),
+      para(),
+      ...formTable(),
+      heading(2, '1. 개요'),
+      para(),
+    ])
+    await lander(editor).section(0, [
+      { type: 'paragraph', text: '표 앞 문장' },
+      {
+        type: 'table',
+        rows: [
+          ['항목', '설명'],
+          ['A', '가'],
+          ['B', '나'],
+        ],
+      },
+    ])
+    expect(tableRowsOf(editor)).toEqual([
+      ['구분', '내용'],
+      ['A', '가'],
+      ['B', '나'],
+    ])
+    expect(blocks(editor).filter(([t]) => /table/i.test(t))).toHaveLength(1)
+  })
+
+  it('a different number of columns: the written table replaces the form table', async () => {
+    const editor = editorWith([
+      heading(1, 'Ⅰ. 소개'),
+      para(),
+      ...formTable(),
+      heading(2, '1. 개요'),
+      para(),
+    ])
+    await lander(editor).section(0, [
+      {
+        type: 'table',
+        rows: [
+          ['a', 'b', 'c'],
+          ['1', '2', '3'],
+        ],
+      },
+    ])
+    expect(tableRowsOf(editor)).toEqual([
+      ['a', 'b', 'c'],
+      ['1', '2', '3'],
+    ])
+  })
+})
