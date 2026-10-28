@@ -8,6 +8,8 @@ import type { Lang } from '@genoffice/i18n'
 import { readAiSettingsFile } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { WIKI_CHANNELS, WIKI_UNAVAILABLE } from '@genoffice/work-wiki'
+import type { WikiReadiness } from '@genoffice/work-wiki'
+import { waitForWiki } from './llm-wiki-ready'
 import { createSavedMirror, WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
@@ -439,6 +441,24 @@ export function workWikiDocumentSaved(path: string): void {
   }
 }
 
+/**
+ * LLM Wiki answering before a template fill: waits while it starts (≤30 s), restarts it once.
+ * A build without the bundled program reports it as off.
+ */
+export async function ensureLlmWikiReady(): Promise<WikiReadiness> {
+  return waitForWiki({
+    enabled: () =>
+      readWorkWikiSettings().enabled &&
+      llmWikiExePath(process.resourcesPath, devLlmWikiDir()) !== null,
+    status: () =>
+      llmWiki?.status() ?? {
+        state: 'stopped',
+        ...(llmWikiReason ? { reason: llmWikiReason } : {}),
+      },
+    restart: () => startLlmWiki(),
+  })
+}
+
 /** the work wiki's catalog (pages matching `query` first); '' when the wiki is off */
 export async function workWikiCatalog(query = ''): Promise<string> {
   return engine ? await engine.catalogFor(query) : ''
@@ -473,6 +493,7 @@ export function registerWorkWikiIpc(): void {
   })
   const wikiOn = (): boolean => readWorkWikiSettings().enabled && engine?.enabled === true
   ipcMain.handle(WIKI_CHANNELS.status, () => ({ enabled: wikiOn() }))
+  ipcMain.handle(WIKI_CHANNELS.ensureReady, () => ensureLlmWikiReady())
   ipcMain.handle(WIKI_CHANNELS.addMaterial, (e, input: unknown) => {
     const s = readWorkWikiSettings()
     return handleWikiMaterialRequest(input, {

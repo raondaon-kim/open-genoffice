@@ -50,7 +50,14 @@ export interface WorkWikiApi extends WikiMaterialApi {
   search(query: string): Promise<WikiHit[]>
   read(id: string): Promise<{ ok: true; page: string } | { ok: false; error: string }>
   remember(points: string[], work?: string): Promise<{ ok: boolean; error?: string }>
+  /**
+   * LLM Wiki answering, waited for (bounded) and restarted once if needed; a template fill
+   * checks this first. Optional: hosts without the bundled LLM Wiki leave it out.
+   */
+  ensureReady?(): Promise<WikiReadiness>
 }
+
+export type WikiReadiness = { ok: true } | { ok: false; off: boolean; reason: string }
 
 export const WIKI_CHANNELS = {
   catalog: 'wiki:catalog',
@@ -60,6 +67,7 @@ export const WIKI_CHANNELS = {
   remember: 'wiki:remember',
   status: 'wiki:status',
   addMaterial: 'wiki:add-material',
+  ensureReady: 'wiki:ensure-ready',
 } as const
 
 export const WIKI_UNAVAILABLE = '업무 위키를 사용할 수 없습니다'

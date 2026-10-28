@@ -83,7 +83,8 @@ GenOffice가 저장된 문서와 대화에서 자동으로 정리하는 업무 �
 - 본문 링크는 [[이름]]
 `,
 }
-const sameText = (a: string, b: string) => a.replace(/\r\n/g, '\n').trim() === b.replace(/\r\n/g, '\n').trim()
+const sameText = (a: string, b: string) =>
+  a.replace(/\r\n/g, '\n').trim() === b.replace(/\r\n/g, '\n').trim()
 
 /** page names are file names: letters, digits and hyphens only, so no name leaves its folder */
 const SLUG = /^[\p{L}\p{N}][\p{L}\p{N}-]{0,79}$/u

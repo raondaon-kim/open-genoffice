@@ -15,5 +15,7 @@ export function createWorkWikiPreloadApi(
     status: () => invoke(WIKI_CHANNELS.status) as ReturnType<WorkWikiApi['status']>,
     addMaterial: (paths) =>
       invoke(WIKI_CHANNELS.addMaterial, paths) as ReturnType<WorkWikiApi['addMaterial']>,
+    ensureReady: () =>
+      invoke(WIKI_CHANNELS.ensureReady) as ReturnType<NonNullable<WorkWikiApi['ensureReady']>>,
   }
 }
