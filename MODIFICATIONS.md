@@ -156,6 +156,34 @@ The fork's material changes on top of upstream:
   on the share; transient failures retry every 30 s and after a restart. Built by the user on the
   October tree and ported onto this one: local projects became home folders, Word/PowerPoint PDF
   exports and PDF page extraction are not sent.
+- **Team templates made from team documents** (`packages/team-templates`,
+  `apps/shell/src/main/team-templates.ts`, Home `TeamTemplateSets.tsx`; design in
+  `docs/superpowers/specs/2026-10-28-team-templates-from-documents-design.md`). Word only for now.
+  - **Set:** one folder per template under the templates share, `Word/<name>/` holding
+    `form.docx` (the source's form: headings, styles, page setup, headers/footers, cover with
+    `[label]` placeholders, table header rows; every sentence, value, comment, tracked change,
+    property text and body picture removed) and `template.md` (purpose, needed material, wiki
+    pages to read, the fixed `## 목차` with guidance per heading, the form's sha256, and a
+    measured style block in the document-style wiki format). A root `index.md` lists the sets.
+  - **Candidates:** the Word documents in the team documents share, grouped by outline signature
+    (heading sequence and table headers, numbering and project words ignored; cached per file).
+    "템플릿 만들기" has the configured AI draft `template.md`; a person reviews it (headings may be
+    renamed, guidance edited) and confirms. Before anything is written, no 8-letter run of the
+    source's sentences, cover values or table values may remain (all flagged lines are shown),
+    and doc-mask checks both files.
+  - **NAS writes:** only on 확정 and 삭제 (staged, then renamed). Sets are never edited in the app;
+    "다른 문서로 다시 만들기" replaces both files and refuses when another member changed the set
+    meanwhile. Listing reads `index.md` plus one directory listing per kind folder; sets added,
+    renamed or removed in Explorer and lost index updates are repaired (in memory for read-only
+    members). Loose files of the 0.5.7 layout stay listed under 정리되지 않은 파일.
+  - **Writing:** "이 양식으로 작성" opens a local copy of the form (remembered in
+    `userData/team-template-copies.json`, following renames). In that document `write_report`
+    keeps the template's outline: cover placeholders first, then every section under its heading
+    (four at a time, landed in order) from the attachments and the work wiki, the form's empty
+    tables replaced by written ones, open items in 「확인 필요 사항」. The Word AI can also read the
+    catalog (`list_team_templates`).
+  - **LLM Wiki before a fill:** the panel waits up to 30 s for LLM Wiki to answer, restarts it
+    once, and otherwise asks before writing with the attachments only.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and
