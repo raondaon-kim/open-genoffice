@@ -44,3 +44,14 @@ describe('deriveReportProgressView', () => {
     expect(e).toMatchObject({ finished: true, outcome: 'error', error: 'boom' })
   })
 })
+
+describe('progress view: waiting for the work wiki', () => {
+  it('shows a row while the wiki gets ready', async () => {
+    const { deriveReportProgressView } = await import('../src/progress-view')
+    const v = deriveReportProgressView([{ kind: 'wiki-waiting' }, { kind: 'reading' }])
+    expect(v.steps.map((s) => [s.label, s.state])).toEqual([
+      ['report.wikiWaiting', 'done'],
+      ['report.reading', 'running'],
+    ])
+  })
+})

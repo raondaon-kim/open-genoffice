@@ -14,6 +14,8 @@ export function ReportProgressCard({ view, lang, onCancel }: ReportProgressCardP
   const L = reportLabels(lang)
   const label = (step: ReportProgressView['steps'][number]): string => {
     switch (step.label) {
+      case 'report.wikiWaiting':
+        return L.wikiWaiting
       case 'report.reading':
         return L.reading
       case 'report.planning':

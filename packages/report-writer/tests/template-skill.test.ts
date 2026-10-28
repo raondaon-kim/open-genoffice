@@ -128,3 +128,19 @@ describe('write_report with a team template: review fixes', () => {
     expect(sections).toEqual([])
   })
 })
+
+describe('write_report shows that it waits for the work wiki', () => {
+  it('a slow readiness check shows a waiting row; a quick one does not', async () => {
+    const slowEvents: string[] = []
+    const slow = deps({
+      wikiReady: () => new Promise((r) => setTimeout(() => r({ ok: true }), 400)),
+      progress: (e) => void slowEvents.push(e.kind),
+    })
+    await createReportSkill(slow.d).executeTool(call({ request: '써 줘' }))
+    expect(slowEvents[0]).toBe('wiki-waiting')
+    const quickEvents: string[] = []
+    const quick = deps({ progress: (e) => void quickEvents.push(e.kind) })
+    await createReportSkill(quick.d).executeTool(call({ request: '써 줘' }))
+    expect(quickEvents).not.toContain('wiki-waiting')
+  })
+})

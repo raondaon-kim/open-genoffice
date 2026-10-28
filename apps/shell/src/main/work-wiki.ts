@@ -9,7 +9,7 @@ import { readAiSettingsFile } from '@genoffice/ai-search'
 import { parseFileToText } from '@genoffice/file-parse'
 import { WIKI_CHANNELS, WIKI_UNAVAILABLE } from '@genoffice/work-wiki'
 import type { WikiReadiness } from '@genoffice/work-wiki'
-import { waitForWiki } from './llm-wiki-ready'
+import { singleFlight, waitForWiki } from './llm-wiki-ready'
 import { createSavedMirror, WorkWikiEngine } from '@genoffice/work-wiki/node'
 import type { WikiComplete } from '@genoffice/work-wiki/node'
 import { HOME_CHANNELS } from '../shared/home-api'
@@ -172,7 +172,14 @@ async function stopCodexBridge(): Promise<void> {
 }
 
 /** (re)start LLM Wiki for the current settings; every failure becomes a status, never an exception */
-async function startLlmWiki(): Promise<void> {
+/**
+ * Starts go one at a time: a start asked for while one runs (launch, a settings change, a template
+ * fill checking readiness) shares it, so two LLM Wiki processes are never spawned.
+ */
+const llmWikiStart = singleFlight(() => startLlmWikiNow())
+const startLlmWiki = (): Promise<void> => llmWikiStart.run()
+
+async function startLlmWikiNow(): Promise<void> {
   await llmWiki?.stopAndWait()
   llmWiki = null
   llmWikiReason = null
@@ -456,6 +463,7 @@ export async function ensureLlmWikiReady(): Promise<WikiReadiness> {
         ...(llmWikiReason ? { reason: llmWikiReason } : {}),
       },
     restart: () => startLlmWiki(),
+    pending: () => llmWikiStart.pending(),
   })
 }
 

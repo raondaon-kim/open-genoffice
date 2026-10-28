@@ -2,6 +2,7 @@ import type { Lang } from '@genoffice/i18n'
 
 export interface ReportLabels {
   title: string
+  wikiWaiting: string
   reading: string
   planning: string
   chapter: (v: { no: number; of: number; title: string }) => string
@@ -14,6 +15,7 @@ export interface ReportLabels {
 
 const ko: ReportLabels = {
   title: '문서 쓰기',
+  wikiWaiting: '업무 위키 준비 중…',
   reading: '첨부 읽기',
   planning: '목차 만들기',
   chapter: ({ no, of, title }) => `${no}/${of}장 · ${title}`,
@@ -26,6 +28,7 @@ const ko: ReportLabels = {
 
 const en: ReportLabels = {
   title: 'Writing the document',
+  wikiWaiting: 'Waiting for the work wiki…',
   reading: 'Reading attachments',
   planning: 'Planning the outline',
   chapter: ({ no, of, title }) => `Chapter ${no}/${of} · ${title}`,

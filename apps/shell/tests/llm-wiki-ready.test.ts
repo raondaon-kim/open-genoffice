@@ -72,3 +72,41 @@ describe('waitForWiki', () => {
     expect(r).toMatchObject({ ok: false, off: false })
   })
 })
+
+describe('LLM Wiki start is single-flight', () => {
+  it('concurrent starts share one run; pending() is the run while it lasts', async () => {
+    const { singleFlight } = await import('../src/main/llm-wiki-ready')
+    let runs = 0
+    let release!: () => void
+    const start = singleFlight(async () => {
+      runs++
+      await new Promise<void>((r) => (release = r))
+    })
+    const a = start.run()
+    const b = start.run()
+    expect(start.pending()).not.toBeNull()
+    release()
+    await Promise.all([a, b])
+    expect(runs).toBe(1)
+    expect(start.pending()).toBeNull()
+  })
+
+  it('waitForWiki waits for a start in progress instead of starting another', async () => {
+    const restart = vi.fn(async () => {})
+    let state: 'stopped' | 'running' = 'stopped'
+    let release!: () => void
+    const inFlight = new Promise<void>((r) => (release = r)).then(() => {
+      state = 'running'
+    })
+    setTimeout(() => release(), 20)
+    const r = await waitForWiki({
+      enabled: () => true,
+      status: () => ({ state }),
+      restart,
+      pending: () => (state === 'running' ? null : inFlight),
+      pollMs: 1,
+    })
+    expect(r).toEqual({ ok: true })
+    expect(restart).not.toHaveBeenCalled()
+  })
+})

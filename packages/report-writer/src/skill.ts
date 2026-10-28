@@ -35,6 +35,9 @@ export interface ReportSkillDeps<St> {
   wikiReady?(): Promise<WikiReadiness>
 }
 
+/** how long the readiness check may take before the progress card says it is waiting */
+const WIKI_WAIT_ROW_MS = 300
+
 const TEMPLATE_TAG = /\n*<team-template>[\s\S]*?<\/team-template>\n*/g
 
 export const REPORT_PROMPT = `## Whole documents from material (write_report)
@@ -136,7 +139,9 @@ export function createReportSkill<St>(deps: ReportSkillDeps<St>): AgentSkill {
         }
       }
       if (template && deps.templateLander && !withoutWiki && deps.wikiReady) {
-        const ready = await deps.wikiReady()
+        // a quick answer shows nothing; a wait (LLM Wiki still starting) gets its own row
+        const waiting = setTimeout(() => deps.progress({ kind: 'wiki-waiting' }), WIKI_WAIT_ROW_MS)
+        const ready = await deps.wikiReady().finally(() => clearTimeout(waiting))
         if (!ready.ok) {
           return fail(
             'work wiki unavailable',

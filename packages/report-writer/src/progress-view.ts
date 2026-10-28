@@ -22,6 +22,9 @@ export function deriveReportProgressView(events: ReportProgress[]): ReportProgre
   }
   for (const e of events) {
     switch (e.kind) {
+      case 'wiki-waiting':
+        start('report.wikiWaiting')
+        break
       case 'reading':
         start('report.reading')
         break

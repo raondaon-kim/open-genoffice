@@ -90,6 +90,8 @@ export interface Lander {
 }
 
 export type ReportProgress =
+  /** a template fill waits for LLM Wiki to answer */
+  | { kind: 'wiki-waiting' }
   | { kind: 'reading' }
   | { kind: 'planning' }
   | { kind: 'chapter'; no: number; of: number; title: string }
