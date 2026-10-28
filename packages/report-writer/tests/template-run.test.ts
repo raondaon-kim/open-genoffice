@@ -141,7 +141,11 @@ describe('writeFromTemplate', () => {
   it('each section prompt carries its guidance, its path and the template wiki pages first', async () => {
     const llm = fakeLlm()
     await run(llm, recordingLander())
-    const first = llm.prompts.filter((p) => p.kind === 'section')[0]!.user
+    const first = llm.prompts.find(
+      (p) =>
+        p.kind === 'section' &&
+        p.user.includes('## 지금 쓸 절\nⅠ. 제안사 소개 > 1. 일반현황 > 1-1.'),
+    )!.user
     expect(first).toContain('회사명·대표자를 글머리로')
     expect(first).toContain('Ⅰ. 제안사 소개 > 1. 일반현황 > 1-1. 회사 일반현황')
     expect(first.indexOf('methods/pmc')).toBeLessThan(first.indexOf('entities/nurie'))
@@ -163,5 +167,51 @@ describe('writeFromTemplate', () => {
     expect(outcome).toMatchObject({ ok: true, written: 2, failed: [2] })
     expect(lander.calls.some((c) => c[0] === 'sectionFailed' && c[1] === 1)).toBe(true)
     expect(lander.calls.filter((c) => c[0] === 'section').map((c) => c[1])).toEqual([0, 2])
+  })
+})
+
+describe('writeFromTemplate concurrency', () => {
+  it('asks up to 4 sections at once but lands them in order', async () => {
+    const many: TemplateForRun = {
+      ...TEMPLATE,
+      coverLabels: [],
+      sections: Array.from({ length: 9 }, (_, i) => ({
+        index: i * 2,
+        path: ['Ⅰ'],
+        heading: `${i + 1}. 절`,
+        level: 2,
+        guidance: '',
+      })),
+    }
+    let live = 0
+    let peak = 0
+    const llm: LlmPort = async (req) => {
+      if (req.system.includes('템플릿 기획자')) {
+        return { status: 'complete', text: '{"brief":{},"cover":{},"sections":[]}' }
+      }
+      live++
+      peak = Math.max(peak, live)
+      await new Promise((r) => setTimeout(r, 5 + Math.random() * 10))
+      live--
+      return { status: 'complete', text: '본문.\n<<주장>>\n- a\n<<부족>>\n- 없음' }
+    }
+    const lander = recordingLander()
+    const progress: ReportProgress[] = []
+    const outcome = await writeFromTemplate(
+      { request: 'r', template: many, attachments: [] },
+      { llm, wiki: null, lander, progress: (e) => progress.push(e) },
+    )
+    expect(outcome).toMatchObject({ ok: true, written: 9 })
+    expect(peak).toBeGreaterThan(1)
+    expect(peak).toBeLessThanOrEqual(4)
+    expect(lander.calls.filter((c) => c[0] === 'section').map((c) => c[1])).toEqual([
+      0, 2, 4, 6, 8, 10, 12, 14, 16,
+    ])
+    const chapters = progress.filter((e) => e.kind === 'chapter') as Array<{
+      no: number
+      of: number
+    }>
+    expect(chapters.map((e) => e.no)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    expect(chapters.every((e) => e.of === 9)).toBe(true)
   })
 })

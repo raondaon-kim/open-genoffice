@@ -14,9 +14,13 @@ import type {
   ReportProgress,
   TemplateForRun,
   TemplateLander,
+  TemplateSection,
   WikiPort,
 } from './types'
 import { planWikiMaterial, readChapterPages } from './wiki'
+
+/** sections asked at once; they land in template order */
+export const SECTION_BATCH = 4
 
 const PROPOSAL = /제안서|제안 ?요청서|proposal|\bRFP\b/i
 
@@ -164,10 +168,8 @@ export async function writeFromTemplate(
       .map((label) => ({ no: 0, need: `표지의 ${label}` }))
 
     const ledger: string[] = []
-    for (const s of t.sections) {
-      if (signal?.aborted) return cancel()
-      const no = s.index + 1
-      progress({ kind: 'chapter', no, of: t.sections.length, title: s.heading })
+    /** one section's answer: asked in parallel with its batch, landed in order */
+    const ask = async (s: TemplateSection) => {
       const sp = plan.sections.get(s.index) ?? { point: '', attachmentParts: [], wikiPages: [] }
       const pageIds = [...new Set([...t.wikiPages, ...sp.wikiPages])]
       const wikiPages = wiki && pageIds.length ? await readChapterPages(wiki, pageIds) : []
@@ -184,37 +186,51 @@ export async function writeFromTemplate(
         }
         attachment = out.join('\n\n')
       }
-      const answer = await askChapter(
+      return askChapter(
         llm,
         templateSectionPrompt({
           template: t,
           section: s,
           point: sp.point,
           brief: plan.brief,
-          ledger,
+          // claims of the batches already landed
+          ledger: [...ledger],
           attachment,
           wikiPages,
           kind,
         }),
         signal,
       )
-      if (!answer.ok && answer.stopped) return cancel()
-      const parsed = answer.ok ? parseChapterAnswer(answer.text) : null
-      if (!parsed || parsed.blocks.length === 0) {
-        failed.push(no)
-        await lander.sectionFailed(s.index, s.heading)
-        progress({
-          kind: 'chapter-failed',
-          no,
-          title: s.heading,
-          error: answer.ok ? 'empty section' : answer.error,
-        })
-        continue
+    }
+    for (let at = 0; at < t.sections.length; at += SECTION_BATCH) {
+      if (signal?.aborted) return cancel()
+      const batch = t.sections.slice(at, at + SECTION_BATCH)
+      batch.forEach((s, k) =>
+        progress({ kind: 'chapter', no: at + k + 1, of: t.sections.length, title: s.heading }),
+      )
+      const answers = await Promise.all(batch.map(ask))
+      for (let k = 0; k < batch.length; k++) {
+        const s = batch[k]!
+        const answer = answers[k]!
+        const no = at + k + 1
+        if (!answer.ok && answer.stopped) return cancel()
+        const parsed = answer.ok ? parseChapterAnswer(answer.text) : null
+        if (!parsed || parsed.blocks.length === 0) {
+          failed.push(no)
+          await lander.sectionFailed(s.index, s.heading)
+          progress({
+            kind: 'chapter-failed',
+            no,
+            title: s.heading,
+            error: answer.ok ? 'empty section' : answer.error,
+          })
+          continue
+        }
+        await lander.section(s.index, flatten(parsed.blocks))
+        written++
+        for (const c of parsed.claims) ledger.push(`${s.heading}: ${c}`)
+        for (const g of parsed.gaps) gaps.push({ no, need: g })
       }
-      await lander.section(s.index, flatten(parsed.blocks))
-      written++
-      for (const c of parsed.claims) ledger.push(`${s.heading}: ${c}`)
-      for (const g of parsed.gaps) gaps.push({ no, need: g })
     }
 
     if (signal?.aborted) return cancel()
