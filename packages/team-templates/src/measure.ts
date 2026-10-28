@@ -106,7 +106,7 @@ export async function measureDocxStyle(
     const out: RawStyle = { ...defaults }
     for (const s of chain.reverse()) {
       for (const [k, v] of Object.entries(s))
-        if (v !== undefined && k !== 'basedOn') (out as Record<string, unknown>)[k] = v
+        if (v !== undefined && k !== 'basedOn') (out as unknown as Record<string, unknown>)[k] = v
     }
     return out
   }
