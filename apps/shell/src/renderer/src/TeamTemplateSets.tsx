@@ -35,6 +35,10 @@ export function TeamTemplateSets({
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  /** the candidate the open draft came from (marked covered on 확정, without a rescan) */
+  const [draftKey, setDraftKey] = useState<string | null>(null)
+  /** candidate key → the chosen representative document (default: the newest) */
+  const [representative, setRepresentative] = useState<Record<string, string>>({})
   const request = useRef(0)
 
   const fail = useCallback(
@@ -67,6 +71,13 @@ export function TeamTemplateSets({
     else fail(found)
   }, [api, fail, text.repaired])
 
+  /** the sets only: after 확정 or 삭제 the documents folder is not scanned again */
+  const refreshList = async () => {
+    const listed = await api.templateList()
+    if (listed.ok) setList(listed.value)
+    else fail(listed)
+  }
+
   useEffect(() => {
     void load()
     const requests = request
@@ -93,6 +104,7 @@ export function TeamTemplateSets({
     run(text.drafting, async () => {
       const result = await api.templateDraft(source, replaces)
       if (!result.ok) return fail(result)
+      setDraftKey('candidateKey' in source ? source.candidateKey : null)
       setRemakeTarget(null)
       setDraft(result.value)
       setMarkdown(result.value.markdown)
@@ -105,7 +117,11 @@ export function TeamTemplateSets({
       if (!result.ok) return fail(result)
       setDraft(null)
       setNotice(text.confirmed + result.value.title)
-      await load()
+      const made = result.value.path
+      setCandidates(
+        (all) => all?.map((c) => (c.key === draftKey ? { ...c, coveredBy: made } : c)) ?? all,
+      )
+      await refreshList()
     })
 
   const remove = (path: string) => {
@@ -114,7 +130,15 @@ export function TeamTemplateSets({
       const result = await api.templateRemove(path)
       if (!result.ok) return fail(result)
       setNotice(result.value.keptFolder ? text.removedKeptFolder : text.removed)
-      await load()
+      setCandidates(
+        (all) =>
+          all?.map((c) => {
+            if (c.coveredBy !== path) return c
+            const { coveredBy: _gone, ...rest } = c
+            return rest
+          }) ?? all,
+      )
+      await refreshList()
     })
   }
 
@@ -358,14 +382,38 @@ export function TeamTemplateSets({
                       {titleOf(c.coveredBy)}
                     </small>
                   )}
+                  {c.docs.length > 1 && (
+                    <label className="team-representative">
+                      <span>{text.representative}</span>
+                      <select
+                        aria-label={text.representative}
+                        value={representative[c.key] ?? c.docs[0]!.id}
+                        onChange={(event) =>
+                          setRepresentative((all) => ({ ...all, [c.key]: event.target.value }))
+                        }
+                      >
+                        {c.docs.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
                 {writable && (remakeTarget || !c.coveredBy) && (
                   <button
                     className="btn btn-secondary"
                     disabled={Boolean(busy)}
-                    onClick={() =>
-                      void startDraft({ candidateKey: c.key }, remakeTarget ?? undefined)
-                    }
+                    onClick={() => {
+                      const chosen = representative[c.key]
+                      void startDraft(
+                        chosen && chosen !== c.docs[0]!.id
+                          ? { candidateKey: c.key, docId: chosen }
+                          : { candidateKey: c.key },
+                        remakeTarget ?? undefined,
+                      )
+                    }}
                   >
                     {remakeTarget ? text.remakeFrom : text.makeTemplate}
                   </button>

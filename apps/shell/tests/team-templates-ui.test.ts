@@ -233,3 +233,43 @@ describe('TeamTemplateSets template errors in Korean', () => {
     )
   })
 })
+
+describe('TeamTemplateSets candidates without a rescan', () => {
+  it('after 확정 the candidate reads as covered without scanning the documents again', async () => {
+    const api = fakeApi({
+      templateConfirm: vi.fn(async () => ({
+        ok: true as const,
+        value: {
+          path: 'Word/새 템플릿/',
+          title: '새 템플릿',
+          kind: 'Word',
+          purpose: '',
+          status: 'ok' as const,
+          hash8: '44444444',
+        },
+      })),
+    })
+    await render(api)
+    await act(async () => buttons('템플릿 만들기')[1]!.click())
+    await act(async () => buttons('확정')[0]!.click())
+    expect(api.templateCandidates).toHaveBeenCalledTimes(1)
+    const section = host.querySelector('section[aria-label="후보"]')!
+    expect(section.textContent).toContain('이미 템플릿 있음: Word/새 템플릿/')
+  })
+
+  it('the representative document can be chosen', async () => {
+    const api = fakeApi()
+    await render(api)
+    const select = host.querySelector('select[aria-label="대표 문서"]') as HTMLSelectElement
+    expect(select).not.toBeNull()
+    await act(async () => {
+      select.value = 'Q/공용/Word/b.docx'
+      select.dispatchEvent(new Event('change', { bubbles: true }))
+    })
+    await act(async () => buttons('템플릿 만들기')[1]!.click())
+    expect(api.templateDraft).toHaveBeenCalledWith(
+      { candidateKey: 'aaa', docId: 'Q/공용/Word/b.docx' },
+      undefined,
+    )
+  })
+})

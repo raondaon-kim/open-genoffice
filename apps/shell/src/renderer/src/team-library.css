@@ -285,3 +285,13 @@
     grid-template-columns: 1fr;
   }
 }
+.team-representative {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.team-representative select {
+  max-width: 100%;
+}
