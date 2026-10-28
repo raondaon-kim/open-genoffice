@@ -231,9 +231,13 @@ At the root of `GenOffice-Templates`. Human-readable, with fixed line shapes the
 - Documents whose signatures match closely enough form a group; a group is a candidate. While the
   team is testing, a single document is a candidate too; the threshold (1 → 2) is a setting the
   builder exposes, default 1 for now (user's direction: start testing now, repetition later).
-- A candidate already covered by a set (same signature as a set's `## 목차` or one of its
-  `근거 서명` hashes) is shown as "이미 템플릿 있음" with a link. Computing candidates never writes
-  to the NAS; adding the document to that set's 근거 문서 is a click (my call).
+- A candidate already covered by a set (an outline at least 80% alike the set's `## 목차`, or one
+  of its `근거 서명` hashes) is shown as "이미 템플릿 있음" with a link. Computing candidates never
+  writes to the NAS. There is no "add to the set's 근거 문서" action: it would edit a confirmed
+  template, which the user ruled out; a form that grew is taken in with 다시 만들기 (2026-10-28,
+  after the 0.5.8 review).
+- A candidate of several documents lets the user choose the representative document the form is
+  built from (default: the newest).
 - Heading detection uses Word heading styles (`Heading1..n` / outline level). Documents without
   heading styles fall back to numbering patterns (Ⅰ., 1., 1-1., 가.) and run size; such guesses are
   marked as less certain in the candidate card.

@@ -171,19 +171,27 @@ The fork's material changes on top of upstream:
     renamed, guidance edited) and confirms. Before anything is written, no 8-letter run of the
     source's sentences, cover values or table values may remain (all flagged lines are shown),
     and doc-mask checks both files.
-  - **NAS writes:** only on 확정 and 삭제 (staged, then renamed). Sets are never edited in the app;
-    "다른 문서로 다시 만들기" replaces both files and refuses when another member changed the set
-    meanwhile. Listing reads `index.md` plus one directory listing per kind folder; sets added,
-    renamed or removed in Explorer and lost index updates are repaired (in memory for read-only
-    members). Loose files of the 0.5.7 layout stay listed under 정리되지 않은 파일.
+  - **NAS writes:** only on 확정 and 삭제, and a write probe before them finds a read-only
+    folder. Sets are never edited in the app. A new set is written into a hidden staging folder
+    that takes its name in one rename; "다른 문서로 다시 만들기" writes both new files first, swaps
+    them in and moves the old ones back on any failure, and refuses when another member changed
+    the set meanwhile. 삭제 removes only `template.md`, `form.docx` and write leftovers and keeps a
+    folder that holds other files.
+  - **Listing:** `index.md` plus one directory listing per kind folder; sets added, renamed or
+    removed in Explorer and lost index updates are repaired (in memory for read-only members).
+    Loose files of the 0.5.7 layout stay listed under 정리되지 않은 파일, with sizes and dates kept
+    in `index.md`; "목록 다시 만들기" looks six levels into plain folders.
   - **Writing:** "이 양식으로 작성" opens a local copy of the form (remembered in
     `userData/team-template-copies.json`, following renames). In that document `write_report`
-    keeps the template's outline: cover placeholders first, then every section under its heading
-    (four at a time, landed in order) from the attachments and the work wiki, the form's empty
-    tables replaced by written ones, open items in 「확인 필요 사항」. The Word AI can also read the
-    catalog (`list_team_templates`).
-  - **LLM Wiki before a fill:** the panel waits up to 30 s for LLM Wiki to answer, restarts it
-    once, and otherwise asks before writing with the attachments only.
+    keeps the template's outline (headings found by text, numbered or guessed ones too): cover
+    placeholders first, then every section under its heading (four at a time, landed in order)
+    from the attachments and the work wiki; a written table fills the form's table when the
+    columns match; open items in 「확인 필요 사항」. A filled copy, or one whose headings no longer
+    match its definition, is not filled. Template text reaches the model fenced as team data. The
+    Word AI can also read the catalog (`list_team_templates`).
+  - **LLM Wiki before a fill:** the panel waits up to 30 s for LLM Wiki to answer (for a start
+    already in progress, never a second one; "업무 위키 준비 중…" shows during the wait), restarts
+    it once, and otherwise asks before writing with the work wiki's own pages and the attachments.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and

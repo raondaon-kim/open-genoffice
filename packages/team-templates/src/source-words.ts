@@ -66,12 +66,11 @@ export function sourceContentTexts(outline: DocxOutline): string[] {
 }
 
 /**
- * The texts whose runs are never exempt as form: cover values and table values, minus lines that
- * repeat a heading (a table of contents or an evaluation table that lists the chapters).
+ * The texts whose runs are never exempt as form: the cover values (where the project, client and
+ * dates are named), minus lines that repeat a heading. Table values are not here: evaluation and
+ * summary tables repeat generic heading phrases, which are form (live NAS run, 0.5.9).
  */
 export function strictContentTexts(outline: DocxOutline): string[] {
   const headings = new Set(outline.headings.map((h) => normalizeHeading(h.text)))
-  return [...outline.cover, ...outline.tableCells].filter(
-    (line) => !headings.has(normalizeHeading(line)),
-  )
+  return outline.cover.filter((line) => !headings.has(normalizeHeading(line)))
 }

@@ -121,9 +121,9 @@ export type ReportOutcome =
   | { ok: true; written: number; failed: number[]; gaps: number }
   | { ok: false; error: string; written: number }
 
-/** one leaf section of a team template: the writer fills it under its existing heading */
+/** one section of a team template: the writer fills it under its existing heading */
 export interface TemplateSection {
-  /** 0-based position among the template's leaf sections */
+  /** the heading's 0-based ordinal in the template's whole outline (the form has the same headings) */
   index: number
   /** headings above it, outermost first */
   path: string[]

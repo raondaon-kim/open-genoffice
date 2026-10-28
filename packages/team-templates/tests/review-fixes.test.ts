@@ -181,7 +181,7 @@ describe('review fixes: body-level content controls', () => {
 })
 
 describe('review fixes: strict texts', () => {
-  it('cover and table values, minus lines that repeat a heading', async () => {
+  it('the cover values (the project), minus lines that repeat a heading; not table values', async () => {
     const { strictContentTexts } = await import('../src/source-words')
     expect(
       strictContentTexts({
@@ -192,6 +192,31 @@ describe('review fixes: strict texts', () => {
         tableCells: ['과업 세부실행방안', '25'],
         certain: true,
       }),
-    ).toEqual(['경기도 광역 도시생태현황지도 제작 용역', '25'])
+    ).toEqual(['경기도 광역 도시생태현황지도 제작 용역'])
+  })
+
+  it('a generic heading repeated in an evaluation table is not flagged (live NAS run)', async () => {
+    const { sourceWordsHits, strictContentTexts, sourceContentTexts } = await import(
+      '../src/source-words'
+    )
+    const outline = {
+      headings: [
+        { level: 3, text: '2-2. 주요 사업 추진현황(유사사업 수행실적)', styled: true, index: 5 },
+      ],
+      tables: [],
+      body: [],
+      cover: ['인도네시아 보건인력 관리체계 개선사업'],
+      tableCells: ['국내외 유사사업 수행실적 비율'],
+      certain: true,
+    }
+    expect(
+      sourceWordsHits(
+        sourceContentTexts(outline),
+        ['- 2-2. 주요 사업 추진현황(유사사업 수행실적) — 표로'],
+        8,
+        outline.headings.map((h) => h.text),
+        strictContentTexts(outline),
+      ),
+    ).toEqual([])
   })
 })
