@@ -48,3 +48,11 @@ describe('sourceWordsHit with allowed form text', () => {
     ).toBeNull()
   })
 })
+
+describe('sourceWordsHit counts letters and digits only', () => {
+  it('punctuation does not make a run long enough', () => {
+    const source = ['제안사의 일반현황·연혁·조직·인원·주요사업 내역을 제시한다.']
+    expect(sourceWordsHit(source, ['법인명·설립일·소재지·인원·주요 사업 등을 정리한다.'])).toBeNull()
+    expect(sourceWordsHit(source, ['일반현황, 연혁, 조직, 인원 순서'])).toBe('일반현황, 연혁, 조직, 인원 순서')
+  })
+})

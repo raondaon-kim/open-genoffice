@@ -66,3 +66,14 @@ describe('parseDraft', () => {
     expect(d.title).toBe('Ⅰ. 제안사 소개')
   })
 })
+
+describe('parseDraft level markers', () => {
+  it('drops a "(n) " level marker the model copied from the prompt', () => {
+    const d = parseDraft(
+      { headings: ['(1) Ⅰ. 제안사 소개', '(2) 1-2. 사업대상지 현황'] },
+      outline,
+      new Set(),
+    )
+    expect(d.headings.slice(0, 2)).toEqual(['Ⅰ. 제안사 소개', '1-2. 사업대상지 현황'])
+  })
+})

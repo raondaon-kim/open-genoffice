@@ -68,7 +68,10 @@ export function parseDraft(
   knownWikiPages: Set<string>,
 ): TemplateDraft {
   const r = (json && typeof json === 'object' ? json : {}) as Record<string, unknown>
-  const headings = outline.headings.map((h, i) => at(r.headings, i) || h.text)
+  // the prompt shows a heading as "(level) text"; a model that copies the marker loses it here
+  const headings = outline.headings.map(
+    (h, i) => at(r.headings, i).replace(/^\(\d\)\s*/, '') || h.text,
+  )
   const hf: Record<string, string> = {}
   if (r.headerFooter && typeof r.headerFooter === 'object') {
     for (const [k, v] of Object.entries(r.headerFooter)) {

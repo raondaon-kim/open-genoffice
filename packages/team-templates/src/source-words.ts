@@ -1,12 +1,15 @@
 import type { DocxOutline } from './docx-outline'
 import { normalizeHeading } from './signature'
 
-/** a line without leading bullets/numbering and without whitespace, for comparison */
+/**
+ * A line without leading bullets/numbering, whitespace and punctuation, for comparison: a run is
+ * counted in letters and digits, so a shared list like "·인원·주요사업" is not a copied phrase.
+ */
 function normalize(line: string): string {
   return line
     .normalize('NFC')
     .replace(/^[\s\-–—•*·]*(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ\d]+(?:[-.]\d+)*[.)]?|[가-하][.)])?\s*/u, '')
-    .replace(/\s+/gu, '')
+    .replace(/[\s\p{P}\p{S}]+/gu, '')
 }
 
 /**
