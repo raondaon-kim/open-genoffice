@@ -1,5 +1,5 @@
 import { maskPieces } from './pieces'
-import type { Counts } from './rules'
+import { type Counts, maskText } from './rules'
 
 /**
  * Masking text inside XML parts without touching anything else.
@@ -174,3 +174,55 @@ export function maskXmlParagraphs(
   }
   return { xml: tokens.map((t) => t.raw).join(''), counts }
 }
+
+const ATTR = /(\s[^\s=/>]+\s*=\s*)(?:"([^"]*)"|'([^']*)')/g
+
+function escapeXmlAttr(s: string): string {
+  return escapeXmlText(s).replace(/"/g, '&quot;')
+}
+
+function addCounts(into: Counts, from: Counts): void {
+  for (const [rule, n] of Object.entries(from)) {
+    into[rule as keyof Counts] = (into[rule as keyof Counts] ?? 0) + (n ?? 0)
+  }
+}
+
+/**
+ * The catch-all pass over any XML part: every run of character data and every attribute value is
+ * masked on its own (a number split across elements is the family pass's job, which runs first).
+ * Covers what no family lists: formulas, pivot caches, chart caches, defined names, hyperlink
+ * targets, document properties.
+ */
+export function maskXmlGeneric(xml: string): { xml: string; counts: Counts } {
+  const tokens = tokenize(xml)
+  const counts: Counts = {}
+  let changed = false
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i]
+    if (!tok.tag) {
+      const text = decodeXmlText(tok.raw)
+      const masked = maskText(text)
+      if (masked.text !== text) {
+        tokens[i] = { raw: escapeXmlText(masked.text), tag: false }
+        addCounts(counts, masked.counts)
+        changed = true
+      }
+      continue
+    }
+    if (!tagKind(tok.raw) || tok.raw.startsWith('</')) continue
+    const raw = tok.raw.replace(ATTR, (all, lead: string, dq?: string, sq?: string) => {
+      const value = decodeXmlText(dq ?? sq ?? '')
+      const masked = maskText(value)
+      if (masked.text === value) return all
+      addCounts(counts, masked.counts)
+      return `${lead}"${escapeXmlAttr(masked.text)}"`
+    })
+    if (raw !== tok.raw) {
+      tokens[i] = { raw, tag: true }
+      changed = true
+    }
+  }
+  return changed ? { xml: tokens.map((t) => t.raw).join(''), counts } : { xml, counts }
+}
+
+export { addCounts }

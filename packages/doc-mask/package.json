@@ -14,7 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "@genoffice/zip-gate": "*"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
