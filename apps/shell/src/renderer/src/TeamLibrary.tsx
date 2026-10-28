@@ -9,6 +9,7 @@ import type {
 import type { FolderRoot } from '../../shared/home-api'
 import { useI18n } from './locale'
 import { teamError, teamStrings } from './team-library-strings'
+import { TeamTemplateSets } from './TeamTemplateSets'
 import './team-library.css'
 
 declare global {
@@ -47,9 +48,15 @@ export function TeamLibrary({
   const [authorFilter, setAuthorFilter] = useState('')
   const [uploads, setUploads] = useState<TeamSyncEntry[]>([])
   const request = useRef(0)
+  const [reloadKey, setReloadKey] = useState(0)
   const configured = Boolean(settings?.templates && settings?.documents)
 
   const refresh = useCallback(async () => {
+    // templates list themselves (index.md); the old recursive listing is not used there
+    if (kind === 'templates') {
+      setReloadKey((n) => n + 1)
+      return
+    }
     const id = ++request.current
     setLoading(true)
     setError('')
@@ -150,6 +157,7 @@ export function TeamLibrary({
     if (result.value) {
       await refresh()
       setNotice(text.published + result.value.name)
+      setReloadKey((n) => n + 1)
     }
   }
 
@@ -315,89 +323,100 @@ export function TeamLibrary({
               <strong>{project.name}</strong>
             </p>
           )}
-          <div className="team-search">
-            <input
-              type="search"
-              aria-label={text.search}
-              placeholder={text.search}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+          {kind === 'templates' ? (
+            <TeamTemplateSets
+              api={api}
+              lang={lang}
+              reloadKey={reloadKey}
+              {...(project ? { project: { path: project.path } } : {})}
             />
-            {kind === 'documents' && (
-              <>
-                <select
-                  aria-label={text.allProjects}
-                  value={projectFilter}
-                  onChange={(event) => {
-                    setProjectFilter(event.target.value)
-                    setAuthorFilter('')
-                  }}
-                >
-                  <option value="">{text.allProjects}</option>
-                  {projectFolders.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={text.allAuthors}
-                  value={authorFilter}
-                  onChange={(event) => setAuthorFilter(event.target.value)}
-                >
-                  <option value="">{text.allAuthors}</option>
-                  {authors.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-            <select
-              aria-label={text.all}
-              value={extension}
-              onChange={(event) => setExtension(event.target.value)}
-            >
-              <option value="">{text.all}</option>
-              {types.map((ext) => (
-                <option key={ext} value={ext}>
-                  {ext.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </div>
-          {loading ? (
-            <p className="team-empty" role="status">
-              {text.loading}
-            </p>
           ) : (
-            <ul className="team-files">
-              {visible.map((entry) => (
-                <li key={entry.id}>
-                  <span className={`team-file-type team-file-type-${entry.ext}`}>
-                    {entry.ext.toUpperCase()}
-                  </span>
-                  <div className="team-file-details">
-                    <strong>{entry.name}</strong>
-                    <small>{entry.id}</small>
-                  </div>
-                  <span className="team-file-date">
-                    {new Date(entry.mtimeMs).toLocaleDateString(dateLocale)}
-                  </span>
-                  <button
-                    className="btn btn-secondary"
-                    disabled={busy}
-                    onClick={() => void run(() => open(entry))}
-                  >
-                    {kind === 'templates' ? text.choose : text.open}
-                  </button>
-                </li>
-              ))}
-              {visible.length === 0 && <li className="team-empty">{text.empty}</li>}
-            </ul>
+            <>
+              <div className="team-search">
+                <input
+                  type="search"
+                  aria-label={text.search}
+                  placeholder={text.search}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+                {kind === 'documents' && (
+                  <>
+                    <select
+                      aria-label={text.allProjects}
+                      value={projectFilter}
+                      onChange={(event) => {
+                        setProjectFilter(event.target.value)
+                        setAuthorFilter('')
+                      }}
+                    >
+                      <option value="">{text.allProjects}</option>
+                      {projectFolders.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label={text.allAuthors}
+                      value={authorFilter}
+                      onChange={(event) => setAuthorFilter(event.target.value)}
+                    >
+                      <option value="">{text.allAuthors}</option>
+                      {authors.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                <select
+                  aria-label={text.all}
+                  value={extension}
+                  onChange={(event) => setExtension(event.target.value)}
+                >
+                  <option value="">{text.all}</option>
+                  {types.map((ext) => (
+                    <option key={ext} value={ext}>
+                      {ext.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {loading ? (
+                <p className="team-empty" role="status">
+                  {text.loading}
+                </p>
+              ) : (
+                <ul className="team-files">
+                  {visible.map((entry) => (
+                    <li key={entry.id}>
+                      <span className={`team-file-type team-file-type-${entry.ext}`}>
+                        {entry.ext.toUpperCase()}
+                      </span>
+                      <div className="team-file-details">
+                        <strong>{entry.name}</strong>
+                        <small>{entry.id}</small>
+                      </div>
+                      <span className="team-file-date">
+                        {new Date(entry.mtimeMs).toLocaleDateString(dateLocale)}
+                      </span>
+                      <button
+                        className="btn btn-secondary"
+                        disabled={busy}
+                        onClick={() => void run(() => open(entry))}
+                      >
+                        {text.open}
+                      </button>
+                    </li>
+                  ))}
+                  {visible.length === 0 && <li className="team-empty">{text.empty}</li>}
+                </ul>
+              )}
+              {partial && <p className="team-hint">{text.partial}</p>}
+            </>
           )}
-          {partial && <p className="team-hint">{text.partial}</p>}
         </>
       )}
       {kind === 'documents' && (

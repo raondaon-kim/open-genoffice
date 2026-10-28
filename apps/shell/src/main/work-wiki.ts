@@ -439,6 +439,11 @@ export function workWikiDocumentSaved(path: string): void {
   }
 }
 
+/** the work wiki's catalog (pages matching `query` first); '' when the wiki is off */
+export async function workWikiCatalog(query = ''): Promise<string> {
+  return engine ? await engine.catalogFor(query) : ''
+}
+
 export function registerWorkWikiIpc(): void {
   ipcMain.handle(WIKI_CHANNELS.catalog, (_e, query: unknown) =>
     engine ? engine.catalogFor(typeof query === 'string' ? query : '') : '',

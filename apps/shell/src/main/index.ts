@@ -20,6 +20,8 @@ import {
 } from './team-library'
 import { registerTeamLibraryIpc } from './team-library-ipc'
 import { TeamSync } from './team-sync'
+import { TeamTemplates } from './team-templates'
+import { TemplateCopies } from './template-copies'
 import type { TeamFolders } from '../shared/team-library-api'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import {
@@ -269,10 +271,12 @@ import {
 import { registerCodexIpc, stopCodexLoginForQuit } from './codex-connection'
 import {
   addWikiMaterialFromDialog,
+  createWikiComplete,
   openLlmWiki,
   registerWorkWikiIpc,
   startWorkWiki,
   stopWorkWikiForQuit,
+  workWikiCatalog,
   workWikiDocumentSaved,
   workWikiDocumentMoved,
 } from './work-wiki'
@@ -3224,6 +3228,8 @@ const teamLibrary = new TeamLibrary(
 /** the NAS project folder: the innermost home folder holding the document */
 const teamProjectNameFor = (path: string): string => teamProjectName(path, folderRootPaths())
 let teamSync: TeamSync | null = null
+/** local working copies opened from a team template set → that set's template.md */
+let templateCopies: TemplateCopies | null = null
 
 /**
  * After a successful write by any editor: the work wiki sees every save; the team NAS only the
@@ -3332,6 +3338,8 @@ function afterFileMoved(oldPath: string, newPath: string): void {
   projectFileRenamed(oldPath, newPath)
   // the document's copy in the work wiki keeps its name; its record follows the move
   workWikiDocumentMoved(oldPath, newPath)
+  // a team template's working copy keeps its template after a rename/move
+  templateCopies?.moved(oldPath, newPath)
   if (/\.pptx$/i.test(newPath)) void replaceSlidesRecentFile(oldPath, newPath)
   const affected = tabManager?.renameTabFile(oldPath, newPath) ?? []
   const detachedAffected = detachedRenameFile(oldPath, newPath)
@@ -6640,9 +6648,27 @@ app.whenReady().then(async () => {
     teamLibrary,
     teamProjectNameFor,
   )
+  templateCopies = new TemplateCopies(join(app.getPath('userData'), 'team-template-copies.json'))
+  const teamTemplates = new TeamTemplates({
+    library: teamLibrary,
+    memberName: () => teamLibrary.getFolders().memberName,
+    complete: createWikiComplete(join(app.getPath('userData'), 'ai-settings.json')),
+    wikiCatalog: () => workWikiCatalog(),
+    cacheDir: join(app.getPath('userData'), 'team-templates'),
+    draftsDir: join(app.getPath('documents'), 'GenOffice', 'Team'),
+    minDocs: () => {
+      const n = Number(readAppSettings(APP_SETTINGS_PATH()).teamTemplateMinDocs)
+      return Number.isInteger(n) && n >= 1 ? n : 1
+    },
+  })
   registerTeamLibraryIpc({
     library: teamLibrary,
     sync: teamSync,
+    templates: teamTemplates,
+    openTemplateCopy: (path, templateMd) => {
+      templateCopies?.remember(path, templateMd)
+      if (!openDocumentPath(path)) throw new TeamLibraryError('open-failed')
+    },
     projectName: teamProjectNameFor,
     isHomeFolder: (path) => insideAnyRoot(path),
     syncFolder: async (folder) => {

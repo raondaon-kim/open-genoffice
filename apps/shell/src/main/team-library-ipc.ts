@@ -9,10 +9,14 @@ import {
   teamResult,
 } from './team-library'
 import type { TeamSync } from './team-sync'
+import type { TeamTemplates } from './team-templates'
 
 export function registerTeamLibraryIpc(options: {
   library: TeamLibrary
   sync: TeamSync
+  templates: TeamTemplates
+  /** open a template's working copy and remember which template it came from */
+  openTemplateCopy(path: string, templateMd: string): void
   getWindow(): BrowserWindow | null
   openWorkingCopy(path: string): void
   isKorean(): boolean
@@ -110,6 +114,66 @@ export function registerTeamLibraryIpc(options: {
     homeWindow(event)
     options.sync.retry()
   })
+  const { templates } = options
+  const text = (v: unknown): string => {
+    if (typeof v !== 'string' || v.length > 1_000_000) throw new TeamLibraryError('invalid-path')
+    return v
+  }
+  ipcMain.handle(CHANNELS.templateList, (event) =>
+    teamResult(async () => {
+      homeWindow(event)
+      return templates.list()
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateRebuild, (event) =>
+    teamResult(async () => {
+      homeWindow(event)
+      return templates.rebuildIndex()
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateCandidates, (event) =>
+    teamResult(async () => {
+      homeWindow(event)
+      return templates.candidates()
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateDraft, (event, source: unknown, replaces: unknown) =>
+    teamResult(async () => {
+      homeWindow(event)
+      const s = (source ?? {}) as Record<string, unknown>
+      const checked =
+        typeof s.loose === 'string'
+          ? { loose: text(s.loose) }
+          : {
+              candidateKey: text(s.candidateKey),
+              ...(typeof s.docId === 'string' ? { docId: s.docId } : {}),
+            }
+      return templates.draft(checked, replaces === undefined ? undefined : text(replaces))
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateConfirm, (event, draftId: unknown, markdown: unknown) =>
+    teamResult(async () => {
+      homeWindow(event)
+      return templates.confirm(text(draftId), text(markdown))
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateRemove, (event, path: unknown) =>
+    teamResult(async () => {
+      homeWindow(event)
+      await templates.remove(text(path))
+    }),
+  )
+  ipcMain.handle(CHANNELS.templateOpen, (event, path: unknown, folder: unknown) =>
+    teamResult(async () => {
+      homeWindow(event)
+      if (folder !== undefined && (typeof folder !== 'string' || !options.isHomeFolder(folder))) {
+        throw new TeamLibraryError('invalid-path')
+      }
+      const opened = await templates.openSet(text(path), folder as string | undefined)
+      options.openTemplateCopy(opened.workingCopy, opened.templateMd)
+      return opened.workingCopy
+    }),
+  )
   ipcMain.handle(CHANNELS.syncFolder, (event, folder: unknown) =>
     teamResult(async () => {
       homeWindow(event)

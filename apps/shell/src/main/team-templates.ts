@@ -312,7 +312,7 @@ export class TeamTemplates {
   /** signature hashes each set was made from (cached per set and form hash) */
   private async setSignatures(root: string, sets: IndexSet[]): Promise<Map<string, string[]>> {
     const file = join(this.deps.cacheDir, 'sets.json')
-    let cache: Record<string, string[]> = {}
+    let cache: Record<string, string[]>
     try {
       cache = JSON.parse(await readFile(file, 'utf8'))
     } catch {
@@ -618,8 +618,13 @@ export class TeamTemplates {
 
   // ── open ──────────────────────────────────────────────
 
+  /**
+   * A local working copy of the set's form. `targetDir` (a home folder the caller has checked)
+   * puts it beside the user's files under a fresh name; otherwise it goes to the drafts folder.
+   */
   async openSet(
     setPath: string,
+    targetDir?: string,
   ): Promise<{ workingCopy: string; templateMd: string; status: TeamTemplateSet['status'] }> {
     const root = await this.deps.library.root('templates')
     const folder = this.setFolder(setPath)
@@ -638,9 +643,22 @@ export class TeamTemplates {
     if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.error)
     const status: TeamTemplateSet['status'] =
       sha256(form) === parsed.def.formSha256 ? 'ok' : 'stale-md'
+    const stem = teamFolderName(parsed.def.title)
+    if (targetDir !== undefined) {
+      for (let n = 1; n <= 1000; n++) {
+        const workingCopy = join(targetDir, n === 1 ? `${stem}.docx` : `${stem} (${n}).docx`)
+        try {
+          await writeFile(workingCopy, form, { flag: 'wx' })
+          return { workingCopy, templateMd: md, status }
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+        }
+      }
+      throw new TeamLibraryError('copy-failed')
+    }
     await mkdir(this.deps.draftsDir, { recursive: true })
     const workdir = await mkdtemp(join(this.deps.draftsDir, 'team-'))
-    const workingCopy = join(workdir, `${teamFolderName(parsed.def.title)}.docx`)
+    const workingCopy = join(workdir, `${stem}.docx`)
     await writeFile(workingCopy, form, { flag: 'wx' })
     return { workingCopy, templateMd: md, status }
   }

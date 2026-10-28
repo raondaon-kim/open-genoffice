@@ -223,3 +223,64 @@
 .team-file-details .team-upload-error {
   color: #ad3529;
 }
+
+/* team template sets: sets, loose files, candidates and the review panel */
+.team-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.team-templates h2 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+}
+.team-templates .team-actions {
+  flex-wrap: wrap;
+}
+.team-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.team-review-body {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.team-review-body textarea {
+  min-height: 360px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--text);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.team-review-body aside {
+  overflow: auto;
+  max-height: 420px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.team-review-body aside h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--text);
+}
+.team-review-body aside ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+@media (max-width: 760px) {
+  .team-review-body {
+    grid-template-columns: 1fr;
+  }
+}

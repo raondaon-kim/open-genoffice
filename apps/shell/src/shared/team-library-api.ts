@@ -120,6 +120,22 @@ export interface TeamLibraryApi {
   retrySync(): Promise<void>
   /** queue every supported document in a home folder; resolves to the number queued */
   syncFolder(folder: string): Promise<TeamResult<number>>
+  /** template sets from index.md plus one listing per kind folder */
+  templateList(): Promise<TeamResult<TeamTemplateList>>
+  /** Word documents in the team documents folder grouped by form */
+  templateCandidates(): Promise<TeamResult<TeamTemplateCandidate[]>>
+  /** a reviewable template.md and form for a candidate or a loose file; replaces = 다시 만들기 */
+  templateDraft(
+    source: TeamTemplateSource,
+    replaces?: string,
+  ): Promise<TeamResult<TeamTemplateDraftView>>
+  /** writes the set (the only NAS write besides remove) */
+  templateConfirm(draftId: string, markdown: string): Promise<TeamResult<TeamTemplateSet>>
+  templateRemove(path: string): Promise<TeamResult<void>>
+  /** a local working copy of the set's form, opened in Word; folder = a home folder */
+  templateOpen(path: string, folder?: string): Promise<TeamResult<string>>
+  /** index.md rebuilt from the sets on disk */
+  templateRebuild(): Promise<TeamResult<TeamTemplateList>>
 }
 
 export const TEAM_LIBRARY_CHANNELS = {
@@ -133,4 +149,11 @@ export const TEAM_LIBRARY_CHANNELS = {
   syncStatus: 'team-library:sync-status',
   retrySync: 'team-library:retry-sync',
   syncFolder: 'team-library:sync-folder',
+  templateList: 'team-library:template-list',
+  templateCandidates: 'team-library:template-candidates',
+  templateDraft: 'team-library:template-draft',
+  templateConfirm: 'team-library:template-confirm',
+  templateRemove: 'team-library:template-remove',
+  templateOpen: 'team-library:template-open',
+  templateRebuild: 'team-library:template-rebuild',
 } as const

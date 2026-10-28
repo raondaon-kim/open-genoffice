@@ -241,3 +241,16 @@ describe('TeamTemplates', () => {
     expect(list.loose.map((l) => l.id)).toEqual(['Word/옛 양식.docx'])
   })
 })
+
+describe('TeamTemplates.openSet into a home folder', () => {
+  it('puts the copy beside the user files with a unique name', async () => {
+    const svc = service()
+    const { set } = await makeSet(svc)
+    const home = join(dir, 'home')
+    await mkdir(home)
+    const first = await svc.openSet(set.path, home)
+    const second = await svc.openSet(set.path, home)
+    expect(first.workingCopy).toBe(join(home, 'KOICA ODA 기술제안서.docx'))
+    expect(second.workingCopy).toBe(join(home, 'KOICA ODA 기술제안서 (2).docx'))
+  })
+})

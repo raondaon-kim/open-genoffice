@@ -785,6 +785,16 @@ const teamLibraryApi: TeamLibraryApi = {
   syncStatus: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.syncStatus),
   retrySync: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.retrySync),
   syncFolder: (folder) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.syncFolder, folder),
+  templateList: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateList),
+  templateCandidates: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateCandidates),
+  templateDraft: (source, replaces) =>
+    ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateDraft, source, replaces),
+  templateConfirm: (draftId, markdown) =>
+    ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateConfirm, draftId, markdown),
+  templateRemove: (path) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateRemove, path),
+  templateOpen: (path, folder) =>
+    ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateOpen, path, folder),
+  templateRebuild: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.templateRebuild),
 }
 
 contextBridge.exposeInMainWorld('aiOfficeTeam', teamLibraryApi)
