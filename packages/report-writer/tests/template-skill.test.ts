@@ -63,20 +63,20 @@ describe('write_report with a team template', () => {
     const r = await createReportSkill(d).executeTool(call({ request: '써 줘' }))
     expect(r.isError).toBe(true)
     expect(r.output).toContain(
-      '업무 위키를 사용할 수 없습니다 (health check timed out). 첨부 자료만으로 쓸까요?',
+      'LLM Wiki를 사용할 수 없습니다 (health check timed out). 업무 위키 페이지와 첨부 자료만으로 쓸까요?',
     )
     expect(r.output).toContain('withoutWiki')
     expect(sections).toEqual([])
   })
 
-  it('withoutWiki writes with no wiki', async () => {
+  it('withoutWiki writes with the work wiki pages still read', async () => {
     const { d, sections } = deps({
       wikiReady: async () => ({ ok: false, off: true, reason: '업무 위키가 꺼져 있습니다' }),
     })
     const r = await createReportSkill(d).executeTool(call({ request: '써 줘', withoutWiki: true }))
     expect(r.isError).toBeFalsy()
     expect(sections).toEqual([0])
-    expect(d.wiki).not.toHaveBeenCalled()
+    expect(d.wiki).toHaveBeenCalled()
   })
 
   it('names the template in the context and strips it from older messages', async () => {
@@ -93,5 +93,38 @@ describe('write_report with a team template', () => {
     expect(await skill.buildContext!('')).toBe('')
     await skill.executeTool(call({ request: '보고서 써 줘' }))
     expect(d.lander).toHaveBeenCalled()
+  })
+})
+
+describe('write_report with a team template: review fixes', () => {
+  it('without LLM Wiki it still reads the work wiki pages, and says so', async () => {
+    const { d, sections } = deps({
+      wikiReady: async () => ({ ok: false, off: false, reason: 'health check timed out' }),
+    })
+    const asked = await createReportSkill(d).executeTool(call({ request: '써 줘' }))
+    expect(asked.output).toContain('업무 위키 페이지와 첨부 자료만으로 쓸까요?')
+    await createReportSkill(d).executeTool(call({ request: '써 줘', withoutWiki: true }))
+    expect(sections).toEqual([0])
+    expect(d.wiki).toHaveBeenCalled()
+  })
+
+  it('a copy that was already filled is not filled again', async () => {
+    const { d, sections } = deps({ template: async () => ({ ...TEMPLATE, filled: true }) })
+    const skill = createReportSkill(d)
+    const r = await skill.executeTool(call({ request: '다시 써 줘' }))
+    expect(r.isError).toBe(true)
+    expect(r.output).toContain('already filled')
+    expect(sections).toEqual([])
+    expect(await skill.buildContext!('')).toContain('already been filled')
+  })
+
+  it('a form that no longer matches its definition is refused, naming the first heading', async () => {
+    const { d, sections } = deps({
+      template: async () => ({ ...TEMPLATE, problem: '1. 개요' }),
+    })
+    const r = await createReportSkill(d).executeTool(call({ request: '써 줘' }))
+    expect(r.isError).toBe(true)
+    expect(r.output).toContain('「1. 개요」')
+    expect(sections).toEqual([])
   })
 })

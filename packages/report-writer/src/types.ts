@@ -141,6 +141,12 @@ export interface TemplateForRun {
   wikiPages: string[]
   /** the template's own prose and formatting notes */
   styleRules: string
+  /** every outline heading in order (the form has the same headings) */
+  headings?: string[]
+  /** the copy was already filled: no empty section slot is left */
+  filled?: boolean
+  /** the first outline heading the open form does not have, when they differ */
+  problem?: string
 }
 
 /** lands a template fill in the opened form */

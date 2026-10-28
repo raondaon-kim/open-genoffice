@@ -108,6 +108,9 @@ export function createReportSkill<St>(deps: ReportSkillDeps<St>): AgentSkill {
     buildContext: async () => {
       const t = await deps.template?.()
       if (!t) return ''
+      if (t.filled) {
+        return `<team-template>\nThis document was made from the team template "${t.title}" and has already been filled. Edit it with the normal editing tools; do not call write_report for it.\n</team-template>`
+      }
       return `<team-template>\nThis document was opened from the team template "${t.title}" (${t.purpose}). Its table of contents is fixed (${t.sections.length} sections); to write or fill the document, call write_report.\n</team-template>`
     },
     stripContext: (text) => text.replace(TEMPLATE_TAG, '').trim(),
@@ -118,12 +121,26 @@ export function createReportSkill<St>(deps: ReportSkillDeps<St>): AgentSkill {
       if (!request) return fail('invalid argument', 'write_report needs the request')
       const template = (await deps.template?.()) ?? null
       const withoutWiki = input.withoutWiki === true
+      if (template && deps.templateLander) {
+        if (template.problem) {
+          return fail(
+            'template does not match its form',
+            `Nothing was written. Tell the user: 이 문서의 제목이 팀 템플릿 정의와 다릅니다(첫 번째로 다른 제목: 「${template.problem}」). 팀 템플릿에서 새로 열거나 템플릿을 다시 만드세요.`,
+          )
+        }
+        if (template.filled) {
+          return fail(
+            'template already filled',
+            'Nothing was written: this team template copy is already filled. Edit it with the normal editing tools instead of write_report.',
+          )
+        }
+      }
       if (template && deps.templateLander && !withoutWiki && deps.wikiReady) {
         const ready = await deps.wikiReady()
         if (!ready.ok) {
           return fail(
             'work wiki unavailable',
-            `Nothing was written. Ask the user exactly: "업무 위키를 사용할 수 없습니다 (${ready.reason}). 첨부 자료만으로 쓸까요?" Only if they agree, call write_report again with the same request and withoutWiki: true.`,
+            `Nothing was written. Ask the user exactly: "LLM Wiki를 사용할 수 없습니다 (${ready.reason}). 업무 위키 페이지와 첨부 자료만으로 쓸까요?" Only if they agree, call write_report again with the same request and withoutWiki: true.`,
           )
         }
       }
@@ -139,7 +156,8 @@ export function createReportSkill<St>(deps: ReportSkillDeps<St>): AgentSkill {
           { request, template, attachments },
           {
             llm: deps.llm(),
-            wiki: withoutWiki ? null : deps.wiki(),
+            // LLM Wiki down still leaves the work wiki's own pages (read from the folder)
+            wiki: deps.wiki(),
             lander: deps.templateLander(template, runId),
             progress: deps.progress,
           },
