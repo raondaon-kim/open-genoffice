@@ -539,9 +539,13 @@ export class TeamTemplates {
         markdown.indexOf('```json style') >= 0 ? markdown.indexOf('```json style') : undefined,
       )
       .split('\n')
+    // hash lines and wiki page ids are the app's own data, not text taken from the document
+    const contentLines = mdLines.filter(
+      (l) => !/^- (근거 서명|형태 파일|참고할 업무 위키):/.test(l),
+    )
     const hit = sourceWordsHit(
       draft.outlines.flatMap(sourceContentTexts),
-      [...(await docxTexts(form)), ...mdLines],
+      [...(await docxTexts(form)), ...contentLines],
       8,
       draft.allowed,
     )

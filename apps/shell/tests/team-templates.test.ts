@@ -278,3 +278,16 @@ describe('TeamTemplates.indexText', () => {
     expect(await unset.indexText()).toBeNull()
   })
 })
+
+describe('TeamTemplates source-words gate scope', () => {
+  it('wiki page ids are not source words', async () => {
+    const svc = service()
+    const [candidate] = await svc.candidates()
+    const draft = await svc.draft({ candidateKey: candidate!.key })
+    const edited = draft.markdown.replace(
+      /- 참고할 업무 위키: .*/,
+      '- 참고할 업무 위키: methods/자카르타-보건소-인력은-집계',
+    )
+    await expect(svc.confirm(draft.draftId, edited)).resolves.toMatchObject({ kind: 'Word' })
+  })
+})
