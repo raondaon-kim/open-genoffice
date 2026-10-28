@@ -6,7 +6,8 @@
   "type": "module",
   "description": "Team template sets made from team documents: Word outline, signatures, emptied forms, template.md and index.md",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./md": "./src/md.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

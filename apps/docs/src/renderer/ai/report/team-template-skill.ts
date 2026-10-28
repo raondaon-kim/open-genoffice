@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import type { AgentSkill, ToolExecution } from '@genoffice/agent-core'
 import type { DocxStyle } from '@genoffice/doc-styles'
 import type { TemplateForRun } from '@genoffice/report-writer'
-import { parseTemplateMd, templateForRun } from '@genoffice/team-templates'
+import { parseTemplateMd, templateForRun } from '@genoffice/team-templates/md'
 
 /** the `[label]` placeholders of the form's cover (the paragraphs before the first heading) */
 export function coverLabelsOf(editor: Editor): string[] {

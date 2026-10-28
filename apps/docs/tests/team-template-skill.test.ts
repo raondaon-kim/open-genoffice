@@ -112,3 +112,16 @@ describe('team template in the Word AI panel', () => {
     ).toContain('not set up')
   })
 })
+
+describe('renderer bundle boundary', () => {
+  it('the Word renderer imports only the browser-safe team-templates entry', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const text = readFileSync(
+      join(__dirname, '..', 'src', 'renderer', 'ai', 'report', 'team-template-skill.ts'),
+      'utf8',
+    )
+    expect(text).toContain("from '@genoffice/team-templates/md'")
+    expect(text).not.toMatch(/from '@genoffice\/team-templates'/)
+  })
+})
