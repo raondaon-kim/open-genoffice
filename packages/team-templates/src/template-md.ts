@@ -73,16 +73,31 @@ export function renderTemplateMd(def: TemplateDef): string {
   ].join('\n')
 }
 
-export type ParsedTemplate = { ok: true; def: TemplateDef } | { ok: false; error: string }
+/** why a template.md does not read (the UI translates the code; `error` is for logs) */
+export type TemplateParseCode =
+  | 'no-title'
+  | 'no-kind'
+  | 'no-outline-section'
+  | 'empty-outline'
+  | 'bad-status'
+  | 'bad-form-hash'
+  | 'bad-documents'
+  | 'bad-style'
+
+export type ParsedTemplate =
+  { ok: true; def: TemplateDef } | { ok: false; code: TemplateParseCode; error: string }
 
 export function parseTemplateMd(text: string): ParsedTemplate {
   const src = text.replace(/\r\n/g, '\n')
   const titleLine = /^# (.+)$/m.exec(src)
-  if (!titleLine) return { ok: false, error: 'the template has no "# title" line' }
+  if (!titleLine)
+    return { ok: false, code: 'no-title', error: 'the template has no "# title" line' }
   const titleMatch = /^(.*?)\s*\((Word)\)\s*$/.exec(titleLine[1]!.trim())
-  if (!titleMatch) return { ok: false, error: 'the title line must end with "(Word)"' }
+  if (!titleMatch)
+    return { ok: false, code: 'no-kind', error: 'the title line must end with "(Word)"' }
   const outlineAt = src.search(/^## 목차\s*$/m)
-  if (outlineAt < 0) return { ok: false, error: 'the template has no "## 목차" section' }
+  if (outlineAt < 0)
+    return { ok: false, code: 'no-outline-section', error: 'the template has no "## 목차" section' }
 
   const header = src.slice(titleLine.index + titleLine[0].length, outlineAt)
   const values = new Map<string, string>()
@@ -94,11 +109,22 @@ export function parseTemplateMd(text: string): ParsedTemplate {
     else if (line.trim()) notes.push(line)
   }
   const status = /^확정 · (\S+) · (.+)$/.exec(values.get(KEYS.status) ?? '')
-  if (!status) return { ok: false, error: 'the 상태 line must read "확정 · <date> · <author>"' }
+  if (!status)
+    return {
+      ok: false,
+      code: 'bad-status',
+      error: 'the 상태 line must read "확정 · <date> · <author>"',
+    }
   const form = /^form\.docx · sha256 ([0-9a-f]{64})$/.exec(values.get(KEYS.form) ?? '')
-  if (!form) return { ok: false, error: 'the 형태 파일 line needs a sha256 of form.docx' }
+  if (!form)
+    return {
+      ok: false,
+      code: 'bad-form-hash',
+      error: 'the 형태 파일 line needs a sha256 of form.docx',
+    }
   const documents = /^(\d+)건$/.exec(values.get(KEYS.documents) ?? '')
-  if (!documents) return { ok: false, error: 'the 근거 문서 line must read "<N>건"' }
+  if (!documents)
+    return { ok: false, code: 'bad-documents', error: 'the 근거 문서 line must read "<N>건"' }
 
   const afterOutline = src.slice(outlineAt).split('\n').slice(1)
   const outline: TemplateOutlineEntry[] = []
@@ -116,12 +142,13 @@ export function parseTemplateMd(text: string): ParsedTemplate {
       guidance: guidance.trim(),
     })
   }
-  if (outline.length === 0) return { ok: false, error: 'the "## 목차" section lists no headings' }
+  if (outline.length === 0)
+    return { ok: false, code: 'empty-outline', error: 'the "## 목차" section lists no headings' }
 
   const style = parseAnyStylePage(src)
-  if (!style.ok) return { ok: false, error: style.error }
+  if (!style.ok) return { ok: false, code: 'bad-style', error: style.error }
   if (style.style.format !== 'docx')
-    return { ok: false, error: 'the style block is not a Word style' }
+    return { ok: false, code: 'bad-style', error: 'the style block is not a Word style' }
 
   return {
     ok: true,

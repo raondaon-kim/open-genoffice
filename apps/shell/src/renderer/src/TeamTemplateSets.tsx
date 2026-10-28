@@ -7,7 +7,7 @@ import type {
   TeamTemplateList,
   TeamTemplateSource,
 } from '../../shared/team-library-api'
-import { teamError, teamStrings } from './team-library-strings'
+import { teamError, teamStrings, templateDetail } from './team-library-strings'
 
 /**
  * The 팀 템플릿 space's sets, loose files and candidates. The NAS is written only by 확정 and
@@ -39,7 +39,14 @@ export function TeamTemplateSets({
 
   const fail = useCallback(
     (result: Extract<TeamResult<unknown>, { ok: false }>) =>
-      setError(teamError(lang, result.error) + (result.detail ?? '')),
+      setError(
+        teamError(lang, result.error) +
+          (result.detail
+            ? result.error === 'invalid-template'
+              ? templateDetail(lang, result.detail)
+              : result.detail
+            : ''),
+      ),
     [lang],
   )
 

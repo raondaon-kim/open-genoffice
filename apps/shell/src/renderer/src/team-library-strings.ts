@@ -183,6 +183,44 @@ export function teamStrings(lang: string): typeof en {
   return lang === 'ko' ? ko : en
 }
 
+/** the reason an invalid template gives (a parse code from the main process) in the UI language */
+export function templateDetail(lang: string, detail: string): string {
+  const ko = lang === 'ko'
+  const texts: Record<string, [string, string]> = {
+    'no-title': ['the "# title (Word)" line is missing.', '「# 제목 (Word)」 줄이 없습니다.'],
+    'no-kind': ['the title line must end with "(Word)".', '제목 줄은 「(Word)」로 끝나야 합니다.'],
+    'no-outline-section': ['the "## 목차" section is missing.', '「## 목차」 부분이 없습니다.'],
+    'empty-outline': ['the "## 목차" section lists no headings.', '「## 목차」에 제목이 없습니다.'],
+    'bad-status': [
+      'the 상태 line must read "확정 · <date> · <author>".',
+      '「상태」 줄은 「확정 · 날짜 · 작성자」 형식이어야 합니다.',
+    ],
+    'bad-form-hash': [
+      'the 형태 파일 line must keep its sha256.',
+      '「형태 파일」 줄의 sha256 값을 지우거나 바꾸지 마세요.',
+    ],
+    'bad-documents': [
+      'the 근거 문서 line must read "<N>건".',
+      '「근거 문서」 줄은 「N건」 형식이어야 합니다.',
+    ],
+    'bad-style': [
+      'the json style block is missing or not valid.',
+      '서식 블록(json style)이 없거나 올바르지 않습니다.',
+    ],
+    'outline-mismatch': [
+      'headings were added, removed or moved; only their wording may change.',
+      '제목을 더하거나 빼거나 옮겼습니다. 제목은 이름만 바꿀 수 있습니다.',
+    ],
+  }
+  const hit = texts[detail]
+  if (hit) return hit[ko ? 1 : 0]
+  if (detail.startsWith('form-xml:')) {
+    const part = detail.slice('form-xml:'.length)
+    return ko ? `형태 파일이 손상되었습니다 (${part}).` : `the form is damaged (${part}).`
+  }
+  return detail
+}
+
 export function teamError(lang: string, code: TeamErrorCode): string {
   const errors: Record<TeamErrorCode, [string, string]> = {
     'not-configured': [

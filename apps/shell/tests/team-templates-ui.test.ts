@@ -215,3 +215,21 @@ describe('TeamTemplateSets delete result', () => {
     expect(host.textContent).toContain('다른 파일이 있어 폴더는 남겼습니다')
   })
 })
+
+describe('TeamTemplateSets template errors in Korean', () => {
+  it('translates the parse code of an invalid template', async () => {
+    const api = fakeApi({
+      templateConfirm: vi.fn(async () => ({
+        ok: false as const,
+        error: 'invalid-template' as const,
+        detail: 'no-outline-section',
+      })),
+    })
+    await render(api)
+    await act(async () => buttons('템플릿 만들기')[1]!.click())
+    await act(async () => buttons('확정')[0]!.click())
+    expect(host.textContent).toContain(
+      '템플릿 정의가 올바르지 않습니다: 「## 목차」 부분이 없습니다.',
+    )
+  })
+})

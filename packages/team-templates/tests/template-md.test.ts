@@ -60,14 +60,17 @@ describe('template.md', () => {
 
   it('names what is missing', async () => {
     const text = renderTemplateMd(await sampleDef())
-    expect(parseTemplateMd(text.replace('## 목차', '## 차례'))).toEqual({
+    expect(parseTemplateMd(text.replace('## 목차', '## 차례'))).toMatchObject({
       ok: false,
       error: 'the template has no "## 목차" section',
     })
     const noStyle = parseTemplateMd(text.slice(0, text.indexOf('```json style')))
     expect(noStyle.ok).toBe(false)
     const badHash = parseTemplateMd(text.replace('a'.repeat(64), 'xyz'))
-    expect(badHash).toEqual({ ok: false, error: 'the 형태 파일 line needs a sha256 of form.docx' })
+    expect(badHash).toMatchObject({
+      ok: false,
+      error: 'the 형태 파일 line needs a sha256 of form.docx',
+    })
   })
 })
 
@@ -92,5 +95,24 @@ describe('template.md headings with an em dash', () => {
       heading: '1. 일반현황',
       guidance: '표로',
     })
+  })
+})
+
+describe('template.md parse errors carry a code', () => {
+  it('each failure names its kind for the UI to translate', async () => {
+    const text = renderTemplateMd(await sampleDef())
+    expect(parseTemplateMd(text.replace('## 목차', '## 차례'))).toMatchObject({
+      code: 'no-outline-section',
+    })
+    expect(parseTemplateMd(text.replace('a'.repeat(64), 'xyz'))).toMatchObject({
+      code: 'bad-form-hash',
+    })
+    expect(parseTemplateMd(text.replace(/- 상태: .*/, '- 상태: 임시'))).toMatchObject({
+      code: 'bad-status',
+    })
+    expect(parseTemplateMd(text.slice(0, text.indexOf('```json style')))).toMatchObject({
+      code: 'bad-style',
+    })
+    expect(parseTemplateMd('그냥 글')).toMatchObject({ code: 'no-title' })
   })
 })

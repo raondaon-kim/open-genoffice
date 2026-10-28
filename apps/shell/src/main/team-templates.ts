@@ -612,7 +612,7 @@ export class TeamTemplates {
       (l) => !/^- (근거 서명|형태 파일|참고할 업무 위키):/.test(l),
     )
     const broken = await validateDocxXml(form)
-    if (broken) throw new TeamLibraryError('invalid-template', `form.docx: ${broken}`)
+    if (broken) throw new TeamLibraryError('invalid-template', `form-xml:${broken}`)
     const hits = sourceWordsHits(
       [...draft.outlines.flatMap(sourceContentTexts), ...draft.headerFooter],
       // every XML part of the form, not only the body: charts, properties, anything unknown
@@ -645,11 +645,11 @@ export class TeamTemplates {
     const draft = this.drafts.get(draftId)
     if (!draft) throw new TeamLibraryError('changed')
     const parsed = parseTemplateMd(markdown)
-    if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.error)
+    if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.code)
     const formOutline = await readDocxOutline(draft.form)
     const levels = formOutline.headings.map((h) => h.level).join(',')
     if (parsed.def.outline.map((e) => e.level).join(',') !== levels) {
-      throw new TeamLibraryError('invalid-template', '목차의 제목 수나 단계가 형태 파일과 다릅니다')
+      throw new TeamLibraryError('invalid-template', 'outline-mismatch')
     }
     const form = await setFormHeadings(
       draft.form,
@@ -852,7 +852,7 @@ export class TeamTemplates {
       throw new TeamLibraryError('moved')
     }
     const parsed = parseTemplateMd(md)
-    if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.error)
+    if (!parsed.ok) throw new TeamLibraryError('invalid-template', parsed.code)
     const status: TeamTemplateSet['status'] =
       sha256(form) === parsed.def.formSha256 ? 'ok' : 'stale-md'
     this.statuses.set(setPath, status)
