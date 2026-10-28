@@ -142,6 +142,20 @@ The fork's material changes on top of upstream:
 - **Reports without the AI-change highlight:** `write_report` in Word lands its paragraphs
   without the yellow AI-change highlight, which suits short edits but covered the whole document
   while a report was written.
+- **Team templates and team documents on a NAS** (`apps/shell/src/main/team-library.ts`,
+  `team-sync.ts`, `team-library-ipc.ts`, Home `TeamLibrary.tsx`): two Home spaces over folders
+  the user picks on a share already connected in Explorer/Finder (no NAS password is stored).
+  Templates open as local working copies (into the selected home folder when there is one);
+  with automatic sending on, every save the user starts (`afterDocumentSaved` with origin
+  `user`; AutoSave and the AI's or agents' own saves are not sent) is queued in
+  `userData/team-sync.json` and written to `project / author / type`, where the project is the
+  innermost home folder holding the document. Every copy written to the NAS (automatic or
+  registered by hand) goes through `@genoffice/doc-mask` first: identification numbers and
+  e-mail addresses become placeholders, the file name too; .hwp/.pdf and documents with an
+  embedded object the masker cannot open are refused and shown as such. Staged write then rename
+  on the share; transient failures retry every 30 s and after a restart. Built by the user on the
+  October tree and ported onto this one: local projects became home folders, Word/PowerPoint PDF
+  exports and PDF page extraction are not sent.
 - **docx-engine**: an explicit zero space-before is written back on save, like
   space-after.
 - **Independent identity**: app id `com.sergedoub.opengenoffice`, product and

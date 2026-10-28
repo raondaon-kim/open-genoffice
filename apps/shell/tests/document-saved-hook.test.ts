@@ -16,10 +16,28 @@ describe('document saves reach the work wiki', () => {
     'setPdfDocumentSavedHook',
     'setMarkdownDocumentSavedHook',
     'setHtmlDocumentSavedHook',
-  ])('%s is registered with workWikiDocumentSaved', (setter) => {
+  ])('%s is registered with afterDocumentSaved', (setter) => {
     expect(index).toMatch(
-      new RegExp(`${setter}\\(\\s*\\(path\\)\\s*=>\\s*workWikiDocumentSaved\\(path\\)\\s*\\)`),
+      new RegExp(
+        `${setter}\\(\\s*\\(path, origin\\)\\s*=>\\s*afterDocumentSaved\\(path, origin\\)\\s*\\)`,
+      ),
     )
+  })
+
+  it('afterDocumentSaved feeds the work wiki always and the team NAS only for user saves', () => {
+    const body = index.slice(index.indexOf('function afterDocumentSaved('))
+    const fn = body.slice(0, body.indexOf('\n}\n'))
+    expect(fn).toMatch(/function afterDocumentSaved\(path: string, origin: SaveOrigin\)/)
+    expect(fn).toMatch(/workWikiDocumentSaved\(path\)/)
+    expect(fn).toMatch(/if \(origin !== 'user'\) return[\s\S]*teamSync\?\.enqueue\(path\)/)
+  })
+
+  it('Hangul saves and the shell PDF copy go through afterDocumentSaved too', () => {
+    expect(index).toMatch(
+      /onSaved: \(webContentsId, path, origin\) => \{[\s\S]*?afterDocumentSaved\(path, origin\)/,
+    )
+    // Save As of a clean PDF is the user's own action
+    expect(index).toMatch(/this copy bypasses it\s*afterDocumentSaved\(target, 'user'\)/)
   })
 })
 
@@ -32,11 +50,11 @@ describe('moving a document in the app', () => {
 })
 
 describe('a clean PDF Save As', () => {
-  it('reports the byte-identical copy to the work wiki (it bypasses the PDF save handler)', () => {
+  it('reports the byte-identical copy like a save (it bypasses the PDF save handler)', () => {
     const body = index.slice(index.indexOf('async function savePdfAs('))
     const fn = body.slice(0, body.indexOf('\n}\n'))
     expect(fn).toMatch(
-      /await atomicCopyFile\(tab\.filePath, target\)\r?\n(\s*\/\/[^\n]*\n)?\s*workWikiDocumentSaved\(target\)/,
+      /await atomicCopyFile\(tab\.filePath, target\)\r?\n(\s*\/\/[^\n]*\n)?\s*afterDocumentSaved\(target, 'user'\)/,
     )
   })
 })

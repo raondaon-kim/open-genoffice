@@ -10,6 +10,17 @@ import {
 } from 'node:fs'
 import { readFile as readFileAsync, stat as statAsync } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { userInfo } from 'node:os'
+import {
+  localTeamDocuments,
+  TeamLibrary,
+  TeamLibraryError,
+  teamProjectName,
+  teamUploadable,
+} from './team-library'
+import { registerTeamLibraryIpc } from './team-library-ipc'
+import { TeamSync } from './team-sync'
+import type { TeamFolders } from '../shared/team-library-api'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import {
   BrowserWindow,
@@ -142,6 +153,7 @@ import {
   setDocsShellWindow,
   setDocsFileSavedHook,
   setDocsDocumentSavedHook,
+  type SaveOrigin,
   setDocsFileOpenedHook,
   setSessionPathResolver,
   defaultSaveDir,
@@ -614,13 +626,13 @@ configureHwpRuntime({
   hwpforgePath: HWPFORGE_BIN,
   rhwpPath: RHWP_BIN,
   // an untitled Hangul document's first save (or Save As) lands on a new path
-  onSaved: (webContentsId, path) => {
+  onSaved: (webContentsId, path, origin) => {
     tabManager?.setTabFileFor(webContentsId, path)
     detachedSetFileFor(webContentsId, path)
     recordRecentFile(path)
     applyPendingDir(webContentsId, path)
     // hwp calls onSaved after every write, so every Hangul save feeds the work wiki
-    workWikiDocumentSaved(path)
+    afterDocumentSaved(path, origin)
   },
   onCreateDocument: (path) => {
     openDocumentPath(path)
@@ -3194,6 +3206,40 @@ function folderRootPaths(): string[] {
   return [defaultSaveDir(), ...extraFolderRoots()]
 }
 
+// ── Team library (NAS templates and documents) ──────────────
+const teamLibrary = new TeamLibrary(
+  () => {
+    const saved = readAppSettings(APP_SETTINGS_PATH()).teamFolders as
+      Partial<TeamFolders> | undefined
+    return {
+      templates: typeof saved?.templates === 'string' ? saved.templates : '',
+      documents: typeof saved?.documents === 'string' ? saved.documents : '',
+      memberName: typeof saved?.memberName === 'string' ? saved.memberName : userInfo().username,
+      autoSync: saved?.autoSync !== false,
+    }
+  },
+  (folders) => writeAppSetting(APP_SETTINGS_PATH(), 'teamFolders', folders),
+  () => join(app.getPath('documents'), 'GenOffice', 'Team'),
+)
+/** the NAS project folder: the innermost home folder holding the document */
+const teamProjectNameFor = (path: string): string => teamProjectName(path, folderRootPaths())
+let teamSync: TeamSync | null = null
+
+/**
+ * After a successful write by any editor: the work wiki sees every save; the team NAS only the
+ * saves the user started (Save, Save As, close then Save), not AutoSave, recovery or the AI's and
+ * agents' own saves.
+ */
+function afterDocumentSaved(path: string, origin: SaveOrigin): void {
+  workWikiDocumentSaved(path)
+  if (origin !== 'user') return
+  try {
+    teamSync?.enqueue(path)
+  } catch {
+    // the NAS queue never turns a finished local save into a failure
+  }
+}
+
 function insideAnyRoot(path: string): boolean {
   return folderRootPaths().some((root) => isInsideRoot(root, path))
 }
@@ -3590,12 +3636,12 @@ function createShellWindow(): void {
   })
   // docs' save-as / silent first save lands on a new path → sync the tab title too
   // every saved document (docx, pptx, xlsx, pdf, md, html) feeds the work wiki
-  setDocsDocumentSavedHook((path) => workWikiDocumentSaved(path))
-  setSlidesDocumentSavedHook((path) => workWikiDocumentSaved(path))
-  setSheetsDocumentSavedHook((path) => workWikiDocumentSaved(path))
-  setPdfDocumentSavedHook((path) => workWikiDocumentSaved(path))
-  setMarkdownDocumentSavedHook((path) => workWikiDocumentSaved(path))
-  setHtmlDocumentSavedHook((path) => workWikiDocumentSaved(path))
+  setDocsDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
+  setSlidesDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
+  setSheetsDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
+  setPdfDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
+  setMarkdownDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
+  setHtmlDocumentSavedHook((path, origin) => afterDocumentSaved(path, origin))
   setDocsFileSavedHook((wc, path) => {
     manager.setTabFileFor(wc.id, path)
     detachedSetFileFor(wc.id, path)
@@ -6002,7 +6048,7 @@ async function savePdfAs(): Promise<void> {
       // No pending edits → a byte-identical copy
       await atomicCopyFile(tab.filePath, target)
       // the PDF save handler reports its own writes; this copy bypasses it
-      workWikiDocumentSaved(target)
+      afterDocumentSaved(target, 'user')
     }
     // the Save As copy shares the original's note
     void copyPdfNoteLink(tab.filePath, target)
@@ -6589,6 +6635,29 @@ async function runHeadlessExportEntry(
 }
 
 app.whenReady().then(async () => {
+  teamSync = new TeamSync(
+    join(app.getPath('userData'), 'team-sync.json'),
+    teamLibrary,
+    teamProjectNameFor,
+  )
+  registerTeamLibraryIpc({
+    library: teamLibrary,
+    sync: teamSync,
+    projectName: teamProjectNameFor,
+    isHomeFolder: (path) => insideAnyRoot(path),
+    syncFolder: async (folder) => {
+      // .hwp and .pdf cannot be masked, so they are not queued
+      const files = (await localTeamDocuments(folder)).filter(teamUploadable)
+      for (const file of files) teamSync?.enqueue(file)
+      return files.length
+    },
+    getWindow: () => shellWindow,
+    isKorean: () => currentLang() === 'ko',
+    openWorkingCopy: (path) => {
+      if (!openDocumentPath(path)) throw new TeamLibraryError('open-failed')
+    },
+  })
+  teamSync.start()
   startWorkWiki({
     userData: app.getPath('userData'),
     documents: app.getPath('documents'),
@@ -6903,6 +6972,7 @@ app.on('before-quit', (event) => {
 
 // after every window has closed, so the shell window's own 'closed' republish cannot revive the file
 app.on('will-quit', () => {
+  teamSync?.stop()
   fileIndexer?.stop()
   fileIndexStore?.close()
   stopAuthWatch?.()

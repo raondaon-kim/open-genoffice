@@ -51,3 +51,6 @@ _scratch-*
 /apps/shell/build/llm-wiki/
 /apps/shell/build/codex/
 /apps/shell/build/tesseract/
+# team NAS upload queue (lives in userData; ignored if a dev profile points here)
+team-sync.json
+team-sync.json.tmp

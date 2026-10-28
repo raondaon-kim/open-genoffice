@@ -9,6 +9,8 @@ import {
 import type { AiSettings, CodexModelCatalog } from '@genoffice/ai-provider/browser'
 import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 import type { UpdateUiState } from '../shared/update-api'
+import { TEAM_LIBRARY_CHANNELS } from '../shared/team-library-api'
+import type { TeamLibraryApi } from '../shared/team-library-api'
 import { normalizeAiPanelPrefs } from '@genoffice/ui/ai-panel-prefs'
 import type {
   AccountLoginEvent,
@@ -768,3 +770,21 @@ contextBridge.exposeInMainWorld('aiOfficeQuickLookHome', quickLookHomeApi)
 
 // open documents dragged from the OS anywhere over Home or the tab strip
 installDropOpenBridge()
+
+// Team library: shared templates and documents on the team NAS (home window only; the main
+// process refuses calls from any other renderer)
+const teamLibraryApi: TeamLibraryApi = {
+  getFolders: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.getFolders),
+  pickFolder: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.pickFolder),
+  configure: (folders) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.configure, folders),
+  list: (kind) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.list, kind),
+  useEntry: (kind, id, folder) =>
+    ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.useEntry, kind, id, folder),
+  publish: (kind) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.publish, kind),
+  revealFolder: (kind) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.revealFolder, kind),
+  syncStatus: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.syncStatus),
+  retrySync: () => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.retrySync),
+  syncFolder: (folder) => ipcRenderer.invoke(TEAM_LIBRARY_CHANNELS.syncFolder, folder),
+}
+
+contextBridge.exposeInMainWorld('aiOfficeTeam', teamLibraryApi)

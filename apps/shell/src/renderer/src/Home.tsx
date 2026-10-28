@@ -37,6 +37,9 @@ import './quick-look/quick-look.css'
 import { QuickLookView } from './quick-look/QuickLookView'
 import { quickLookText } from './i18n/strings-quick-look'
 import type { QuickLookPayload } from '../../shared/quick-look-api'
+import { TeamLibrary } from './TeamLibrary'
+import { teamStrings } from './team-library-strings'
+import type { TeamLibraryKind } from '../../shared/team-library-api'
 
 declare global {
   interface Window {
@@ -1416,6 +1419,9 @@ export function Home() {
   const [view, setView] = useState<'recent' | 'starred'>('recent')
   // Genspark web projects take over the content area (like a selected folder)
   const [cloudMode, setCloudMode] = useState(false)
+  // Team templates / team documents (NAS) take over the content area too
+  const [teamView, setTeamView] = useState<TeamLibraryKind | null>(null)
+  const teamOpen = teamView !== null
   const [filter, setFilter] = useState('all')
   // ── File search (names + indexed content); active while the box has text ──
   const [searchQuery, setSearchQuery] = useState('')
@@ -1867,6 +1873,7 @@ export function Home() {
     setView(next)
     setSelectedFolder(null)
     setCloudMode(false)
+    setTeamView(null)
     setSelected(new Set())
     setRowMenu(null)
   }
@@ -1880,6 +1887,7 @@ export function Home() {
   const selectFolder = (dir: string) => {
     setSelectedFolder(dir)
     setCloudMode(false)
+    setTeamView(null)
     setSelected(new Set())
     setRowMenu(null)
     setFolderMenu(null)
@@ -3457,7 +3465,7 @@ export function Home() {
         </div>
         <nav className="sidebar-nav">
           <button
-            className={`nav-item${view === 'recent' && !selectedFolder && !cloudMode ? ' active' : ''}`}
+            className={`nav-item${view === 'recent' && !selectedFolder && !cloudMode && !teamOpen ? ' active' : ''}`}
             onClick={() => changeView('recent')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3473,7 +3481,7 @@ export function Home() {
             <span className="nav-count">{navCounts.recent}</span>
           </button>
           <button
-            className={`nav-item${view === 'starred' && !selectedFolder && !cloudMode ? ' active' : ''}`}
+            className={`nav-item${view === 'starred' && !selectedFolder && !cloudMode && !teamOpen ? ' active' : ''}`}
             onClick={() => changeView('starred')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -3489,10 +3497,11 @@ export function Home() {
           </button>
           {loggedIn && (
             <button
-              className={`nav-item${cloudMode && !selectedFolder ? ' active' : ''}`}
+              className={`nav-item${cloudMode && !selectedFolder && !teamOpen ? ' active' : ''}`}
               onClick={() => {
                 setCloudMode(true)
                 setSelectedFolder(null)
+                setTeamView(null)
                 setSelected(new Set())
                 setRowMenu(null)
               }}
@@ -3524,6 +3533,38 @@ export function Home() {
               </svg>
             </button>
           )}
+          {window.aiOfficeTeam &&
+            (['templates', 'documents'] as const).map((kind) => (
+              <button
+                key={kind}
+                className={`nav-item${teamView === kind ? ' active' : ''}`}
+                onClick={() => {
+                  // a selected folder stays: working copies and "send this folder" use it
+                  setTeamView(kind)
+                  setCloudMode(false)
+                  setSelected(new Set())
+                  setRowMenu(null)
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <rect
+                    x="1.5"
+                    y="3.5"
+                    width="13"
+                    height="10"
+                    rx="2"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                  />
+                  <path
+                    d="M5 3.5V2h6v1.5M1.5 7h13M5.5 7v2h5V7"
+                    stroke="currentColor"
+                    strokeWidth="1.3"
+                  />
+                </svg>
+                <span className="nav-label">{teamStrings(lang)[kind]}</span>
+              </button>
+            ))}
         </nav>
         <div className="sidebar-divider" />
         {renderFolderPanel()}
@@ -3533,7 +3574,17 @@ export function Home() {
           openRequest={settingsRequest}
         />
       </aside>
-      {selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
+      {teamView ? (
+        <TeamLibrary
+          key={teamView}
+          kind={teamView}
+          project={
+            selectedFolder && rootOf(selectedFolder, roots)?.usable
+              ? { path: selectedFolder, name: fileName(selectedFolder) || selectedFolder }
+              : undefined
+          }
+        />
+      ) : selectedFolder && rootOf(selectedFolder, roots)?.readable ? (
         renderFolderContent()
       ) : cloudMode ? (
         <CloudProjectsView />
