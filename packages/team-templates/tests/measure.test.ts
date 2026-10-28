@@ -44,3 +44,18 @@ describe('measureDocxStyle', () => {
     expect(() => validateDocx(style as unknown as Record<string, unknown>)).not.toThrow()
   })
 })
+
+describe('measureDocxStyle with Korean Word style ids', () => {
+  it('finds heading styles by name or outline level, not only by id', async () => {
+    const styles = `<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:style w:type="paragraph" w:default="1" w:styleId="a"><w:name w:val="Normal"/><w:rPr><w:sz w:val="20"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="1"><w:name w:val="heading 1"/><w:basedOn w:val="a"/><w:rPr><w:b/><w:sz w:val="36"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="2"><w:name w:val="heading 2"/><w:basedOn w:val="a"/><w:rPr><w:b/><w:sz w:val="30"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="x3"><w:name w:val="내 제목"/><w:basedOn w:val="a"/><w:pPr><w:outlineLvl w:val="2"/></w:pPr><w:rPr><w:sz w:val="24"/></w:rPr></w:style>
+</w:styles>`
+    const style = await measureDocxStyle(await makeDocx([{ text: '본문' }], { styles }), META)
+    const size = (n: number) => style.roles.find((r) => r.id === `heading-${n}`)!.size
+    expect([size(1), size(2), size(3)]).toEqual([18, 15, 12])
+    expect(style.roles.find((r) => r.id === 'body')!.size).toBe(10)
+  })
+})

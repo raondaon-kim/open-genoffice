@@ -168,8 +168,11 @@ describe('review fixes: the writer sees every heading', () => {
 
 describe('review fixes: body-level content controls', () => {
   it('a cover page in a w:sdt keeps its shape but not its text', async () => {
-    const sdt = '<w:sdt><w:sdtPr><w:alias w:val="표지"/></w:sdtPr><w:sdtContent><w:p><w:r><w:t>인도네시아 보건인력 사업 표지</w:t></w:r></w:p></w:sdtContent></w:sdt>'
-    const form = await buildFormDocx(await makeDocx([{ raw: sdt }, { text: 'Ⅰ. 개요', style: 'Heading1' }]))
+    const sdt =
+      '<w:sdt><w:sdtPr><w:alias w:val="표지"/></w:sdtPr><w:sdtContent><w:p><w:r><w:t>인도네시아 보건인력 사업 표지</w:t></w:r></w:p></w:sdtContent></w:sdt>'
+    const form = await buildFormDocx(
+      await makeDocx([{ raw: sdt }, { text: 'Ⅰ. 개요', style: 'Heading1' }]),
+    )
     const xml = (await part(form, 'word/document.xml'))!
     expect(xml).toContain('<w:sdt>')
     expect(xml).not.toContain('인도네시아')

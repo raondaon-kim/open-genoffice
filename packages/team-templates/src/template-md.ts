@@ -47,7 +47,8 @@ export function renderTemplateMd(def: TemplateDef): string {
   const outline = def.outline
     .map(
       (e) =>
-        `${'  '.repeat(Math.max(0, e.level - minLevel))}- ${e.heading}${e.guidance ? ` — ${e.guidance}` : ''}`,
+        // a dash inside the heading is escaped so the first unescaped " — " starts the guidance
+        `${'  '.repeat(Math.max(0, e.level - minLevel))}- ${e.heading.replace(/ — /g, ' \\— ')}${e.guidance ? ` — ${e.guidance}` : ''}`,
     )
     .join('\n')
   return [
@@ -105,11 +106,14 @@ export function parseTemplateMd(text: string): ParsedTemplate {
     if (line.startsWith('```') || /^## /.test(line)) break
     const m = /^( *)- (.+)$/.exec(line)
     if (!m) continue
-    const [heading, ...rest] = m[2]!.split(' — ')
+    // the first " — " that is not escaped as " \— " separates heading and guidance
+    const cut = /(?<!\\) — /.exec(m[2]!)
+    const heading = cut ? m[2]!.slice(0, cut.index) : m[2]!
+    const guidance = cut ? m[2]!.slice(cut.index + cut[0].length) : ''
     outline.push({
       level: Math.floor(m[1]!.length / 2) + 1,
-      heading: heading!.trim(),
-      guidance: rest.join(' — ').trim(),
+      heading: heading.replace(/ \\— /g, ' — ').trim(),
+      guidance: guidance.trim(),
     })
   }
   if (outline.length === 0) return { ok: false, error: 'the "## 목차" section lists no headings' }

@@ -70,3 +70,27 @@ describe('template.md', () => {
     expect(badHash).toEqual({ ok: false, error: 'the 형태 파일 line needs a sha256 of form.docx' })
   })
 })
+
+describe('template.md headings with an em dash', () => {
+  it('a heading that contains " — " round trips and old files still read', async () => {
+    const def = await sampleDef()
+    def.outline[1] = { level: 2, heading: '1. 일반현황 — 연혁 포함', guidance: '표로' }
+    const text = renderTemplateMd(def)
+    const parsed = parseTemplateMd(text)
+    expect(parsed.ok && parsed.def.outline[1]).toEqual({
+      level: 2,
+      heading: '1. 일반현황 — 연혁 포함',
+      guidance: '표로',
+    })
+    // a 0.5.8 line without escapes still splits at its first " — "
+    expect(text).toContain('- 1. 일반현황 \\— 연혁 포함 — 표로')
+    const old = parseTemplateMd(
+      text.replace('1. 일반현황 \\— 연혁 포함 — 표로', '1. 일반현황 — 표로'),
+    )
+    expect(old.ok && old.def.outline[1]).toEqual({
+      level: 2,
+      heading: '1. 일반현황',
+      guidance: '표로',
+    })
+  })
+})

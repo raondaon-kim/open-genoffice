@@ -81,6 +81,14 @@ export async function measureDocxStyle(
   const stylesXml = (await parts.zip.file('word/styles.xml')?.async('string')) ?? ''
   const raw = new Map<string, RawStyle>()
   let defaultId = 'Normal'
+  /** style id → its name (Korean Word gives headings ids like "1", named "heading 1") */
+  const names = new Map<string, string>()
+  const outlines = new Map<string, number>()
+  /** a style by one of its usual ids, else by name, else by its own outline level */
+  const styleFor = (ids: string[], name: RegExp, outline?: number): string | undefined =>
+    ids.find((x) => raw.has(x)) ??
+    [...names].find(([, n]) => name.test(n))?.[0] ??
+    (outline === undefined ? undefined : [...outlines].find(([, o]) => o === outline)?.[0])
   for (const m of stylesXml.matchAll(/<w:style\b([^>]*)>([\s\S]*?)<\/w:style>/g)) {
     const head = m[1]!
     if (!/w:type="paragraph"/.test(head)) continue
@@ -88,6 +96,9 @@ export async function measureDocxStyle(
     if (!id) continue
     if (/w:default="(?:1|true)"/.test(head)) defaultId = id
     raw.set(id, readProps(m[2]!, /<w:basedOn w:val="([^"]+)"/.exec(m[2]!)?.[1] ?? null))
+    names.set(id, (/<w:name w:val="([^"]+)"/.exec(m[2]!)?.[1] ?? '').toLowerCase())
+    const outline = /<w:outlineLvl w:val="(\d)"/.exec(m[2]!)?.[1]
+    if (outline !== undefined) outlines.set(id, Number(outline))
   }
   const defaults = readProps(
     /<w:docDefaults>[\s\S]*?<\/w:docDefaults>/.exec(stylesXml)?.[0] ?? '',
@@ -157,7 +168,11 @@ export async function measureDocxStyle(
     roles.push(toRole(resolve('Title'), { id: 'title', label: '표지 제목', kind: 'title' }))
   const labels = ['장', '절', '항']
   for (let n = 1; n <= 3; n++) {
-    const id = [`Heading${n}`, `heading${n}`, `제목${n}`].find((x) => raw.has(x))
+    const id = styleFor(
+      [`Heading${n}`, `heading${n}`, `제목${n}`],
+      new RegExp(`^(?:heading|제목)\\s*${n}$`),
+      n - 1,
+    )
     const s = id
       ? resolve(id)
       : { ...body, size: (bodySize + 2 * (4 - n)) * 2, bold: true, jc: 'left' }
