@@ -187,8 +187,13 @@ The fork's material changes on top of upstream:
     placeholders first, then every section under its heading (four at a time, landed in order)
     from the attachments and the work wiki; a written table fills the form's table when the
     columns match; open items in 「확인 필요 사항」. A filled copy, or one whose headings no longer
-    match its definition, is not filled. Template text reaches the model fenced as team data. The
-    Word AI can also read the catalog (`list_team_templates`).
+    match its definition, is not filled. Template text reaches the model fenced as team data.
+  - **Finding a template:** asked to write a whole document in any other Word document, the AI
+    reads the catalog (`list_team_templates`), asks once whether to use the template that fits,
+    and on yes calls `use_team_template`: the replace guard runs, the shell makes a working copy
+    in the drafts folder, and when the reply ends the tab loads that copy; the new conversation
+    starts with the user's request (and its attachments) carried over and fills the template.
+    No fit, a no, or a stopped run changes nothing.
   - **LLM Wiki before a fill:** the panel waits up to 30 s for LLM Wiki to answer (for a start
     already in progress, never a second one; "업무 위키 준비 중…" shows during the wait), restarts
     it once, and otherwise asks before writing with the work wiki's own pages and the attachments.

@@ -25,6 +25,7 @@ const api: DesktopApi = {
   readDocStyle: (id: string) => ipcRenderer.invoke('docs:read-doc-style', id),
   templateFor: (filePath: string) => ipcRenderer.invoke('docs:template-for', filePath),
   teamTemplateIndex: () => ipcRenderer.invoke('docs:team-template-index'),
+  useTeamTemplate: (setPath: string) => ipcRenderer.invoke('docs:team-template-use', setPath),
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
   getSystemLocale: () => ipcRenderer.invoke('docs:system-locale'),
   onLanguageChanged: (handler) => {

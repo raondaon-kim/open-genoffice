@@ -4098,6 +4098,14 @@ let templateCatalog: (() => Promise<string | null>) | null = null
 export function setDocsTemplateCatalog(fn: (() => Promise<string | null>) | null): void {
   templateCatalog = fn
 }
+/**
+ * the shell makes a new working copy of a team template set and remembers it as that template's
+ * copy; the path of the copy, or a team-library error code to throw
+ */
+let templateUse: ((setPath: string) => Promise<string>) | null = null
+export function setDocsTemplateUse(fn: ((setPath: string) => Promise<string>) | null): void {
+  templateUse = fn
+}
 
 /** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
 /** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
@@ -4342,6 +4350,19 @@ export function registerDocsIpc(): void {
       return (await templateCatalog?.()) ?? null
     } catch {
       return null
+    }
+  })
+  ipcMain.handle('docs:team-template-use', async (event, setPath: unknown) => {
+    if (typeof setPath !== 'string' || !setPath || !templateUse) {
+      return { ok: false, error: 'not-configured' }
+    }
+    try {
+      const copy = await templateUse(setPath)
+      const result = await loadDocx(copy, event.sender.id)
+      return result ? { ok: true, result } : { ok: false, error: 'open-failed' }
+    } catch (error) {
+      const code = (error as { code?: unknown }).code
+      return { ok: false, error: typeof code === 'string' ? code : String(error) }
     }
   })
 

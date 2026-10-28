@@ -279,6 +279,15 @@ From a candidate (or a loose file), "템플릿 만들기":
   deleted from a set because of the index.
 - The Word AI can read `index.md` (read-only tool) to suggest a template for a request such as
   "KOICA 제안서 써 줘", then the user opens it.
+- Added 2026-10-28 (user's decision: "한 번 묻고 진행하자"): asked to write a whole document in a
+  document that is not a working copy, the AI reads `index.md` first; when a template fits it
+  asks once ("팀 템플릿 「…」으로 쓸까요?"), names the candidates when several fit, and says
+  nothing about templates when none fits. On yes the current tab becomes a new working copy (the
+  usual unsaved-changes guard first; drafts folder, same as "이 양식으로 작성" from Home) and the
+  user's request — every value given in the conversation, and the attachments — starts the fill
+  there without being repeated. On no it writes without a template and does not ask again in
+  that conversation. It never applies a template unasked. My calls: same tab (the conversation
+  carries over), the answer is typed in chat (no buttons), Word only.
 
 ### 4. Write
 

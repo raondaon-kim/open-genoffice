@@ -316,6 +316,13 @@ export interface DesktopApi {
   templateFor(filePath: string): Promise<string | null>
   /** the team templates folder's index.md, or null when templates are not set up */
   teamTemplateIndex(): Promise<string | null>
+  /**
+   * A new local working copy of the team template set `setPath` (`Word/<name>/` from index.md),
+   * remembered as that template's copy and read for this tab (the caller loads `result`).
+   */
+  useTeamTemplate(
+    setPath: string,
+  ): Promise<{ ok: true; result: OpenDocxResult } | { ok: false; error: string }>
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */

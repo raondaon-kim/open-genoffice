@@ -157,6 +157,7 @@ import {
   setDocsDocumentSavedHook,
   setDocsTemplateCatalog,
   setDocsTemplateLookup,
+  setDocsTemplateUse,
   type SaveOrigin,
   setDocsFileOpenedHook,
   setSessionPathResolver,
@@ -6666,6 +6667,12 @@ app.whenReady().then(async () => {
   // the Word AI fills a working copy into its template's outline and can list the templates
   setDocsTemplateLookup((path) => templateCopies?.lookup(path) ?? null)
   setDocsTemplateCatalog(() => teamTemplates.indexText())
+  // the Word assistant opens the template the user agreed to: a working copy in the drafts folder
+  setDocsTemplateUse(async (setPath) => {
+    const opened = await teamTemplates.openSet(setPath)
+    templateCopies?.remember(opened.workingCopy, opened.templateMd)
+    return opened.workingCopy
+  })
   registerTeamLibraryIpc({
     library: teamLibrary,
     sync: teamSync,

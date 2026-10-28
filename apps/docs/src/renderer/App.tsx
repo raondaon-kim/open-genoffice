@@ -94,7 +94,7 @@ import {
 import type { AiDocContent, AiSettings, MenuCommand, OpenDocxResult } from '../shared/ipc'
 import { AI_PROVIDERS } from '../shared/ipc'
 import { ZoteroDocumentController } from './zotero/controller'
-import { AiPanel, AI_REVISION_AUTHOR } from './ai/AiPanel'
+import { AiPanel, AI_REVISION_AUTHOR, type CarriedRequest } from './ai/AiPanel'
 import { useAiDock } from './ai/use-ai-dock'
 import type { AiCommentsAccess, AiDocExtras, AiHeaderFooterAccess } from './ai/tools'
 import type { AiStyleInfo } from './ai/style-ops'
@@ -2104,6 +2104,22 @@ export function App() {
     return outcome
   }, [])
   const resetFile = useCallback(() => newFileImpl(fileCtxRef.current), [])
+  /** the request the AI panel carries into a team template's working copy (taken once) */
+  const templateHandoffRef = useRef<CarriedRequest | null>(null)
+  // the replace guard already ran in use_team_template, before the copy was made
+  const switchToTemplateCopy = useCallback(
+    async ({ result, handoff }: { result: OpenDocxResult; handoff: CarriedRequest }) => {
+      templateHandoffRef.current = handoff
+      const outcome = await loadFile(result)
+      if (outcome !== 'ok') templateHandoffRef.current = null
+    },
+    [loadFile],
+  )
+  const takeTemplateHandoff = useCallback(() => {
+    const carried = templateHandoffRef.current
+    templateHandoffRef.current = null
+    return carried
+  }, [])
   const commitOpenedFile = useCallback(
     async (result: OpenDocxResult) => {
       if (!result) return
@@ -6962,6 +6978,8 @@ export function App() {
               pageSetupAccess={aiPageSetupAccess}
               docExtras={aiDocExtras}
               notesAccess={aiNotesAccess}
+              onTemplateSwitch={switchToTemplateCopy}
+              takeTemplateHandoff={takeTemplateHandoff}
             />
           </div>
         )}

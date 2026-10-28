@@ -17,7 +17,12 @@ import type { Block } from '@genoffice/docx-engine'
 import { AgentLoop, composeSkills, streamText, type AgentImage } from '@genoffice/agent-core'
 import { createWorkWikiSkill } from '@genoffice/work-wiki'
 import { imageGenerationAvailable, mediaAnalysisAvailable } from '@genoffice/ai-provider/browser'
-import type { AiSettings, AttachmentAddResult, AttachmentMeta } from '../../shared/ipc'
+import type {
+  AiSettings,
+  AttachmentAddResult,
+  AttachmentMeta,
+  OpenDocxResult,
+} from '../../shared/ipc'
 import { ATTACHMENT_IMAGE_EXTS } from '../../shared/ipc'
 import type { PmNode } from '../editor/convert'
 import { TABLE_TRAILING_SKIP } from '../editor/extensions'
@@ -44,7 +49,12 @@ import { EditQueueCard } from './EditQueueCard'
 import type { DocxStyle } from '@genoffice/doc-styles'
 import { createDocsLander } from './report/docs-lander'
 import { createReportSkill } from './report/report-skill'
-import { createTeamTemplatesSkill, templateRunFor } from './report/team-template-skill'
+import {
+  createTeamTemplatesSkill,
+  templateRunFor,
+  type TemplateHandoff,
+  type TemplateSwitch,
+} from './report/team-template-skill'
 import { createTemplateLander } from './report/template-lander'
 import {
   buildQueueInstruction,
@@ -340,7 +350,17 @@ interface AiPanelProps {
   docExtras?: AiDocExtras
   /** footnote / endnote lists for insert_footnote, insert_endnote, delete_note, read_notes */
   notesAccess?: AiNotesAccess
+  /**
+   * the user agreed to a team template: once the reply ends, load its working copy into this tab
+   * (the panel remounts) and start the carried-over request there
+   */
+  onTemplateSwitch?: (s: { result: OpenDocxResult; handoff: CarriedRequest }) => void
+  /** one-shot: the request carried over from the conversation that opened this working copy */
+  takeTemplateHandoff?: () => CarriedRequest | null
 }
+
+/** a request carried from one conversation to the next (the template's working copy) */
+export type CarriedRequest = TemplateHandoff & { attachments: AttachmentMeta[] }
 
 export function AiPanel({
   editor,
@@ -364,12 +384,36 @@ export function AiPanel({
   pageSetupAccess,
   docExtras,
   notesAccess,
+  onTemplateSwitch,
+  takeTemplateHandoff,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
   // the agent loop is built once: it reads the current path and the template's style through refs
   const filePathRef = useRef(filePath)
   filePathRef.current = filePath
   const templateStyleRef = useRef<DocxStyle | null>(null)
+  const onTemplateSwitchRef = useRef(onTemplateSwitch)
+  onTemplateSwitchRef.current = onTemplateSwitch
+  /** set by use_team_template during a run; the tab switches once that run ends */
+  const pendingTemplateSwitchRef = useRef<TemplateSwitch<OpenDocxResult> | null>(null)
+  /**
+   * the run that agreed to a team template is over: its working copy replaces this document
+   * (this panel remounts there and runs the carried request). Refs only: the loop built on the
+   * first render calls it.
+   */
+  const flushTemplateSwitch = () => {
+    const next = pendingTemplateSwitchRef.current
+    pendingTemplateSwitchRef.current = null
+    if (!next) return
+    const seen = new Set<string>()
+    const attachments = [...sentAttachmentsRef.current, ...attachmentsRef.current].filter((a) =>
+      seen.has(a.path) ? false : (seen.add(a.path), true),
+    )
+    onTemplateSwitchRef.current?.({
+      result: next.result,
+      handoff: { ...next.handoff, attachments },
+    })
+  }
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   const [input, setInput] = useState('')
@@ -839,7 +883,17 @@ export function AiPanel({
             }),
           wikiReady: async () => (await window.workWiki?.ensureReady?.()) ?? { ok: true },
         }),
-        createTeamTemplatesSkill(() => window.desktop),
+        createTeamTemplatesSkill(
+          () => window.desktop,
+          onTemplateSwitchRef.current
+            ? {
+                filePath: () => filePathRef.current,
+                onSwitch: (s) => {
+                  pendingTemplateSwitchRef.current = s
+                },
+              }
+            : undefined,
+        ),
         createFilesSkill(availableAttachments),
         createWorkWikiSkill(() => window.workWiki),
       ]),
@@ -922,6 +976,8 @@ export function AiPanel({
           if (!cancelled && (finalText || runToolsRef.current.length > 0)) {
             persistMessage('assistant', finalText, runToolsRef.current)
           }
+          if (cancelled) pendingTemplateSwitchRef.current = null
+          flushTemplateSwitch()
         },
         onError: (error) => {
           setChat((prev) => {
@@ -955,6 +1011,9 @@ export function AiPanel({
             })
             .catch(() => {})
           setBusy(false)
+          // the working copy is already made and the user agreed: a failed closing sentence
+          // must not strand them in the old document
+          flushTemplateSwitch()
         },
       },
     })
@@ -1152,8 +1211,19 @@ export function AiPanel({
       })
   }
 
+  // a working copy opened for a request made in the previous conversation: run it here, once
+  useEffect(() => {
+    const carried = takeTemplateHandoff?.()
+    if (!carried) return
+    sentAttachmentsRef.current = carried.attachments
+    runWith(carried.instruction, carried.display, carried.attachments)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const cancel = () => {
     if (pendingSendRef.current) pendingSendRef.current.aborted = true
+    // a stopped run does not switch documents
+    pendingTemplateSwitchRef.current = null
     loopRef.current?.cancel()
   }
 
@@ -1189,6 +1259,7 @@ export function AiPanel({
       pendingSendRef.current.aborted = true
       pendingSendRef.current = null
     }
+    pendingTemplateSwitchRef.current = null
     abandonWriter()
     loopRef.current?.reset()
     setBusy(false)
