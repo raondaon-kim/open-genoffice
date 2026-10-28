@@ -236,3 +236,27 @@ describe('saves reach the work wiki (html)', () => {
     ).toMatchObject({ ok: true })
   })
 })
+
+describe('the AI names and saves an untitled document', () => {
+  afterEach(() => setHtmlDocumentSavedHook(null))
+
+  it("is reported as an agent save, not the user's", async () => {
+    const saved = vi.fn()
+    setHtmlDocumentSavedHook(saved)
+    const view = createHtmlView()
+    const contents = view.webContents as unknown as FakeWebContents
+    const result = await save(contents, {
+      text: '<p>AI</p>',
+      imageSources: [],
+      mode: 'save',
+      suggestedName: `ai-named-${Date.now()}`,
+    })
+    expect(result).toMatchObject({ ok: true })
+    const path = (result as { path: string }).path
+    try {
+      expect(saved).toHaveBeenLastCalledWith(path, 'agent')
+    } finally {
+      rmSync(path, { force: true })
+    }
+  })
+})

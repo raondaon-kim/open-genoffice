@@ -59,7 +59,7 @@ const ko: typeof en = {
   title: '팀 템플릿',
   subtitle: '공용 양식의 원본을 보존하면서 새 작업 문서를 만드세요.',
   documentsTitle: '팀 문서 저장소',
-  documentsSubtitle: '저장한 프로젝트 문서를 프로젝트·작성자·문서 종류별로 찾아 보고하세요.',
+  documentsSubtitle: '팀원이 저장한 문서를 프로젝트·작성자·문서 종류별로 찾아보세요.',
   allProjects: '모든 프로젝트',
   allAuthors: '모든 작성자',
   storageLocation: '저장 위치',

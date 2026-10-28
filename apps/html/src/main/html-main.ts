@@ -1501,6 +1501,8 @@ function registerHtmlIpc(): void {
           typeof request.suggestedName === 'string' ? request.suggestedName : undefined
         const defaultName =
           typeof request.defaultName === 'string' ? request.defaultName : undefined
+        // the AI's silent first save of an untitled document, named after its content
+        const aiNamed = mode === 'save' && !pathAtRequest && !!suggestedName?.trim()
         const target = await resolveSaveTarget(e, mode, suggestedName, defaultName)
         if (target === 'canceled') return done({ ok: true, canceled: true })
         if (!target) return done({ ok: false, error: 'html: no save target' })
@@ -1555,7 +1557,7 @@ function registerHtmlIpc(): void {
           }
         }
         if (isNewPath) fileSavedHook?.(e.sender, target)
-        notifyDocumentSaved(target, auto ? 'auto' : 'user')
+        notifyDocumentSaved(target, auto ? 'auto' : aiNamed ? 'agent' : 'user')
         return done({
           ok: true,
           path: target,
