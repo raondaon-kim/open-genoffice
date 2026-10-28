@@ -87,6 +87,51 @@ function roleSet(style: DocxStyle) {
   }
 }
 
+/** report blocks as editor nodes in the style's roles (tables as Word tables) */
+export function reportBlockNodes(
+  style: DocxStyle,
+  blocks: ReportBlock[],
+  numIds: NumIds,
+): PmNode[] {
+  const roles = roleSet(style)
+  const out: PmNode[] = []
+  let n = 0
+  for (const b of blocks) {
+    if (b.type === 'table') {
+      const [head, ...rows] = b.rows
+      const tr = (cells: string[], tag: 'th' | 'td') =>
+        `<tr>${cells.map((c) => `<${tag}>${esc(c)}</${tag}>`).join('')}</tr>`
+      const html = `<table>${head ? tr(head, 'th') : ''}${rows.map((r) => tr(r, 'td')).join('')}</table>`
+      out.push(...parseHtmlFragment(html, numIds))
+      continue
+    }
+    if (b.type !== 'numbered') n = 0
+    const pick = (): { role: DocxRole; text: string } => {
+      switch (b.type) {
+        case 'chapter':
+          return { role: roles.h1, text: b.text }
+        case 'section':
+          return { role: roles.h2, text: b.text }
+        case 'subsection':
+          return { role: roles.h3, text: b.text }
+        case 'bullet':
+          return roles.bullet
+            ? { role: roles.bullet, text: b.text }
+            : { role: roles.body, text: `• ${b.text}` }
+        case 'numbered':
+          n++
+          return roles.numbered
+            ? { role: roles.numbered, text: b.text }
+            : { role: roles.body, text: `${n}. ${b.text}` }
+        default:
+          return { role: roles.body, text: b.text }
+      }
+    }
+    out.push(...styledBlockNodes(style, [pick()], numIds))
+  }
+  return out
+}
+
 /**
  * Lands a report in the open Word document: the skeleton (title, table of contents, one
  * placeholder per chapter) first, then each chapter in place of its placeholder. Placeholders
@@ -97,44 +142,8 @@ export function createDocsLander(deps: DocsLanderDeps): Lander {
   const roles = roleSet(deps.style)
   const marker = (slot: string) => `⟦${deps.runId}·${slot}⟧`
 
-  const toNodes = (blocks: ReportBlock[]): PmNode[] => {
-    const out: PmNode[] = []
-    let n = 0
-    for (const b of blocks) {
-      if (b.type === 'table') {
-        const [head, ...rows] = b.rows
-        const tr = (cells: string[], tag: 'th' | 'td') =>
-          `<tr>${cells.map((c) => `<${tag}>${esc(c)}</${tag}>`).join('')}</tr>`
-        const html = `<table>${head ? tr(head, 'th') : ''}${rows.map((r) => tr(r, 'td')).join('')}</table>`
-        out.push(...parseHtmlFragment(html, deps.numIds()))
-        continue
-      }
-      if (b.type !== 'numbered') n = 0
-      const pick = (): { role: DocxRole; text: string } => {
-        switch (b.type) {
-          case 'chapter':
-            return { role: roles.h1, text: b.text }
-          case 'section':
-            return { role: roles.h2, text: b.text }
-          case 'subsection':
-            return { role: roles.h3, text: b.text }
-          case 'bullet':
-            return roles.bullet
-              ? { role: roles.bullet, text: b.text }
-              : { role: roles.body, text: `• ${b.text}` }
-          case 'numbered':
-            n++
-            return roles.numbered
-              ? { role: roles.numbered, text: b.text }
-              : { role: roles.body, text: `${n}. ${b.text}` }
-          default:
-            return { role: roles.body, text: b.text }
-        }
-      }
-      out.push(...styledBlockNodes(deps.style, [pick()], deps.numIds()))
-    }
-    return out
-  }
+  const toNodes = (blocks: ReportBlock[]): PmNode[] =>
+    reportBlockNodes(deps.style, blocks, deps.numIds())
   const bodyNodes = (lines: string[]) =>
     styledBlockNodes(
       deps.style,

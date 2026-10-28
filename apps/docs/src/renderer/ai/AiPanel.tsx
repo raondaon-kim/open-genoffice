@@ -41,8 +41,11 @@ import {
   type DocWriteSpec,
 } from './doc-writer'
 import { EditQueueCard } from './EditQueueCard'
+import type { DocxStyle } from '@genoffice/doc-styles'
 import { createDocsLander } from './report/docs-lander'
 import { createReportSkill } from './report/report-skill'
+import { createTeamTemplatesSkill, templateRunFor } from './report/team-template-skill'
+import { createTemplateLander } from './report/template-lander'
 import {
   buildQueueInstruction,
   buildQueueSummary,
@@ -363,6 +366,10 @@ export function AiPanel({
   notesAccess,
 }: AiPanelProps) {
   const { t, lang } = useI18n()
+  // the agent loop is built once: it reads the current path and the template's style through refs
+  const filePathRef = useRef(filePath)
+  filePathRef.current = filePath
+  const templateStyleRef = useRef<DocxStyle | null>(null)
   // Panel chrome follows the UI language; message text follows its own content (dir=auto below)
   const isRtl = lang === 'ar' || lang === 'he'
   const [input, setInput] = useState('')
@@ -815,7 +822,24 @@ export function AiPanel({
             return r.ok ? { style: r.style, description: r.description } : null
           },
           progress: (e) => patchLastAssistant((last) => ({ report: [...(last.report ?? []), e] })),
+          // a working copy opened from a team template: its outline is fixed, its form is filled
+          template: async () => {
+            const got = await templateRunFor(window.desktop, filePathRef.current, editorRef.current)
+            templateStyleRef.current = got?.style ?? null
+            return got?.run ?? null
+          },
+          templateLander: (template, runId) =>
+            createTemplateLander({
+              editor: () => editorRef.current,
+              style: templateStyleRef.current!,
+              numIds,
+              track: () => (trackChangesRef.current ? { author: AI_REVISION_AUTHOR } : undefined),
+              runId,
+              template,
+            }),
+          wikiReady: async () => (await window.workWiki?.ensureReady?.()) ?? { ok: true },
         }),
+        createTeamTemplatesSkill(() => window.desktop),
         createFilesSkill(availableAttachments),
         createWorkWikiSkill(() => window.workWiki),
       ]),

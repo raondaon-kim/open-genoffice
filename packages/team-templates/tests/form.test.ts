@@ -120,7 +120,9 @@ describe('docxTexts', () => {
 describe('headerFooterTexts', () => {
   it('maps each header/footer part to its text', async () => {
     const { headerFooterTexts } = await import('../src/form')
-    expect(await headerFooterTexts(await makeDocx(ODA_BLOCKS, { header: '가나다컨설팅 제안서' }))).toEqual({
+    expect(
+      await headerFooterTexts(await makeDocx(ODA_BLOCKS, { header: '가나다컨설팅 제안서' })),
+    ).toEqual({
       'word/header1.xml': '가나다컨설팅 제안서',
     })
   })

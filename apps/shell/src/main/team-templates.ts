@@ -299,6 +299,21 @@ export class TeamTemplates {
     return this.listing(true)
   }
 
+  /** the catalog as index.md text (repaired in memory), or null when templates are not set up */
+  async indexText(): Promise<string | null> {
+    try {
+      const root = await this.deps.library.root('templates')
+      const { index } = await this.reconcile(root, false)
+      return renderIndexMd({
+        ...index,
+        updatedAt: index.updatedAt || minute(this.now()),
+        author: index.author || this.deps.memberName(),
+      })
+    } catch {
+      return null
+    }
+  }
+
   // ── candidates ────────────────────────────────────────
 
   private async sigCache(): Promise<Record<string, SigCacheEntry>> {

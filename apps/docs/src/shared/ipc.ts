@@ -312,6 +312,10 @@ export interface DesktopApi {
   readDocStyle(
     id: string,
   ): Promise<{ ok: true; style: DocxStyle; description: string } | { ok: false; error: string }>
+  /** the team template's template.md this working copy was made from, or null */
+  templateFor(filePath: string): Promise<string | null>
+  /** the team templates folder's index.md, or null when templates are not set up */
+  teamTemplateIndex(): Promise<string | null>
   /** current UI language (persisted by the shell in app-settings.json) */
   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */

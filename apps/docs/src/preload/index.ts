@@ -23,6 +23,8 @@ import { installDropOpenBridge } from '@genoffice/electron-utils/drop-open'
 const api: DesktopApi = {
   listDocStyles: () => ipcRenderer.invoke('docs:list-doc-styles'),
   readDocStyle: (id: string) => ipcRenderer.invoke('docs:read-doc-style', id),
+  templateFor: (filePath: string) => ipcRenderer.invoke('docs:template-for', filePath),
+  teamTemplateIndex: () => ipcRenderer.invoke('docs:team-template-index'),
   getLanguage: () => ipcRenderer.invoke('app:get-language'),
   getSystemLocale: () => ipcRenderer.invoke('docs:system-locale'),
   onLanguageChanged: (handler) => {

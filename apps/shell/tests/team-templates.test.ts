@@ -254,3 +254,27 @@ describe('TeamTemplates.openSet into a home folder', () => {
     expect(second.workingCopy).toBe(join(home, 'KOICA ODA 기술제안서 (2).docx'))
   })
 })
+
+describe('TeamTemplates.indexText', () => {
+  it('is the repaired index.md, or null when templates are not set up', async () => {
+    const svc = service()
+    await makeSet(svc)
+    expect(await svc.indexText()).toContain(
+      '- [KOICA ODA 기술제안서](<Word/KOICA ODA 기술제안서/>)',
+    )
+    const unset = new TeamTemplates({
+      library: new TeamLibrary(
+        () => ({ templates: '', documents: '', memberName: 'x', autoSync: true }),
+        () => {},
+        () => drafts,
+      ),
+      memberName: () => 'x',
+      complete,
+      wikiCatalog: async () => '',
+      cacheDir: cache,
+      draftsDir: drafts,
+      minDocs: () => 1,
+    })
+    expect(await unset.indexText()).toBeNull()
+  })
+})

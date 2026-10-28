@@ -4088,6 +4088,17 @@ function getProjectStore(): ProjectStore {
   return projectStore
 }
 
+/** the shell's answer to "which team template was this working copy made from" (template.md text) */
+let templateLookup: ((filePath: string) => string | null) | null = null
+export function setDocsTemplateLookup(fn: ((filePath: string) => string | null) | null): void {
+  templateLookup = fn
+}
+/** the shell's team-template catalog (index.md text), for the assistant's read-only tool */
+let templateCatalog: (() => Promise<string | null>) | null = null
+export function setDocsTemplateCatalog(fn: (() => Promise<string | null>) | null): void {
+  templateCatalog = fn
+}
+
 /** Fired after every successful document write (not autosave copies); the shell feeds the work wiki. */
 /** who started a save: the user (Save, Save As, close → Save), AutoSave, or an agent (AI, MCP) */
 export type SaveOrigin = 'user' | 'auto' | 'agent'
@@ -4318,6 +4329,21 @@ export function registerDocsIpc(): void {
   ipcMain.handle('docs:read-doc-style', (_event, id: unknown) =>
     readDocxStyle(runtime.docStylesDir, id),
   )
+  ipcMain.handle('docs:template-for', (_event, filePath: unknown) => {
+    if (typeof filePath !== 'string' || !filePath) return null
+    try {
+      return templateLookup?.(filePath) ?? null
+    } catch {
+      return null
+    }
+  })
+  ipcMain.handle('docs:team-template-index', async () => {
+    try {
+      return (await templateCatalog?.()) ?? null
+    } catch {
+      return null
+    }
+  })
 
   configureMetricsCache(userDataPath('font-metrics'))
   ipcMain.handle('docs:font-metrics', (_event, family: string) =>
