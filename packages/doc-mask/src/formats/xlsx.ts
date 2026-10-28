@@ -3,8 +3,9 @@ import { XML_FAMILIES } from '../xml-text'
 import { readPackage, writePackage } from '../zip'
 import { maskEntries, type PartPlan } from './package'
 
+// a formula may not run past its own cell: its text stops at the next <c or </c>
 const NUMERIC_CELL =
-  /<c\b((?:[^>"']|"[^"]*"|'[^']*')*?)>(\s*(?:<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>)?\s*)<v>([^<]*)<\/v>\s*<\/c>/g
+  /<c\b((?:[^>"']|"[^"]*"|'[^']*')*?)>(\s*(?:<f\b[^>]*\/>|<f\b[^>]*>(?:(?!<\/?c[\s>/])[\s\S])*?<\/f>)?\s*)<v>([^<]*)<\/v>\s*<\/c>/g
 
 /**
  * A number typed into a cell is stored as a number (`<v>9001011234567</v>`), not as text. When its

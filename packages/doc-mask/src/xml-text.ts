@@ -17,14 +17,19 @@ export interface XmlFamily {
   preserveSpace?: boolean
   /** elements that separate text inside a paragraph (tab, line break): numbers never join across them */
   breaks?: readonly string[]
+  /** elements that stand for a hyphen (Word's non-breaking hyphen): part of the joined text, and
+   *  removed when a placeholder takes the number they sit in */
+  hyphens?: readonly string[]
 }
 
 export const XML_FAMILIES = {
   docx: {
     paragraph: 'w:p',
-    text: ['w:t', 'w:delText', 'w:instrText'],
+    // m:t: text of an equation, which sits inside the paragraph
+    text: ['w:t', 'w:delText', 'w:instrText', 'm:t'],
     preserveSpace: true,
     breaks: ['w:tab', 'w:br', 'w:cr', 'w:ptab'],
+    hyphens: ['w:noBreakHyphen'],
   },
   hwpx: { paragraph: 'hp:p', text: ['hp:t'], breaks: ['hp:tab', 'hp:lineBreak'] },
   drawing: { paragraph: 'a:p', text: ['a:t'], breaks: ['a:br'] },
@@ -89,6 +94,8 @@ interface Piece {
   /** index of the opening tag of the text element holding this piece */
   openTag: number
   text: string
+  /** an element standing for a character (non-breaking hyphen): removed, never rewritten */
+  element?: boolean
 }
 
 /** paragraphs (in the order they open), each with its pieces in document order */
@@ -98,6 +105,7 @@ function collect(tokens: Token[], family: XmlFamily): Piece[][] {
   const textStack: number[] = [] // token index of each open text element
   const textNames = new Set(family.text)
   const breakNames = new Set(family.breaks ?? [])
+  const hyphenNames = new Set(family.hyphens ?? [])
   let synthetic: number | null = null // a text element outside any paragraph is its own group
 
   tokens.forEach((tok, i) => {
@@ -106,7 +114,14 @@ function collect(tokens: Token[], family: XmlFamily): Piece[][] {
       if (!k) return
       if (breakNames.has(k.name) && k.kind !== 'close') {
         const group = paraStack.length > 0 ? paraStack[paraStack.length - 1] : synthetic
-        if (group !== null) paragraphs[group].push({ token: -1, openTag: -1, text: '	' })
+        if (group !== null) paragraphs[group].push({ token: -1, openTag: -1, text: '\t' })
+        return
+      }
+      if (hyphenNames.has(k.name) && k.kind !== 'close') {
+        const group = paraStack.length > 0 ? paraStack[paraStack.length - 1] : synthetic
+        if (group !== null) {
+          paragraphs[group].push({ token: i, openTag: -1, text: '-', element: true })
+        }
         return
       }
       if (k.name === family.paragraph) {
@@ -159,6 +174,12 @@ export function maskXmlParagraphs(xml: string, family: XmlFamily): { xml: string
     }
     pieces.forEach((p, i) => {
       if (p.token < 0 || masked.pieces[i] === p.text) return
+      if (p.element) {
+        // a non-breaking hyphen inside a masked number goes with the number
+        tokens[p.token] = { raw: '', tag: true }
+        changed = true
+        return
+      }
       tokens[p.token] = { raw: escapeXmlText(masked.pieces[i]), tag: false }
       preserve.add(p.openTag)
       changed = true
@@ -221,6 +242,17 @@ export function maskXmlGeneric(xml: string): { xml: string; counts: Counts } {
       }
       continue
     }
+    const literal = literalSection(tok.raw)
+    if (literal) {
+      // comments and CDATA hold text as written: masked in place, nothing decoded
+      const masked = maskText(literal.inner)
+      if (masked.text !== literal.inner) {
+        tokens[i] = { raw: literal.open + masked.text + literal.close, tag: true }
+        addCounts(counts, masked.counts)
+        changed = true
+      }
+      continue
+    }
     if (!tagKind(tok.raw) || tok.raw.startsWith('</')) continue
     const raw = tok.raw.replace(ATTR, (all, lead: string, dq?: string, sq?: string) => {
       const value = decodeXmlText(dq ?? sq ?? '')
@@ -248,8 +280,24 @@ export function xmlTextsAndAttrs(xml: string): string[] {
       out.push(decodeXmlText(tok.raw))
       continue
     }
+    const literal = literalSection(tok.raw)
+    if (literal) {
+      out.push(literal.inner)
+      continue
+    }
     if (!tagKind(tok.raw) || tok.raw.startsWith('</')) continue
     for (const m of tok.raw.matchAll(ATTR)) out.push(decodeXmlText(m[2] ?? m[3] ?? ''))
   }
   return out
+}
+
+/** a comment or CDATA section split into its delimiters and its literal text */
+function literalSection(raw: string): { open: string; inner: string; close: string } | null {
+  if (raw.startsWith('<!--') && raw.endsWith('-->')) {
+    return { open: '<!--', inner: raw.slice(4, -3), close: '-->' }
+  }
+  if (raw.startsWith('<![CDATA[') && raw.endsWith(']]>')) {
+    return { open: '<![CDATA[', inner: raw.slice(9, -3), close: ']]>' }
+  }
+  return null
 }

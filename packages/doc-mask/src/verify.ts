@@ -35,6 +35,34 @@ const EMBEDDED_PACKAGE = /\.(xlsx|docx|pptx)$/i
 const isZip = (data: Uint8Array): boolean =>
   data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04
 
+const BLOCK_TAGS =
+  /^(?:p|div|br|hr|li|ul|ol|tr|td|th|table|thead|tbody|h[1-6]|section|article|header|footer|blockquote|pre)$/i
+
+/** html as a reader sees it: inline tags gone, block tags as line breaks, entities decoded */
+function htmlReadingText(html: string): string {
+  return html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<\/?([A-Za-z][\w:-]*)(?:[^>"']|"[^"]*"|'[^']*')*>/g, (_tag, name: string) =>
+      BLOCK_TAGS.test(name) ? '\n' : '',
+    )
+    .replace(/&(#x[0-9a-fA-F]+|#\d+|nbsp|amp|lt|gt|quot|apos);/gi, (all, ent: string) => {
+      const e = ent.toLowerCase()
+      if (e === 'nbsp') return ' '
+      if (e === 'amp') return '&'
+      if (e === 'lt') return '<'
+      if (e === 'gt') return '>'
+      if (e === 'quot') return '"'
+      if (e === 'apos') return "'"
+      const code = e.startsWith('#x') ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : all
+    })
+}
+
+/** markdown without emphasis and code markers, which can sit inside a number */
+function markdownReadingText(md: string): string {
+  return md.replace(/[*_~`]/g, '')
+}
+
 function firstHit(texts: Iterable<string>): RuleId | null {
   for (const t of texts) {
     const found = detectSensitive(t)
@@ -64,7 +92,12 @@ function binaryTexts(data: Uint8Array): string[] {
 export async function verifyMasked(format: MaskFormat, bytes: Uint8Array): Promise<VerifyResult> {
   const families = FAMILIES[format]
   if (!families) {
-    const rule = firstHit([decodePart(bytes).text])
+    const text = decodePart(bytes).text
+    // markup can split a number the raw text masker did not see as one: check the reading view too
+    const views = [text]
+    if (format === 'html') views.push(htmlReadingText(text))
+    if (format === 'md') views.push(markdownReadingText(text))
+    const rule = firstHit(views)
     return rule ? { ok: false, part: '', rule } : { ok: true }
   }
   for (const entry of await readPackage(bytes)) {

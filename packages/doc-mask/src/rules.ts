@@ -121,7 +121,13 @@ const RULES: Rule[] = [
   {
     id: 'email',
     find: (t) =>
-      scan(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/, t, whole),
+      t.includes('@')
+        ? scan(
+            /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/,
+            t,
+            whole,
+          )
+        : [],
   },
   {
     id: 'rrn',
@@ -197,17 +203,32 @@ const ALNUM = /[0-9A-Za-z]/
  * a GUID, a hex font signature, a product code. Korean text and punctuation around a number are
  * normal ("번호는010-1234-5678입니다", "Tel.010-…").
  */
-function standsAlone(text: string, start: number, end: number): boolean {
+/** letters that label a phone number written right before it: Tel010-…, HP010-…, Fax02-… */
+const PHONE_LABEL = /^(?:tel|fax|hp|ph|phone|mobile|mob|cell|call|t|f|m|p|h)$/i
+
+function standsAlone(text: string, start: number, end: number, rule: RuleId): boolean {
   const before = text[start - 1] ?? ''
   const after = text[end] ?? ''
-  if (ALNUM.test(before) && !text.slice(start, end).startsWith('+')) return false
+  const matched = text.slice(start, end)
+  if (ALNUM.test(before) && !matched.startsWith('+')) {
+    const label = /[A-Za-z]+$/.exec(text.slice(Math.max(0, start - 12), start))?.[0]
+    const labelled =
+      rule === 'phone' &&
+      label !== undefined &&
+      PHONE_LABEL.test(label) &&
+      !ALNUM.test(text[start - label.length - 1] ?? '')
+    if (!labelled) return false
+  }
   if (ALNUM.test(after)) return false
   if (before === '-' && ALNUM.test(text[start - 2] ?? '')) return false
   if (after === '-' && ALNUM.test(text[end + 1] ?? '')) return false
-  // the fraction or the integer part of a decimal number (4679.3538869297408, 12,900…)
-  const DIGIT = /\d/
-  if ((before === '.' || before === ',') && DIGIT.test(text[start - 2] ?? '')) return false
-  if ((after === '.' || after === ',') && DIGIT.test(text[end + 1] ?? '')) return false
+  // the fraction or the integer part of a decimal number (4679.3538869297408, 12,900…): only a
+  // run of bare digits can be one; "3,010-1234-5678" in a CSV row is a phone number after a field
+  if (/^\d+$/.test(matched)) {
+    const DIGIT = /\d/
+    if ((before === '.' || before === ',') && DIGIT.test(text[start - 2] ?? '')) return false
+    if ((after === '.' || after === ',') && DIGIT.test(text[end + 1] ?? '')) return false
+  }
   return true
 }
 
@@ -215,12 +236,20 @@ const allSameDigit = (s: string): boolean => /^(\d)\1*$/.test(digitsOf(s))
 
 export function detectSensitive(text: string): SensitiveMatch[] {
   const taken: SensitiveMatch[] = []
+  // characters already claimed by an earlier (higher-precedence) match
+  const covered = new Uint8Array(text.length)
+  const free = (start: number, end: number) => {
+    for (let i = start; i < end; i++) if (covered[i]) return false
+    return true
+  }
   for (const rule of RULES) {
     for (const [start, end] of rule.find(text)) {
       if (rule.id !== 'email') {
-        if (!standsAlone(text, start, end) || allSameDigit(text.slice(start, end))) continue
+        if (!standsAlone(text, start, end, rule.id) || allSameDigit(text.slice(start, end)))
+          continue
       }
-      if (taken.some((t) => start < t.end && end > t.start)) continue
+      if (!free(start, end)) continue
+      covered.fill(1, start, end)
       taken.push({ start, end, rule: rule.id })
     }
   }
