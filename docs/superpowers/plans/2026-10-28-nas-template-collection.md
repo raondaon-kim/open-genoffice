@@ -1,6 +1,6 @@
 # NAS Template Collection Implementation Plan
 
-> **Status (2026-10-28):** only the masking package (`packages/doc-mask`, plan Tasks 1–6) and the save-origin hooks (Task 7) were built. Collection and delivery to the NAS (Tasks 8–11: collector, outbox, SMB client, build config, Settings statement, wiring) are on hold and nothing sends documents anywhere. Before resuming: the company's privacy/security owner should confirm how employees are told about the collection (a statement in Settings only was judged too weak; names and addresses are not masked).
+> **Status (2026-10-28): superseded.** Collection into a per-install NAS folder was not built. What shipped instead is the team library (`1d391df7`, `b3f8ebd7`): Home spaces for team templates and team documents over NAS folders the user connects and configures, uploads only for saves the user starts, every copy masked with `packages/doc-mask` (this plan's Tasks 1–7), .hwp/.pdf and documents with embedded objects refused. See MODIFICATIONS.md.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
