@@ -291,3 +291,18 @@ describe('TeamTemplates source-words gate scope', () => {
     await expect(svc.confirm(draft.draftId, edited)).resolves.toMatchObject({ kind: 'Word' })
   })
 })
+
+describe('TeamTemplates source-words detail', () => {
+  it('names every offending line at once', async () => {
+    const svc = service()
+    const [candidate] = await svc.candidates()
+    const draft = await svc.draft({ candidateKey: candidate!.key })
+    const edited = draft.markdown
+      .replace('- 용도: ', '- 용도: 자카르타 보건소 인력은 2,300명으로 ')
+      .replace('- 필요한 자료: ', '- 필요한 자료: 서울특별시 중구 세종대로 110, ')
+    await expect(svc.confirm(draft.draftId, edited)).rejects.toMatchObject({
+      code: 'source-words',
+      detail: expect.stringMatching(/자카르타[\s\S]*\n[\s\S]*세종대로/),
+    })
+  })
+})

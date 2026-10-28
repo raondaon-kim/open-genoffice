@@ -131,6 +131,7 @@
 .team-feedback-error {
   background: #fff0ee;
   color: #ad3529;
+  white-space: pre-line;
 }
 .team-files,
 .team-uploads {

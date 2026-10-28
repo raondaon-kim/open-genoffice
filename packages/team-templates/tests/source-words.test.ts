@@ -56,3 +56,26 @@ describe('sourceWordsHit counts letters and digits only', () => {
     expect(sourceWordsHit(source, ['일반현황, 연혁, 조직, 인원 순서'])).toBe('일반현황, 연혁, 조직, 인원 순서')
   })
 })
+
+describe('source-words: table of contents before the first heading, all hits', () => {
+  it('cover lines that repeat a heading are form too', async () => {
+    const { sourceContentTexts } = await import('../src/source-words')
+    const texts = sourceContentTexts({
+      headings: [{ level: 1, text: '4. 참여인력 이력사항 (서식 제10호)', styled: true, index: 9 }],
+      tables: [],
+      body: [],
+      cover: ['경기도 도시생태현황지도 제안서', '4. 참여인력 이력사항 (서식 제10호)'],
+      tableCells: [],
+      certain: true,
+    })
+    expect(texts).toEqual(['경기도 도시생태현황지도 제안서'])
+  })
+
+  it('sourceWordsHits lists every offending line', async () => {
+    const { sourceWordsHits } = await import('../src/source-words')
+    const source = ['인도네시아 보건인력 관리체계 개선사업', '자카르타 보건소 인력은 2,300명']
+    expect(
+      sourceWordsHits(source, ['보건인력 관리체계 개선', '무관한 줄', '자카르타 보건소 인력은']),
+    ).toEqual(['보건인력 관리체계 개선', '자카르타 보건소 인력은'])
+  })
+})

@@ -31,7 +31,7 @@ import {
   setFormHeadings,
   signatureHash,
   sourceContentTexts,
-  sourceWordsHit,
+  sourceWordsHits,
   upsertSet,
   type CandidateDoc,
   type CandidateGroup,
@@ -543,13 +543,22 @@ export class TeamTemplates {
     const contentLines = mdLines.filter(
       (l) => !/^- (근거 서명|형태 파일|참고할 업무 위키):/.test(l),
     )
-    const hit = sourceWordsHit(
+    const hits = sourceWordsHits(
       draft.outlines.flatMap(sourceContentTexts),
       [...(await docxTexts(form)), ...contentLines],
       8,
       draft.allowed,
     )
-    if (hit) throw new TeamLibraryError('source-words', hit)
+    // every offending line at once (up to 10), so the reviewer fixes them in one pass
+    if (hits.length) {
+      throw new TeamLibraryError(
+        'source-words',
+        `\n${hits
+          .slice(0, 10)
+          .map((l) => l.trim())
+          .join('\n')}`,
+      )
+    }
     const mask = this.deps.mask ?? maskDocument
     const masked = await mask(FORM, form)
     if (!masked.ok || Object.values(masked.counts).some((n) => n > 0)) {
