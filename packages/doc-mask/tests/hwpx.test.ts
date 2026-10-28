@@ -30,8 +30,12 @@ async function hwpx(extra: Record<string, string | Uint8Array> = {}): Promise<Ui
       // body text split across runs
       p(run('연락처 010-') + run('1234-5678')) +
         // header/footer and footnote live inside the section as controls of a paragraph
-        p(`<hp:run><hp:ctrl><hp:header><hp:subList>${p(run(`대표 02-123-4567`))}</hp:subList></hp:header></hp:ctrl></hp:run>`) +
-        p(`<hp:run><hp:ctrl><hp:footNote><hp:subList>${p(run('hong@x.kr'))}</hp:subList></hp:footNote></hp:ctrl></hp:run>`) +
+        p(
+          `<hp:run><hp:ctrl><hp:header><hp:subList>${p(run(`대표 02-123-4567`))}</hp:subList></hp:header></hp:ctrl></hp:run>`,
+        ) +
+        p(
+          `<hp:run><hp:ctrl><hp:footNote><hp:subList>${p(run('hong@x.kr'))}</hp:subList></hp:footNote></hp:ctrl></hp:run>`,
+        ) +
         // a table whose cell paragraph is nested inside the outer paragraph
         p(
           `<hp:run><hp:t>표 제목</hp:t><hp:tbl><hp:tr><hp:tc><hp:subList>${p(run('010-9876-') + run('5432'))}</hp:subList></hp:tc></hp:tr></hp:tbl></hp:run>` +
@@ -95,7 +99,9 @@ describe('maskHwpx', () => {
 
   it('leaves a section without numbers byte-identical', async () => {
     const clean = section(p(run('안내문')))
-    const out = await partsOf((await maskHwpx(await hwpx({ 'Contents/section2.xml': clean }))).bytes)
+    const out = await partsOf(
+      (await maskHwpx(await hwpx({ 'Contents/section2.xml': clean }))).bytes,
+    )
     expect(out['Contents/section2.xml']).toBe(clean)
   })
 })

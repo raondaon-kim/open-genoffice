@@ -8,7 +8,11 @@ export interface PackageEntry {
 }
 
 /** bounds for documents users save; the zip gate also catches parts that lie about their size */
-const LIMITS = { maxParts: 10000, maxPartBytes: 256 * 1024 * 1024, maxTotalBytes: 512 * 1024 * 1024 }
+const LIMITS = {
+  maxParts: 10000,
+  maxPartBytes: 256 * 1024 * 1024,
+  maxTotalBytes: 512 * 1024 * 1024,
+}
 
 export async function readPackage(bytes: Uint8Array): Promise<PackageEntry[]> {
   await assertZipInflatesWithinLimits(bytes, LIMITS)

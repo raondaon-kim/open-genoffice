@@ -44,7 +44,9 @@ describe('maskDocx', () => {
       'docProps/app.xml': `<Properties><Company>${PHONE}</Company></Properties>`,
       'docProps/custom.xml': `<Properties><property><vt:lpwstr>${PHONE}</vt:lpwstr></property></Properties>`,
     }
-    const out = await maskDocx(await pack({ ...parts, 'docProps/thumbnail.jpeg': new Uint8Array([0xff, 0xd8]) }))
+    const out = await maskDocx(
+      await pack({ ...parts, 'docProps/thumbnail.jpeg': new Uint8Array([0xff, 0xd8]) }),
+    )
     if ('encrypted' in out) throw new Error('unexpected')
     const masked = await partsOf(out.bytes)
     for (const name of Object.keys(parts)) expect(text(masked[name]), name).not.toContain(PHONE)
@@ -57,7 +59,9 @@ describe('maskDocx', () => {
       '<w:r><w:rPr><w:i/></w:rPr><w:t>1234-5678</w:t></w:r></w:hyperlink></w:p></w:body></w:document>'
     const rels =
       '<Relationships><Relationship Id="rId9" Type="hyperlink" Target="mailto:hong@x.kr" TargetMode="External"/></Relationships>'
-    const out = await maskDocx(await pack({ 'word/document.xml': doc, 'word/_rels/document.xml.rels': rels }))
+    const out = await maskDocx(
+      await pack({ 'word/document.xml': doc, 'word/_rels/document.xml.rels': rels }),
+    )
     if ('encrypted' in out) throw new Error('unexpected')
     const masked = await partsOf(out.bytes)
     expect(text(masked['word/document.xml'])).toContain('[전화번호]')
@@ -106,7 +110,8 @@ describe('maskDocx', () => {
 })
 
 describe('maskPptx', () => {
-  const sp = (s: string) => `<p:sp><p:txBody><a:p><a:r><a:t>${s}</a:t></a:r></a:p></p:txBody></p:sp>`
+  const sp = (s: string) =>
+    `<p:sp><p:txBody><a:p><a:r><a:t>${s}</a:t></a:r></a:p></p:txBody></p:sp>`
 
   it('masks slides, notes, layouts, masters, comments, diagrams, charts and embedded workbooks', async () => {
     const inner = await pack({ 'xl/sharedStrings.xml': `<sst><si><t>${PHONE}</t></si></sst>` })

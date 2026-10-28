@@ -151,11 +151,7 @@ const RULES: Rule[] = [
     id: 'phone',
     find: (t) => [
       // mobile, optionally international
-      ...scan(
-        /(?:\+82[ -]?(?:\(0\))?|(?<!\d)0)1[016789][ .-]?\d{3,4}[ .-]?\d{4}(?!\d)/,
-        t,
-        whole,
-      ),
+      ...scan(/(?:\+82[ -]?(?:\(0\))?|(?<!\d)0)1[016789][ .-]?\d{3,4}[ .-]?\d{4}(?!\d)/, t, whole),
       // landline / fax / internet phone, optionally international or with the area code in brackets
       ...scan(
         new RegExp(
@@ -173,7 +169,10 @@ const RULES: Rule[] = [
     find: (t) => [
       // a long digit group shortly after an account word or a bank name
       ...scan(
-        new RegExp(`(?:계좌|예금주|입금|은행|account|${BANKS})[^\\n\\d]{0,15}(\\d[\\d-]{8,22}\\d)`, 'i'),
+        new RegExp(
+          `(?:계좌|예금주|입금|은행|account|${BANKS})[^\\n\\d]{0,15}(\\d[\\d-]{8,22}\\d)`,
+          'i',
+        ),
         t,
         (m) => {
           const n = digitsOf(m[1]).length
@@ -205,6 +204,10 @@ function standsAlone(text: string, start: number, end: number): boolean {
   if (ALNUM.test(after)) return false
   if (before === '-' && ALNUM.test(text[start - 2] ?? '')) return false
   if (after === '-' && ALNUM.test(text[end + 1] ?? '')) return false
+  // the fraction or the integer part of a decimal number (4679.3538869297408, 12,900…)
+  const DIGIT = /\d/
+  if ((before === '.' || before === ',') && DIGIT.test(text[start - 2] ?? '')) return false
+  if ((after === '.' || after === ',') && DIGIT.test(text[end + 1] ?? '')) return false
   return true
 }
 

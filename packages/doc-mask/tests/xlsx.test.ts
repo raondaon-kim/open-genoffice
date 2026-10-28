@@ -94,7 +94,8 @@ describe('maskXlsx', () => {
   })
 
   it('leaves parts without numbers byte-identical', async () => {
-    const styles = '<styleSheet><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts></styleSheet>'
+    const styles =
+      '<styleSheet><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts></styleSheet>'
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3])
     const bytes = await workbook({ 'xl/styles.xml': styles, 'xl/media/image1.png': png })
     const out = await readPackage((await maskXlsx(bytes)).bytes)

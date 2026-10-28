@@ -41,14 +41,15 @@ export type MaskOutcome =
   | { ok: true; bytes: Uint8Array; counts: Counts }
   | {
       ok: false
-      reason: 'unsupported' | 'encrypted' | 'parse' | 'residual'
+      reason: 'unsupported' | 'encrypted' | 'parse' | 'residual' | 'embedded'
       part?: string
       rule?: RuleId
     }
 
 /**
  * Masks one saved document and re-checks the result. Only `ok` may leave the PC: a file that
- * cannot be parsed, an encrypted one, and one in which any detector still finds a number never do.
+ * cannot be parsed, an encrypted one, one with an embedded object the masker cannot open, and one
+ * in which any detector still finds a number never do.
  */
 export async function maskDocument(fileName: string, bytes: Uint8Array): Promise<MaskOutcome> {
   const format = formatOf(fileName)
@@ -65,7 +66,11 @@ export async function maskDocument(fileName: string, bytes: Uint8Array): Promise
     else if (format === 'html') masked = maskHtml(bytes)
     else masked = maskPlainText(bytes)
     const check = await verifyMasked(format, masked.bytes)
-    if (!check.ok) return { ok: false, reason: 'residual', part: check.part, rule: check.rule }
+    if (!check.ok) {
+      return 'embedded' in check
+        ? { ok: false, reason: 'embedded', part: check.part }
+        : { ok: false, reason: 'residual', part: check.part, rule: check.rule }
+    }
   } catch {
     return { ok: false, reason: 'parse' }
   }

@@ -146,10 +146,7 @@ export function xmlParagraphTexts(xml: string, family: XmlFamily): string[] {
   return collect(tokenize(xml), family).map((pieces) => pieces.map((p) => p.text).join(''))
 }
 
-export function maskXmlParagraphs(
-  xml: string,
-  family: XmlFamily,
-): { xml: string; counts: Counts } {
+export function maskXmlParagraphs(xml: string, family: XmlFamily): { xml: string; counts: Counts } {
   const tokens = tokenize(xml)
   const counts: Counts = {}
   let changed = false
@@ -197,6 +194,8 @@ function addCounts(into: Counts, from: Counts): void {
   }
 }
 
+const NUMERIC_ONLY = /^\s*[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?\s*$/
+
 /**
  * The catch-all pass over any XML part: every run of character data and every attribute value is
  * masked on its own (a number split across elements is the family pass's job, which runs first).
@@ -211,6 +210,9 @@ export function maskXmlGeneric(xml: string): { xml: string; counts: Counts } {
     const tok = tokens[i]
     if (!tok.tag) {
       const text = decodeXmlText(tok.raw)
+      // a bare number sits in a numeric slot (a cached chart value, a pivot item): a placeholder
+      // there makes Office repair the file, so it is left for the verification pass to refuse
+      if (NUMERIC_ONLY.test(text)) continue
       const masked = maskText(text)
       if (masked.text !== text) {
         tokens[i] = { raw: escapeXmlText(masked.text), tag: false }
@@ -222,6 +224,7 @@ export function maskXmlGeneric(xml: string): { xml: string; counts: Counts } {
     if (!tagKind(tok.raw) || tok.raw.startsWith('</')) continue
     const raw = tok.raw.replace(ATTR, (all, lead: string, dq?: string, sq?: string) => {
       const value = decodeXmlText(dq ?? sq ?? '')
+      if (NUMERIC_ONLY.test(value)) return all
       const masked = maskText(value)
       if (masked.text === value) return all
       addCounts(counts, masked.counts)
