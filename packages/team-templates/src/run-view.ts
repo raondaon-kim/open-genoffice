@@ -14,6 +14,8 @@ export interface TemplateRunView {
   coverLabels: string[]
   wikiPages: string[]
   styleRules: string
+  /** every outline heading in order: the form has the same headings in the same order */
+  headings: string[]
 }
 
 /**
@@ -44,6 +46,7 @@ export function templateForRun(def: TemplateDef, coverLabels: string[]): Templat
     purpose: def.purpose,
     sections,
     coverLabels,
+    headings: def.outline.map((e) => e.heading),
     wikiPages: def.wikiPages,
     styleRules: [def.notes, def.materials.length ? `필요한 자료: ${def.materials.join(', ')}` : '']
       .filter(Boolean)

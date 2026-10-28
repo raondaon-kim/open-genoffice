@@ -1,18 +1,8 @@
 import { createHash } from 'node:crypto'
 import type { DocxOutline } from './docx-outline'
+import { normalizeHeading } from './normalize'
 
-/** a heading without its numbering, bracketed notes, digits, punctuation and spaces */
-export function normalizeHeading(text: string): string {
-  return (
-    text
-      .normalize('NFC')
-      .trim()
-      // Ⅱ-1. / 1-1. / 3) / 가.
-      .replace(/^(?:[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ\d]+(?:[-.]\d+)*[.)]?|[가-하][.)])\s*/u, '')
-      .replace(/\([^)]*\)|\[[^\]]*\]|（[^）]*）/gu, '')
-      .replace(/[\d\s\p{P}\p{S}]/gu, '')
-  )
-}
+export { normalizeHeading }
 
 /** `level:normalized heading` per heading, then `T:header|header` per table */
 export function outlineSignature(o: DocxOutline): string[] {

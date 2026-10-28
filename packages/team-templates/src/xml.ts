@@ -37,6 +37,24 @@ export function textOf(xml: string): string {
  * Splits the body into its top-level paragraphs and tables. Tables are matched with nesting
  * (a table inside a cell stays inside its parent element).
  */
+/**
+ * The end (exclusive) of the element named `tag` that opens at `start`, counting nested elements
+ * of the same name (self-closing ones do not nest); -1 when it never closes.
+ */
+export function matchingClose(xml: string, start: number, tag: string): number {
+  const re = new RegExp(`<${tag}(?=[\\s>/])[^>]*?(/?)>|</${tag}>`, 'g')
+  re.lastIndex = start
+  let depth = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(xml))) {
+    if (m[0].startsWith('</')) depth--
+    else if (m[1] !== '/') depth++
+    else if (depth === 0) return m.index + m[0].length
+    if (depth === 0) return m.index + m[0].length
+  }
+  return -1
+}
+
 export function splitBody(body: string): BodyElement[] {
   const out: BodyElement[] = []
   let i = 0
@@ -74,10 +92,9 @@ export function splitBody(body: string): BodyElement[] {
       let j: number
       if (body.startsWith('<w:p/>', i)) j = i + 6
       else {
-        // a paragraph never nests another paragraph at the top level of the body
-        const end = body.indexOf('</w:p>', i)
-        if (end < 0) throw new Error('unterminated paragraph')
-        j = end + 6
+        // text boxes (w:txbxContent) nest whole paragraphs inside a paragraph
+        j = matchingClose(body, i, 'w:p')
+        if (j < 0) throw new Error('unterminated paragraph')
       }
       flushRaw()
       out.push({ kind: 'p', xml: body.slice(i, j), index: index++ })

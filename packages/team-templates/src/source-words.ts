@@ -1,5 +1,5 @@
 import type { DocxOutline } from './docx-outline'
-import { normalizeHeading } from './signature'
+import { normalizeHeading } from './normalize'
 
 /**
  * A line without leading bullets/numbering, whitespace and punctuation, for comparison: a run is
@@ -17,13 +17,15 @@ function normalize(line: string): string {
  * source text. Callers pass only the source's content (body paragraphs, cover values, table body
  * cells), never its headings or labels. Runs that also occur in `allowed` (the form's own text:
  * headings, table header rows) are form, so they do not count even when a body sentence repeats
- * them.
+ * them — unless they also occur in `strict` (cover values and table values): a heading that
+ * names the project does not make the project's name form.
  */
 export function sourceWordsHits(
   sourceTexts: string[],
   candidateTexts: string[],
   minLen = 8,
   allowed: string[] = [],
+  strict: string[] = [],
 ): string[] {
   const gramsOf = (text: string): string[] => {
     const chars = Array.from(normalize(text))
@@ -32,7 +34,8 @@ export function sourceWordsHits(
     return out
   }
   const grams = new Set(sourceTexts.flatMap(gramsOf))
-  for (const text of allowed) for (const g of gramsOf(text)) grams.delete(g)
+  const keep = new Set(strict.flatMap(gramsOf))
+  for (const text of allowed) for (const g of gramsOf(text)) if (!keep.has(g)) grams.delete(g)
   if (grams.size === 0) return []
   return candidateTexts.filter((line) => gramsOf(line).some((g) => grams.has(g)))
 }
@@ -43,8 +46,9 @@ export function sourceWordsHit(
   candidateTexts: string[],
   minLen = 8,
   allowed: string[] = [],
+  strict: string[] = [],
 ): string | null {
-  return sourceWordsHits(sourceTexts, candidateTexts, minLen, allowed)[0] ?? null
+  return sourceWordsHits(sourceTexts, candidateTexts, minLen, allowed, strict)[0] ?? null
 }
 
 /**
@@ -59,4 +63,15 @@ export function sourceContentTexts(outline: DocxOutline): string[] {
     ...outline.cover.filter((line) => !headings.has(normalizeHeading(line))),
     ...outline.tableCells,
   ]
+}
+
+/**
+ * The texts whose runs are never exempt as form: cover values and table values, minus lines that
+ * repeat a heading (a table of contents or an evaluation table that lists the chapters).
+ */
+export function strictContentTexts(outline: DocxOutline): string[] {
+  const headings = new Set(outline.headings.map((h) => normalizeHeading(h.text)))
+  return [...outline.cover, ...outline.tableCells].filter(
+    (line) => !headings.has(normalizeHeading(line)),
+  )
 }

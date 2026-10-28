@@ -17,7 +17,8 @@
   "dependencies": {
     "jszip": "^3.10.1",
     "@genoffice/doc-mask": "*",
-    "@genoffice/doc-styles": "*"
+    "@genoffice/doc-styles": "*",
+    "fast-xml-parser": "^5.3.4"
   },
   "devDependencies": {
     "@types/node": "^24.10.1",

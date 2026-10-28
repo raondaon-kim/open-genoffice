@@ -16,7 +16,8 @@ describe('buildFormDocx', () => {
       (await readDocxOutline(src)).headings.map((h) => h.text),
     )
     expect(await part(form, 'word/styles.xml')).toBe(await part(src, 'word/styles.xml'))
-    expect(await part(form, 'word/header1.xml')).toBe(await part(src, 'word/header1.xml'))
+    // header text is the AI's generalized text or nothing (review finding: no source words)
+    expect(await part(form, 'word/header1.xml')).not.toContain('가나다컨설팅')
     expect(await body(form)).toContain('<w:pgMar w:top="1134"')
   })
 

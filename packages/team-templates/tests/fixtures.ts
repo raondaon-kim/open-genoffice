@@ -15,8 +15,14 @@ export interface FxPara {
 }
 export interface FxTable {
   table: string[][]
+  /** how the first row is marked (default bold) */
+  header?: 'plain' | 'bold' | 'tblHeader'
 }
-export type FxBlock = FxPara | FxTable
+/** body XML inserted as is */
+export interface FxRaw {
+  raw: string
+}
+export type FxBlock = FxPara | FxTable | FxRaw
 
 export interface FxOptions {
   styles?: string
@@ -26,6 +32,12 @@ export interface FxOptions {
   customXml?: boolean
   coreTitle?: string
   sectPr?: string
+  /** a chart part with its own text, referenced from a body paragraph */
+  chart?: boolean
+  /** a glossary (building blocks) part */
+  glossary?: boolean
+  /** docProps/app.xml TitlesOfParts entries */
+  appTitles?: string[]
 }
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -66,11 +78,14 @@ function para(p: FxPara): string {
 }
 
 function table(t: FxTable): string {
+  const mark = t.header ?? 'bold'
   const rows = t.table
-    .map(
-      (r) =>
-        `<w:tr>${r.map((c) => `<w:tc><w:tcPr><w:tcW w:w="2000" w:type="dxa"/></w:tcPr><w:p><w:r><w:t xml:space="preserve">${esc(c)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`,
-    )
+    .map((r, i) => {
+      const head = i === 0
+      const trPr = head && mark === 'tblHeader' ? '<w:trPr><w:tblHeader/></w:trPr>' : ''
+      const rPr = head && mark === 'bold' ? '<w:rPr><w:b/></w:rPr>' : ''
+      return `<w:tr>${trPr}${r.map((c) => `<w:tc><w:tcPr><w:tcW w:w="2000" w:type="dxa"/></w:tcPr><w:p><w:r>${rPr}<w:t xml:space="preserve">${esc(c)}</w:t></w:r></w:p></w:tc>`).join('')}</w:tr>`
+    })
     .join('')
   return `<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/></w:tblPr><w:tblGrid/>${rows}</w:tbl>`
 }
@@ -78,11 +93,14 @@ function table(t: FxTable): string {
 /** a small but complete Word package built in memory */
 export async function makeDocx(blocks: FxBlock[], opts: FxOptions = {}): Promise<Uint8Array> {
   const zip = new JSZip()
-  const body = blocks.map((b) => ('table' in b ? table(b) : para(b))).join('')
+  const body = blocks.map((b) => ('raw' in b ? b.raw : 'table' in b ? table(b) : para(b))).join('')
+  const chartPara = opts.chart
+    ? '<w:p><w:r><w:drawing><wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rIdChart"/></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>'
+    : ''
   const sectPr = opts.sectPr ?? DEFAULT_SECTPR
   zip.file(
     'word/document.xml',
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ${W} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}${sectPr}</w:body></w:document>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<w:document ${W} xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body>${body}${chartPara}${sectPr}</w:body></w:document>`,
   )
   zip.file('word/styles.xml', opts.styles ?? DEFAULT_STYLES)
   const rels = [
@@ -99,6 +117,41 @@ export async function makeDocx(blocks: FxBlock[], opts: FxOptions = {}): Promise
     '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>',
     '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>',
   ]
+  if (opts.chart) {
+    zip.file(
+      'word/charts/chart1.xml',
+      '<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:v>자카르타 보건소 인력 2300명</c:v></c:chartSpace>',
+    )
+    zip.file(
+      'word/charts/_rels/chart1.xml.rels',
+      '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdE" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/package" Target="../embeddings/Microsoft_Excel_Worksheet.xlsx"/></Relationships>',
+    )
+    zip.file('word/embeddings/Microsoft_Excel_Worksheet.xlsx', new Uint8Array([80, 75, 3, 4]))
+    rels.push(
+      '<Relationship Id="rIdChart" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart" Target="charts/chart1.xml"/>',
+    )
+    types.push(
+      '<Override PartName="/word/charts/chart1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>',
+    )
+  }
+  if (opts.glossary) {
+    zip.file(
+      'word/glossary/document.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><w:glossaryDocument ${W}><w:docParts><w:docPart><w:docPartBody><w:p><w:r><w:t>상용구 속 인도네시아 사업명</w:t></w:r></w:p></w:docPartBody></w:docPart></w:docParts></w:glossaryDocument>`,
+    )
+    rels.push(
+      '<Relationship Id="rIdG" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/glossaryDocument" Target="glossary/document.xml"/>',
+    )
+    types.push(
+      '<Override PartName="/word/glossary/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml"/>',
+    )
+  }
+  if (opts.appTitles) {
+    zip.file(
+      'docProps/app.xml',
+      `<?xml version="1.0" encoding="UTF-8"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Company>가나다컨설팅</Company><TitlesOfParts><vt:vector size="${opts.appTitles.length}" baseType="lpstr">${opts.appTitles.map((t) => `<vt:lpstr>${esc(t)}</vt:lpstr>`).join('')}</vt:vector></TitlesOfParts></Properties>`,
+    )
+  }
   if (opts.comments) {
     zip.file(
       'word/comments.xml',
