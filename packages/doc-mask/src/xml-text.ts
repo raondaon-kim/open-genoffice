@@ -29,6 +29,10 @@ export const XML_FAMILIES = {
   hwpx: { paragraph: 'hp:p', text: ['hp:t'], breaks: ['hp:tab', 'hp:lineBreak'] },
   drawing: { paragraph: 'a:p', text: ['a:t'], breaks: ['a:br'] },
   sheet: { paragraph: 'si', text: ['t'], preserveSpace: true },
+  /** xlsx inline strings: <c t="inlineStr"><is><t>…</t></is></c> */
+  inline: { paragraph: 'is', text: ['t'], preserveSpace: true },
+  /** xlsx cell comments: <comment><text><r><t>…</t></r></text></comment> */
+  comment: { paragraph: 'text', text: ['t'], preserveSpace: true },
 } as const satisfies Record<string, XmlFamily>
 
 interface Token {
@@ -178,7 +182,13 @@ export function maskXmlParagraphs(
 const ATTR = /(\s[^\s=/>]+\s*=\s*)(?:"([^"]*)"|'([^']*)')/g
 
 function escapeXmlAttr(s: string): string {
-  return escapeXmlText(s).replace(/"/g, '&quot;')
+  // whitespace characters are written as references: a literal newline or tab in an attribute
+  // value would be normalised to a space by every reader
+  return escapeXmlText(s)
+    .replace(/"/g, '&quot;')
+    .replace(/\n/g, '&#10;')
+    .replace(/\r/g, '&#13;')
+    .replace(/\t/g, '&#9;')
 }
 
 function addCounts(into: Counts, from: Counts): void {
@@ -226,3 +236,17 @@ export function maskXmlGeneric(xml: string): { xml: string; counts: Counts } {
 }
 
 export { addCounts }
+
+/** every text node and every attribute value of an XML part, decoded, one string each */
+export function xmlTextsAndAttrs(xml: string): string[] {
+  const out: string[] = []
+  for (const tok of tokenize(xml)) {
+    if (!tok.tag) {
+      out.push(decodeXmlText(tok.raw))
+      continue
+    }
+    if (!tagKind(tok.raw) || tok.raw.startsWith('</')) continue
+    for (const m of tok.raw.matchAll(ATTR)) out.push(decodeXmlText(m[2] ?? m[3] ?? ''))
+  }
+  return out
+}

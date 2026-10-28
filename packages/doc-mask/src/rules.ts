@@ -191,10 +191,32 @@ const RULES: Rule[] = [
   },
 ]
 
+const ALNUM = /[0-9A-Za-z]/
+
+/**
+ * A number glued to Latin letters or digits, or hyphen-joined to them, is part of something else:
+ * a GUID, a hex font signature, a product code. Korean text and punctuation around a number are
+ * normal ("번호는010-1234-5678입니다", "Tel.010-…").
+ */
+function standsAlone(text: string, start: number, end: number): boolean {
+  const before = text[start - 1] ?? ''
+  const after = text[end] ?? ''
+  if (ALNUM.test(before) && !text.slice(start, end).startsWith('+')) return false
+  if (ALNUM.test(after)) return false
+  if (before === '-' && ALNUM.test(text[start - 2] ?? '')) return false
+  if (after === '-' && ALNUM.test(text[end + 1] ?? '')) return false
+  return true
+}
+
+const allSameDigit = (s: string): boolean => /^(\d)\1*$/.test(digitsOf(s))
+
 export function detectSensitive(text: string): SensitiveMatch[] {
   const taken: SensitiveMatch[] = []
   for (const rule of RULES) {
     for (const [start, end] of rule.find(text)) {
+      if (rule.id !== 'email') {
+        if (!standsAlone(text, start, end) || allSameDigit(text.slice(start, end))) continue
+      }
       if (taken.some((t) => start < t.end && end > t.start)) continue
       taken.push({ start, end, rule: rule.id })
     }

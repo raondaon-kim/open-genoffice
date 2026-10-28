@@ -112,3 +112,22 @@ describe('detectSensitive', () => {
     expect(maskText('12345678901234567890').text).toBe('12345678901234567890')
   })
 })
+
+describe('identifiers inside structural values are not numbers', () => {
+  it.each([
+    '{41C04592-2E84-4A1B-9C3D-123456789012}',
+    '{24081801-1234-5678-9012-345678901234}',
+    'w:val="020B0609000101010101"',
+    'usb0="E0002AFF" usb1="0000000000000000"',
+    '0000000000000000',
+    'ID A1234-5678-9012-3456B',
+  ])('%s', (input) => {
+    expect(maskText(input).text).toBe(input)
+  })
+
+  it('still masks numbers next to punctuation and Korean', () => {
+    expect(maskText('Tel.010-1234-5678').text).toBe('Tel.[전화번호]')
+    expect(maskText('(010-1234-5678)').text).toBe('([전화번호])')
+    expect(maskText('번호는010-1234-5678입니다').text).toBe('번호는[전화번호]입니다')
+  })
+})

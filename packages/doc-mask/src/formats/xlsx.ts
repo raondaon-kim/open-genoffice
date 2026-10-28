@@ -1,10 +1,7 @@
 import { type Counts, maskText } from '../rules'
-import { XML_FAMILIES, type XmlFamily } from '../xml-text'
+import { XML_FAMILIES } from '../xml-text'
 import { readPackage, writePackage } from '../zip'
 import { maskEntries, type PartPlan } from './package'
-
-/** inline strings: <c t="inlineStr"><is><t>…</t></is></c>, rich runs like shared strings */
-const INLINE: XmlFamily = { paragraph: 'is', text: ['t'], preserveSpace: true }
 
 const NUMERIC_CELL =
   /<c\b((?:[^>"']|"[^"]*"|'[^']*')*?)>(\s*(?:<f\b[^>]*\/>|<f\b[^>]*>[\s\S]*?<\/f>)?\s*)<v>([^<]*)<\/v>\s*<\/c>/g
@@ -33,9 +30,9 @@ export function maskNumericCells(xml: string): { xml: string; counts: Counts } {
 export function xlsxPlan(name: string): PartPlan {
   if (/^xl\/sharedStrings\.xml$/i.test(name)) return { families: [XML_FAMILIES.sheet] }
   if (/^xl\/worksheets\/[^/]+\.xml$/i.test(name)) {
-    return { before: maskNumericCells, families: [INLINE] }
+    return { before: maskNumericCells, families: [XML_FAMILIES.inline] }
   }
-  if (/^xl\/(comments|threadedComments)/i.test(name)) return { families: [XML_FAMILIES.sheet] }
+  if (/^xl\/(comments|threadedComments)/i.test(name)) return { families: [XML_FAMILIES.comment] }
   if (/^xl\/(charts|drawings)\//i.test(name)) return { families: [XML_FAMILIES.drawing] }
   return {}
 }
