@@ -6,7 +6,6 @@ import {
   mkdtemp,
   readdir,
   readFile,
-  rename,
   rm,
   stat,
   writeFile,
