@@ -47,7 +47,8 @@
     "vite": "^7.3.1",
     "vitest": "^4.1.11",
     "@genoffice/report-writer": "*",
-    "@genoffice/work-wiki": "*"
+    "@genoffice/work-wiki": "*",
+    "@genoffice/team-templates": "*"
   },
   "author": "GenOffice",
   "build": {

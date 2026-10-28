@@ -51,7 +51,8 @@
     "vitest": "^4.1.11",
     "@genoffice/file-parse": "*",
     "@genoffice/work-wiki": "*",
-    "@genoffice/doc-mask": "*"
+    "@genoffice/doc-mask": "*",
+    "@genoffice/team-templates": "*"
   },
   "author": "GenOffice"
 }
