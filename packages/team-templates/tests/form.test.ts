@@ -116,3 +116,12 @@ describe('docxTexts', () => {
     expect(texts).toContain('머리글 문구')
   })
 })
+
+describe('headerFooterTexts', () => {
+  it('maps each header/footer part to its text', async () => {
+    const { headerFooterTexts } = await import('../src/form')
+    expect(await headerFooterTexts(await makeDocx(ODA_BLOCKS, { header: '가나다컨설팅 제안서' }))).toEqual({
+      'word/header1.xml': '가나다컨설팅 제안서',
+    })
+  })
+})

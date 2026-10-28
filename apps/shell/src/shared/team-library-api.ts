@@ -38,8 +38,65 @@ export type TeamErrorCode =
   | 'not-maskable'
   /** an embedded object the masker cannot open, or a number left after masking */
   | 'masking-failed'
+  /** a template still holds words of the document it was made from (detail: the line) */
+  | 'source-words'
+  /** another member replaced or removed the template meanwhile */
+  | 'changed'
+  /** the AI could not draft the template definition */
+  | 'draft-failed'
+  /** template.md does not parse or does not match its form (detail: why) */
+  | 'invalid-template'
+  /** the template's folder is gone; the list was repaired */
+  | 'moved'
 
-export type TeamResult<T> = { ok: true; value: T } | { ok: false; error: TeamErrorCode }
+export type TeamResult<T> =
+  { ok: true; value: T } | { ok: false; error: TeamErrorCode; detail?: string }
+
+/** one template set as the 팀 템플릿 list shows it */
+export interface TeamTemplateSet {
+  /** relative to the templates folder, with a trailing slash: `Word/KOICA-ODA-기술제안서/` */
+  path: string
+  title: string
+  kind: string
+  purpose: string
+  /** computed when read: the form changed since the md was written, or a file is missing */
+  status: 'ok' | 'stale-md' | 'broken'
+  hash8: string
+}
+
+export interface TeamTemplateList {
+  sets: TeamTemplateSet[]
+  /** files in the templates folder that are not in a set (the 0.5.7 layout) */
+  loose: TeamLibraryEntry[]
+  /** this member can write to the templates folder */
+  writable: boolean
+  /** the index did not match the folders and was repaired (in memory when not writable) */
+  repaired: boolean
+}
+
+export interface TeamTemplateCandidate {
+  /** the group's signature hash */
+  key: string
+  /** newest first; docs[0] is the representative */
+  docs: Array<{ id: string; name: string; mtimeMs: number }>
+  /** false when headings were guessed */
+  certain: boolean
+  /** the set that already has this form */
+  coveredBy?: string
+}
+
+export interface TeamTemplateDraftView {
+  draftId: string
+  /** template.md as drafted; the reviewer edits it */
+  markdown: string
+  formHeadings: string[]
+  headerFooter: Record<string, string>
+  coverLabels: string[]
+  /** the set this draft replaces (다시 만들기) */
+  replaces?: string
+}
+
+export type TeamTemplateSource = { candidateKey: string; docId?: string } | { loose: string }
 
 export interface TeamLibraryList {
   entries: TeamLibraryEntry[]

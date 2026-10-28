@@ -148,6 +148,26 @@ export function teamError(lang: string, code: TeamErrorCode): string {
       'Not sent: the document has an embedded object or a number that could not be masked.',
       '보내지 않음: 문서 안에 가릴 수 없는 첨부 개체나 번호가 있습니다.',
     ],
+    'source-words': [
+      'Cannot confirm: words of the original document remain: ',
+      '원본 문서의 문장이 남아 있어 확정할 수 없습니다: ',
+    ],
+    changed: [
+      'Another member changed this template first. Refresh the list and try again.',
+      '다른 사람이 먼저 이 템플릿을 바꿨습니다. 목록을 새로 고친 뒤 다시 시도하세요.',
+    ],
+    'draft-failed': [
+      'The AI could not draft the template definition. Try again.',
+      'AI가 템플릿 정의를 만들지 못했습니다. 다시 시도하세요.',
+    ],
+    'invalid-template': [
+      'The template definition is not valid: ',
+      '템플릿 정의가 올바르지 않습니다: ',
+    ],
+    moved: [
+      'This template was moved or deleted. The list has been refreshed.',
+      '이 템플릿이 옮겨졌거나 삭제되었습니다. 목록을 새로 고쳤습니다.',
+    ],
   }
   return errors[code][lang === 'ko' ? 1 : 0]
 }

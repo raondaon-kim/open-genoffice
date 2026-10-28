@@ -125,8 +125,11 @@ export async function localTeamDocuments(
 }
 
 export class TeamLibraryError extends Error {
-  constructor(readonly code: TeamErrorCode) {
-    super(code)
+  constructor(
+    readonly code: TeamErrorCode,
+    readonly detail?: string,
+  ) {
+    super(detail ? `${code}: ${detail}` : code)
   }
 }
 
@@ -134,7 +137,11 @@ export async function teamResult<T>(run: () => Promise<T>): Promise<TeamResult<T
   try {
     return { ok: true, value: await run() }
   } catch (error) {
-    if (error instanceof TeamLibraryError) return { ok: false, error: error.code }
+    if (error instanceof TeamLibraryError) {
+      return error.detail
+        ? { ok: false, error: error.code, detail: error.detail }
+        : { ok: false, error: error.code }
+    }
     const code = (error as NodeJS.ErrnoException)?.code
     return {
       ok: false,

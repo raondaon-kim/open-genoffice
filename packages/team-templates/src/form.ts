@@ -272,3 +272,19 @@ export async function docxTexts(bytes: Uint8Array): Promise<string[]> {
 }
 
 export { tableRows }
+
+/** each header/footer part with text → that text (paragraphs joined by a space) */
+export async function headerFooterTexts(bytes: Uint8Array): Promise<Record<string, string>> {
+  const parts = await loadDocx(bytes)
+  const out: Record<string, string> = {}
+  for (const name of Object.keys(parts.zip.files).sort()) {
+    if (!/^word\/(header|footer)\d*\.xml$/.test(name)) continue
+    const xml = await parts.zip.file(name)!.async('string')
+    const text = [...xml.matchAll(/<w:p[ >][\s\S]*?<\/w:p>/g)]
+      .map((m) => textOf(m[0]).trim())
+      .filter(Boolean)
+      .join(' ')
+    if (text) out[name] = text
+  }
+  return out
+}
