@@ -12,6 +12,7 @@ import { createHash } from 'node:crypto'
 import { XMLParser } from 'fast-xml-parser'
 import type { SlideSize } from './types'
 import { asXmlNode, xmlArray } from './xml-utils'
+import { canonicalizeOoxmlPrefixes } from './ooxml-prefixes'
 
 const relsParser = new XMLParser({
   ignoreAttributes: false,
@@ -61,6 +62,18 @@ export function assertZipWithinLimits(zip: JSZip): void {
   }
 }
 
+/**
+ * An XML part written with non-standard namespace prefixes (<ns0:presentation …>, as
+ * Python's ElementTree saves it) gets the standard ones, so every reader below finds
+ * 'p:sldId' / 'Relationship'. Parts already standard keep their original bytes.
+ */
+function standardPrefixes(name: string, bytes: Uint8Array): Uint8Array {
+  if (!/\.(xml|rels)$/i.test(name)) return bytes
+  const xml = Buffer.from(bytes).toString('utf8')
+  const fixed = canonicalizeOoxmlPrefixes(xml)
+  return fixed === xml ? bytes : new Uint8Array(Buffer.from(fixed, 'utf8'))
+}
+
 export class PackageArchive {
   private constructor(
     private readonly zip: JSZip,
@@ -82,7 +95,7 @@ export class PackageArchive {
     for (const name of names) {
       const file = zip.files[name]
       if (file.dir) continue
-      entries.set(name, await file.async('uint8array'))
+      entries.set(name, standardPrefixes(name, await file.async('uint8array')))
     }
     return new PackageArchive(zip, entries, originalHash)
   }

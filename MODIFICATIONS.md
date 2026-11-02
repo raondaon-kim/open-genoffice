@@ -151,6 +151,12 @@ The fork's material changes on top of upstream:
   goes to columns with longer lines). A table whose longest words do not fit at 11 pt is written
   in 9 pt, so a 14-column schedule keeps one-line month headers and readable task names instead
   of stacking them one syllable per line. Grid and size are saved into the .docx as written.
+- **Decks with non-standard namespace prefixes open** (`packages/pptx-engine/src/ooxml-prefixes.ts`):
+  a deck re-saved by a script such as Python's ElementTree names its namespaces `ns0:`, `ns1:`…
+  instead of `p:`, `a:`, `r:` (and prefixes the package relationships), which PowerPoint accepts
+  but the engine, reading qualified names, rejected as "malformed presentation.xml". On open every
+  XML part that uses such prefixes is rewritten to the standard ones (only when the rename is
+  unambiguous); parts already standard keep their original bytes.
 - **Team templates and team documents on a NAS** (`apps/shell/src/main/team-library.ts`,
   `team-sync.ts`, `team-library-ipc.ts`, Home `TeamLibrary.tsx`): two Home spaces over folders
   the user picks on a share already connected in Explorer/Finder (no NAS password is stored).
