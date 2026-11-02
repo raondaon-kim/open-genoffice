@@ -40,6 +40,7 @@ import type { QuickLookPayload } from '../../shared/quick-look-api'
 import { TeamLibrary } from './TeamLibrary'
 import { teamStrings } from './team-library-strings'
 import type { TeamLibraryKind } from '../../shared/team-library-api'
+import { OPEN_LOCAL_EXTENSIONS } from './open-local-extensions'
 
 declare global {
   interface Window {
@@ -74,12 +75,6 @@ const FILE_ICONS: Record<string, string> = {
   hwp: iconHwp,
   hwpx: iconHwp,
 }
-
-/* Formats the open-local card advertises. Too long for the card at any window
-   width, so it ellipsizes and a hover ScreenTip carries the full list. Keep in
-   sync with the main-process open-dialog filter (OPEN_DIALOG_EXTENSIONS). */
-const OPEN_LOCAL_EXTENSIONS =
-  '.docx / .xlsx / .xlsm / .xls / .csv / .tsv / .pptx / .pdf / .md / .html'
 
 /** drag payload of home file/folder rows (JSON array of absolute paths) */
 const DRAG_PATHS_MIME = 'application/x-genoffice-paths'

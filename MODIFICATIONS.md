@@ -29,6 +29,9 @@ The fork's material changes on top of upstream:
   existing file in a session, refuses bytes that are not the format the file name says, and
   checks the Hangul 2005 re-pack (compound file, deflate streams, CRC32 + size trailers) before
   writing it, falling back to the bytes rhwp wrote if it does not check out.
+  The installer registers `.hwp`/`.hwpx` (our own ProgId "Hangul Document", never Hancom's
+  `Hwp.Document.*`, with a document icon from `file-hwp.svg`), so GenOffice is offered for a
+  double-clicked Hangul file; the home "Open Local File" card lists both extensions.
 - **Document-style wiki** (`packages/doc-styles`, pages in
   `apps/hwp/resources/doc-styles`, packaged as `modules/hwp-doc-styles`):
   markdown pages with measured role values for Hangul, Word and PowerPoint

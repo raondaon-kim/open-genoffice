@@ -597,6 +597,22 @@ const config = {
       icon: 'html',
       mimeType: 'text/html',
     },
+    {
+      // the hwp module opens both Hangul formats. The ProgId (name) is our own,
+      // so it never overwrites Hancom Office's Hwp.Document.* classes
+      ext: 'hwp',
+      name: 'Hangul Document',
+      role: 'Editor',
+      icon: 'hwp',
+      mimeType: 'application/x-hwp',
+    },
+    {
+      ext: 'hwpx',
+      name: 'Hangul Document',
+      role: 'Editor',
+      icon: 'hwp',
+      mimeType: 'application/hwp+zip',
+    },
   ],
   npmRebuild: false,
   mac: {
