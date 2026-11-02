@@ -3,7 +3,8 @@
  *
  * An equal split stays when every column's longest line fits its equal share: short tables look
  * as they always did. Otherwise the widths follow the browser's automatic table layout, in em of
- * a 10 pt face on a 6.5 in text column (the grid generateTableModelXml writes):
+ * an 11 pt face (a blank Word document's body size; a smaller face only gains room) on a 6.5 in
+ * text column (the grid generateTableModelXml writes):
  * - every column first gets its min-content, the longest word (a word never splits, so a task name
  *   does not stack one syllable per line);
  * - room left over goes to columns whose longest line is wider than that, in proportion to how
@@ -11,10 +12,10 @@
  * - when even the min-contents overflow, the columns share the width in proportion to them.
  */
 
-/** 9360 twips (6.5 in) at 10 pt = 200 twips per em */
-const TABLE_EM = 46.8
-/** Word's default cell margins (108 twips a side) */
-const CELL_PAD_EM = 1.1
+/** 9360 twips (6.5 in) at 11 pt = 220 twips per em */
+const TABLE_EM = 9360 / 220
+/** Word's default cell margins: 108 twips a side */
+const CELL_PAD_EM = 216 / 220
 /** a single long token (a URL) cannot claim more than this share of the table */
 const MAX_WORD_EM = TABLE_EM / 2
 
@@ -67,7 +68,9 @@ export function contentColumnPcts(rows: string[][]): number[] {
     const want = maxSum - minSum
     em = min.map((m, c) => m + ((max[c] - m) / want) * room)
   }
-  const pct = em.map((w) => Math.round((w / TABLE_EM) * 10000) / 100)
-  pct[cols - 1] = Math.round((100 - total(pct.slice(0, -1))) * 100) / 100
+  // round up so no column falls a hair under its min-content; the widest column pays the excess
+  const pct = em.map((w) => Math.ceil((w / TABLE_EM) * 10000) / 100)
+  const widest = pct.indexOf(Math.max(...pct))
+  pct[widest] = Math.round((pct[widest] - (total(pct) - 100)) * 100) / 100
   return pct
 }

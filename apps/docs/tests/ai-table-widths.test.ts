@@ -30,6 +30,18 @@ describe('column widths of an AI-written table', () => {
     expect(pct[0]).toBeGreaterThan(2 * month)
   })
 
+  it('never squeeze a month header below one line at 11 pt (the blank document body size)', () => {
+    // estimate independent of the module: Hangul 1 em, digit 0.55 em, Word's default cell
+    // margins 108 twips a side, a 6.5 in text column = 9360 twips, all at 11 pt = 220 twips/em
+    const tableEm = 9360 / 220
+    const padEm = 216 / 220
+    const pct = contentColumnPcts(GANTT)
+    MONTHS.forEach((label, i) => {
+      const needEm = (label.length - 1) * 0.55 + 1 + padEm
+      expect(pct[i + 1], label).toBeGreaterThanOrEqual((needEm / tableEm) * 100)
+    })
+  })
+
   it('keep the equal split when every column already fits its equal share', () => {
     const pct = contentColumnPcts([
       ['Metric', 'Value', 'Change'],
