@@ -148,8 +148,9 @@ The fork's material changes on top of upstream:
 - **Column widths of AI tables follow their text** (`apps/docs/src/renderer/ai/table-widths.ts`):
   a table the Word AI writes keeps the equal split when every column fits it, and otherwise
   sizes columns like a browser's automatic table layout (each gets its longest word, the rest
-  goes to columns with longer lines), so a 14-column schedule no longer stacks its task names
-  one syllable per line. The grid is saved into the .docx as written.
+  goes to columns with longer lines). A table whose longest words do not fit at 11 pt is written
+  in 9 pt, so a 14-column schedule keeps one-line month headers and readable task names instead
+  of stacking them one syllable per line. Grid and size are saved into the .docx as written.
 - **Team templates and team documents on a NAS** (`apps/shell/src/main/team-library.ts`,
   `team-sync.ts`, `team-library-ipc.ts`, Home `TeamLibrary.tsx`): two Home spaces over folders
   the user picks on a share already connected in Explorer/Finder (no NAS password is stored).
