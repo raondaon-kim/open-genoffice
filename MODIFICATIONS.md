@@ -145,6 +145,11 @@ The fork's material changes on top of upstream:
 - **Reports without the AI-change highlight:** `write_report` in Word lands its paragraphs
   without the yellow AI-change highlight, which suits short edits but covered the whole document
   while a report was written.
+- **Column widths of AI tables follow their text** (`apps/docs/src/renderer/ai/table-widths.ts`):
+  a table the Word AI writes keeps the equal split when every column fits it, and otherwise
+  sizes columns like a browser's automatic table layout (each gets its longest word, the rest
+  goes to columns with longer lines), so a 14-column schedule no longer stacks its task names
+  one syllable per line. The grid is saved into the .docx as written.
 - **Team templates and team documents on a NAS** (`apps/shell/src/main/team-library.ts`,
   `team-sync.ts`, `team-library-ipc.ts`, Home `TeamLibrary.tsx`): two Home spaces over folders
   the user picks on a share already connected in Explorer/Finder (no NAS password is stored).

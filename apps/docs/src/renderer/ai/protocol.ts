@@ -17,6 +17,7 @@ import { blockRangePositions, isTrackedDeleted, liveText } from './doc-utils'
 import { opSignatures } from './ops'
 import { pageSetupContextLines, type AiSectionState } from './page-setup'
 import { listRevisionEntries } from './revision-ops'
+import { contentColumnPcts } from './table-widths'
 
 export { blockRangePositions, isTrackedDeleted, liveText }
 
@@ -981,11 +982,14 @@ function parseTable(el: Element): PmNode | null {
       row.push({ paras: [''], ...(isHeader ? { bold: true, fill: TABLE_HEADER_FILL } : {}) })
     return row
   })
-  // equal column grid, like the ribbon insert and the save-path backfill
-  // (pmTableToModel): without colWidthsPct the table renders with no <colgroup>,
-  // leaving the fixed-layout column grid to the browser — fragile against
-  // spanning pagination widgets and different from what a save/reload shows
-  const table: TableModel = { rows, colWidthsPct: Array.from({ length: cols }, () => 100 / cols) }
+  // an explicit column grid: without colWidthsPct the table renders with no <colgroup>,
+  // leaving the fixed-layout column grid to the browser — fragile against spanning
+  // pagination widgets and different from what a save/reload shows. The grid follows the
+  // cell texts (equal when everything fits), so a wide schedule keeps a readable first column
+  const table: TableModel = {
+    rows,
+    colWidthsPct: contentColumnPcts(rows.map((row) => row.map((cell) => cell.paras.join('\n')))),
+  }
   return tableModelToPmNode(table)
 }
 

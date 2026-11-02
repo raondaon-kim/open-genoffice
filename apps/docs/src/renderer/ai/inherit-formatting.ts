@@ -526,7 +526,8 @@ export function inheritTableFormatting(
     blockRevision: null,
   }
   if (!exact && !sameGrid) {
-    // the old column grid no longer applies; the parser's equal split does
+    // the old column grid no longer applies; the parser's grid (equal unless a column's text
+    // needs more room, see table-widths.ts) does
     attrs.colWidthsPct = next.attrs?.colWidthsPct ?? null
     attrs.widthPx = next.attrs?.widthPx ?? null
   }
